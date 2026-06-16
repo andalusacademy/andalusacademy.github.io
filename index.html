@@ -2577,17 +2577,20 @@ function renderStudentFinance(s, container) {
         lateFeeHtml = `<span class="badge badge-gray" style="font-size:10px" title="${escapeHtml(rec.exemption_reason || '')}">مستثنى</span>
           <button class="btn btn-outline btn-sm" style="font-size:10px;padding:2px 5px;margin-right:3px" onclick="unExemptLateFee('${s.id}','${type}')">رفع</button>`;
       } else {
+        // أوتوماتيك: إذا تم الدفع بعد يوم 5 من نفس الشهر -> يتم تفعيل "دُفعت" تلقائياً
+        const paidOnTime = rec.paid && paidDate && paidDate <= cutoff;
+        const autoChecked = rec.late_fee_paid || (rec.paid && !paidOnTime);
         lateFeeHtml = `<div style="display:flex;flex-direction:column;gap:3px">
-          <span class="badge badge-danger" style="font-size:10px">غرامة ${lateFeeAmt} ج</span>
-          <div style="display:flex;gap:3px;flex-wrap:wrap">
-            <label style="font-size:10px;cursor:pointer"><input type="checkbox" ${rec.late_fee_paid ? 'checked' : ''} onchange="toggleLateFee('${s.id}','${type}',this.checked)"> دُفعت</label>
+          <span class="badge badge-danger" style="font-size:10px" title="غرامة ${lateFeeAmt} ج تُطبَّق تلقائياً عند الدفع بعد يوم 5">⚡ غرامة ${lateFeeAmt} ج</span>
+          <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center">
+            <label style="font-size:10px;cursor:pointer;background:${autoChecked && !rec.late_fee_paid ? '#fef3c7' : 'transparent'};padding:1px 4px;border-radius:4px"><input type="checkbox" ${autoChecked ? 'checked' : ''} onchange="toggleLateFee('${s.id}','${type}',this.checked)"> ${autoChecked && !rec.late_fee_paid ? 'دُفعت (تلقائي)' : 'دُفعت'}</label>
             <button class="btn btn-outline btn-sm" style="font-size:10px;padding:1px 5px" onclick="exemptLateFee('${s.id}','${type}')">استثناء</button>
           </div>
         </div>`;
       }
     }
 
-    const payDateInput = `<input type="date" class="pay-date-input" id="paydate_${type.replace(/[^a-zA-Z0-9]/g, '_')}" value="${escapeHtml(rec.paid_date || todayStr)}" style="width:120px">`;
+    const payDateInput = `<input type="date" class="pay-date-input" id="paydate_${type.replace(/[^a-zA-Z0-9]/g, '_')}" value="${escapeHtml(rec.paid_date || '')}" placeholder="اختر التاريخ" onchange="toggleRegisterBtn('${type}')" style="width:120px">`;
 
     const waPhone = s.phone || s.guardian_phone;
     const waMsg = waPhone ? waLink(waPhone, `السلام عليكم ورحمة الله\nنُحيطكم علمًا بأنه تم استلام دفعة "${label}" بتاريخ ${rec.paid_date || todayStr} للمتدرب/ة ${s.name}\nمركز الاندلس للتدريب`) : '';
@@ -2603,7 +2606,7 @@ function renderStudentFinance(s, container) {
         </div>`
       : `<div style="display:flex;flex-direction:column;gap:5px">
           ${payDateInput}
-          <button class="btn btn-success btn-sm" style="font-size:12px" onclick="registerPayment('${s.id}','${type}','paydate_${type.replace(/[^a-zA-Z0-9]/g, '_')}')">💵 تسجيل الدفع</button>
+          <button class="btn btn-success btn-sm" id="regbtn_${type.replace(/[^a-zA-Z0-9]/g, '_')}" style="font-size:12px" onclick="registerPayment('${s.id}','${type}','paydate_${type.replace(/[^a-zA-Z0-9]/g, '_')}')" disabled>💵 تسجيل الدفع</button>
         </div>`;
 
     const notesCell = `<input type="text" class="pay-date-input" style="width:120px" value="${escapeHtml(rec.label || '')}" placeholder="ملاحظة..." onchange="updatePayLabel('${s.id}','${type}',this.value)">`;
@@ -2634,8 +2637,8 @@ function renderStudentFinance(s, container) {
         </div>
       </div>`
     : `<div style="display:flex;flex-direction:column;gap:5px">
-        <input type="date" class="pay-date-input" id="${engDueId}" value="${escapeHtml(engRec.paid_date || todayStr)}" style="width:120px">
-        <button class="btn btn-success btn-sm" style="font-size:12px" onclick="registerPayment('${s.id}','كورس_انجليزى','${engDueId}')">💵 تسجيل الدفع</button>
+        <input type="date" class="pay-date-input" id="${engDueId}" value="${escapeHtml(engRec.paid_date || '')}" placeholder="اختر التاريخ" onchange="toggleRegisterBtnEng()" style="width:120px">
+        <button class="btn btn-success btn-sm" id="regbtn_eng" style="font-size:12px" onclick="registerPayment('${s.id}','كورس_انجليزى','${engDueId}')" disabled>💵 تسجيل الدفع</button>
       </div>`;
 
   function extraRowHtml(rec) {
@@ -2723,11 +2726,13 @@ function renderStudentFinance(s, container) {
         </table>
       </div>
     </div>`;
+  setTimeout(reEnableRegisterBtns, 50);
 }
 
 async function registerPayment(studentId, type, dateInputId) {
   const dateEl = document.getElementById(dateInputId);
-  const paidDate = dateEl ? dateEl.value : new Date().toISOString().split('T')[0];
+  const paidDate = dateEl ? dateEl.value : '';
+  if (!paidDate) { showToast('⚠️ اختر تاريخ الدفع أولاً', 'error'); return; }
   const updates = { paid: true, paid_date: paidDate };
   await sb.from('payments').update(updates).eq('student_id', studentId).eq('payment_type', type);
   if (!allPayments[studentId]) allPayments[studentId] = {};
@@ -2786,7 +2791,30 @@ function openPayItem(studentId) {
   document.getElementById('pi-amount').value = '';
   document.getElementById('pi-kind').value = 'عادي';
   document.getElementById('pi-date').value = new Date().toISOString().split('T')[0];
+  const noteEl = document.getElementById('pi-note');
+  if (noteEl) { noteEl.value = 'تم الإضافة في ' + new Date().toLocaleDateString('ar-EG'); }
   document.getElementById('modal-payitem').classList.add('open');
+}
+
+function toggleRegisterBtn(type) {
+  const safe = type.replace(/[^a-zA-Z0-9]/g, '_');
+  const dateEl = document.getElementById('paydate_' + safe);
+  const btnEl = document.getElementById('regbtn_' + safe);
+  if (dateEl && btnEl) btnEl.disabled = !dateEl.value;
+}
+function toggleRegisterBtnEng() {
+  const dateEl = document.getElementById('paydate_kors_eng');
+  const btnEl = document.getElementById('regbtn_eng');
+  if (dateEl && btnEl) btnEl.disabled = !dateEl.value;
+}
+function reEnableRegisterBtns() {
+  document.querySelectorAll('input.pay-date-input[type=date]').forEach(inp => {
+    if (inp.id && inp.id.startsWith('paydate_')) {
+      const safe = inp.id.replace('paydate_', '');
+      const btn = document.getElementById('regbtn_' + safe);
+      if (btn) btn.disabled = !inp.value;
+    }
+  });
 }
 
 async function savePaymentItem() {
@@ -2798,16 +2826,20 @@ async function savePaymentItem() {
   if (amount < 0) { showToast('القيمة يجب أن تكون موجبة', 'error'); return; }
   const type = (kind === 'خصم' ? 'discount_' : 'extra_') + Date.now();
   const note = document.getElementById('pi-note')?.value || '';
+  // Auto-fill label with kind and date for traceability
+  const autoLabel = (label || 'بند') + ' [' + (kind === 'خصم' ? 'خصم' : 'إضافة') + ' - ' + date + ']';
+  const autoNote = (note ? note + ' | ' : '') + 'أضيف بواسطة ' + (currentUser?.full_name || currentUser?.username || 'النظام') + ' في ' + new Date().toLocaleDateString('ar-EG');
   const { error } = await sb.from('payments').insert({
-    student_id: currentProfileId, payment_type: type, label, amount, due_date: date,
-    is_discount: kind === 'خصم', applicable: true, notes: note, created_by: currentAuth.id
+    student_id: currentProfileId, payment_type: type, label: autoLabel, amount, due_date: date,
+    is_discount: kind === 'خصم', applicable: true, notes: autoNote, created_by: currentAuth.id
   });
   if (error) { showToast('خطأ في الحفظ', 'error'); return; }
   if (!allPayments[currentProfileId]) allPayments[currentProfileId] = {};
-  allPayments[currentProfileId][type] = { payment_type: type, label, amount, due_date: date, is_discount: kind === 'خصم', applicable: true };
+  allPayments[currentProfileId][type] = { payment_type: type, label: autoLabel, amount, due_date: date, is_discount: kind === 'خصم', applicable: true, notes: autoNote };
   closeModal('modal-payitem');
   const s = allStudents.find(x => x.id === currentProfileId);
   if (s) renderStudentFinance(s, document.getElementById('finance-content'));
+  setTimeout(reEnableRegisterBtns, 50);
   updatePayStats();
   showToast('✅ تم إضافة البند');
 }
