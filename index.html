@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مركز الأندلس للتدريب v3.1</title>
+<meta name="theme-color" content="#0f766e">
+<!-- 
+IMPORTANT: This file must be served via HTTP/HTTPS server, not file://
+file:// URLs are treated as unique security origins and will break CORS, Supabase, and some JS features.
+Use: npx serve . or python -m http.server
+-->
+<!-- Fixed Manifest: Valid JSON base64 -->
+<link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogItmB2YPZhiDYp9mE2KfYqiDZhNmE2KfYsdi02KfYryIsCiAgInNob3J0X25hbWUiOiAi2KfZhNmF2KfYr9ipIiwKICAic3RhcnRfdXJsIjogIi8iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwZjc2NmUiLAogICJ0aGVtZV9jb2xvciI6ICIjMGY3NjZlIiwKICAiaWNvbnMiOiBbXQp9">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Tailwind CDN: For development only. For production, use Tailwind CLI or PostCSS build -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+<style>
+  :root {
+    --primary: #0f766e;
+    --primary-dark: #0c5d56;
+    --secondary: #f59e0b;
+    --success: #10b981;
+    --danger: #ef4444;
+    --bg: #f8fafc;
+    --card: #ffffff;
+  }
+  *{font-family: 'Cairo', sans-serif;}
+  body{background: var(--bg); color: #1e293b;}
+  .sidebar-item{transition: all .2s ease;}
+  .sidebar-item:hover{background: rgba(15,118,110,0.08); transform: translateX(-4px);}
+  .sidebar-item.active{background: linear-gradient(90deg, rgba(15,118,110,0.15) 0%, transparent 100%); border-right: 4px solid var(--primary); font-weight: 700;}
+  .card{background: var(--card); border-radius: 16px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05); transition: all .3s ease;}
+  .card:hover{box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);}
+  .btn{transition: all .2s ease; font-weight: 600;}
+  .btn:active{transform: scale(.97);}
+  .btn-primary{background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white;}
+  .btn-primary:hover{filter: brightness(1.1);}
+  .input{border: 2px solid #e2e8f0; transition: all .2s;}
+  .input:focus{border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(15,118,110,0.1);}
+  .badge{padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;}
+  .badge-success{background: #d1fae5; color: #065f46;}
+  .badge-danger{background: #fee2e2; color: #991b1b;}
+  .badge-warning{background: #fef3c7; color: #92400e;}
+  .modal-backdrop{background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);}
+  .animate-slide-up{animation: slideUp .3s ease;}
+  @keyframes slideUp{from{opacity:0; transform: translateY(20px);} to{opacity:1; transform: translateY(0);}}
+  .calendar-day{aspect-ratio: 1; cursor: pointer; transition: all .2s;}
+  .calendar-day:hover{background: rgba(15,118,110,0.1);}
+  .calendar-day.active{background: var(--primary); color: white;}
+  .cert-canvas{position: relative; overflow: hidden; border: 2px dashed #cbd5e1; border-radius: 12px;}
+  .draggable-name{position: absolute; cursor: move; user-select: none; font-size: 24px; font-weight: 700; color: #1e293b; padding: 8px 16px; background: rgba(255,255,255,0.8); border-radius: 8px;}
+  .table-wrap{overflow-x: auto;}
+  table{min-width: 600px;}
+  @media (max-width: 390px) {
+    .mobile-stack{flex-direction: column;}
+    .mobile-full{width: 100%;}
+    .text-mobile{font-size: 14px;}
+    h1{font-size: 1.5rem;}
+    .hide-mobile{display: none;}
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+<div id="authScreen" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-teal-50 to-cyan-50">
+  <div class="card p-8 w-full max-w-md animate-slide-up">
+    <div class="text-center mb-6">
+      <div class="w-20 h-20 bg-gradient-to-br from-teal-600 to-cyan-600 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
+        <!-- Fixed SVG: Valid path -->
+        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.5v11m0-11c-1.5-1-3.5-1.5-5.5-1.5s-4 0.5-5.5 1.5v11c1.5-1 3.5-1.5 5.5-1.5s4 0.5 5.5 1.5m0-11c1.5-1 3.5-1.5 5.5-1.5s4 0.5 5.5 1.5v11c-1.5-1-3.5-1.5-5.5-1.5s-4 0.5-5.5 1.5"></path></svg>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-800">مركز الأندلس للتدريب</h1>
+      <p class="text-gray-500 text-sm mt-1">نظام إدارة مساعد خدمات صحية</p>
+    </div>
+    <div class="space-y-4">
+      <input type="email" id="loginEmail" class="input w-full px-4 py-3 rounded-xl" placeholder="البريد الإلكتروني">
+      <input type="password" id="loginPassword" class="input w-full px-4 py-3 rounded-xl" placeholder="كلمة المرور">
+      <button onclick="handleLogin()" class="btn btn-primary w-full py-3 rounded-xl">تسجيل الدخول</button>
+    </div>
+    <div class="mt-4 p-3 bg-amber-50 rounded-lg text-xs text-amber-800">
+      ⚠️ يجب تشغيل الملف من سيرفر محلي http:// وليس file://
+    </div>
+  </div>
+</div>
+
+<div id="appScreen" class="hidden min-h-screen">
+  <div class="flex flex-col md:flex-row">
+    <aside class="md:w-64 bg-white border-l md:border-l-0 md:border-r border-gray-200 md:min-h-screen fixed md:sticky top-0 z-40 md:z-10 w-full md:w-64">
+      <div class="p-6 border-b border-gray-200">
+        <h2 class="text-xl font-bold text-teal-700">مركز الأندلس</h2>
+        <p class="text-xs text-gray-500 mt-1">مساعد خدمات صحية v3.1</p>
+      </div>
+      <nav class="p-4 space-y-1">
+        <button onclick="showSection('dashboard')" class="sidebar-item active w-full text-right px-4 py-3 rounded-lg flex items-center gap-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+          <span>الرئيسية</span>
+        </button>
+        <button onclick="showSection('students')" class="sidebar-item w-full text-right px-4 py-3 rounded-lg flex items-center gap-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+          <span>الطلاب</span>
+        </button>
+        <button onclick="showSection('schedule')" class="sidebar-item w-full text-right px-4 py-3 rounded-lg flex items-center gap-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          <span>جدول المحاضرات</span>
+        </button>
+        <button onclick="showSection('subjects')" class="sidebar-item w-full text-right px-4 py-3 rounded-lg flex items-center gap-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.5v11m0-11c-1.5-1-3.5-1.5-5.5-1.5s-4 0.5-5.5 1.5v11c1.5-1 3.5-1.5 5.5-1.5s4 0.5 5.5 1.5m0-11c1.5-1 3.5-1.5 5.5-1.5s4 0.5 5.5 1.5v11c-1.5-1-3.5-1.5-5.5-1.5s-4 0.5-5.5 1.5"></path></svg>
+          <span>المواد الدراسية</span>
+        </button>
+        <button onclick="showSection('exams')" class="sidebar-item w-full text-right px-4 py-3 rounded-lg flex items-center gap-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+          <span>الامتحانات والدرجات</span>
+        </button>
+        <button onclick="showSection('fees')" class="sidebar-item w-full text-right px-4 py-3 rounded-lg flex items-center gap-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+          <span>المصروفات</span>
+        </button>
+        <button onclick="showSection('certificates')" class="sidebar-item w-full text-right px-4 py-3 rounded-lg flex items-center gap-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 0 01-3.138 3.138 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+          <span>الشهادات</span>
+        </button>
+        <button onclick="showSection('reports')" class="sidebar-item w-full text-right px-4 py-3 rounded-lg flex items-center gap-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+          <span>التقارير</span>
+        </button>
+        <div class="pt-4 mt-4 border-t border-gray-200">
+          <button onclick="handleLogout()" class="sidebar-item w-full text-right px-4 py-3 rounded-lg flex items-center gap-3 text-red-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+            <span>تسجيل الخروج</span>
+          </button>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="flex-1 p-4 md:p-8 md:mr-64 mt-16 md:mt-0">
+      <header class="mb-6 flex justify-between items-center">
+        <div>
+          <h1 id="sectionTitle" class="text-2xl md:text-3xl font-bold text-gray-800">الرئيسية</h1>
+          <p id="gregorianDate" class="text-gray-500 text-sm"></p>
+          <p id="hijriDate" class="text-teal-600 text-sm font-semibold"></p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-left hide-mobile">
+            <p class="text-sm font-semibold" id="userName">مستخدم</p>
+            <p class="text-xs text-gray-500" id="userRole">مدير</p>
+          </div>
+        </div>
+      </header>
+
+      <section id="dashboardSection" class="section space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="card p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm">إجمالي الطلاب</p>
+                <p class="text-3xl font-bold mt-2" id="totalStudents">0</p>
+              </div>
+              <div class="w-14 h-14 bg-teal-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+              </div>
+            </div>
+          </div>
+          <div class="card p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm">المحاضرات اليوم</p>
+                <p class="text-3xl font-bold mt-2" id="todayLectures">0</p>
+              </div>
+              <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </div>
+            </div>
+          <div class="card p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm">إجمالي التحصيل</p>
+                <p class="text-3xl font-bold mt-2" id="totalRevenue">0 ج.م</p>
+              </div>
+              <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </div>
+            </div>
+          </div>
+          <div class="card p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm">نسبة الحضور</p>
+                <p class="text-3xl font-bold mt-2" id="attendanceRate">0%</p>
+              </div>
+              <div class="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center">
+                <svg class="w-7 h-7 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="card p-6 lg:col-span-1">
+            <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+              حاسبة تفاعلية
+            </h3>
+            <input type="text" id="calcDisplay" class="input w-full px-4 py-4 mb-3 rounded-xl text-left text-2xl font-bold" readonly value="0">
+            <div class="grid grid-cols-4 gap-2">
+              <button onclick="calcClear()" class="btn bg-red-100 text-red-600 py-3 rounded-lg">C</button>
+              <button onclick="calcInput('/')" class="btn bg-gray-100 py-3 rounded-lg">÷</button>
+              <button onclick="calcInput('*')" class="btn bg-gray-100 py-3 rounded-lg">×</button>
+              <button onclick="calcBackspace()" class="btn bg-gray-100 py-3 rounded-lg">⌫</button>
+              <button onclick="calcInput('7')" class="btn bg-white border-2 py-3 rounded-lg">7</button>
+              <button onclick="calcInput('8')" class="btn bg-white border-2 py-3 rounded-lg">8</button>
+              <button onclick="calcInput('9')" class="btn bg-white border-2 py-3 rounded-lg">9</button>
+              <button onclick="calcInput('-')" class="btn bg-gray-100 py-3 rounded-lg">−</button>
+              <button onclick="calcInput('4')" class="btn bg-white border-2 py-3 rounded-lg">4</button>
+              <button onclick="calcInput('5')" class="btn bg-white border-2 py-3 rounded-lg">5</button>
+              <button onclick="calcInput('6')" class="btn bg-white border-2 py-3 rounded-lg">6</button>
+              <button onclick="calcInput('+')" class="btn bg-gray-100 py-3 rounded-lg">+</button>
+              <button onclick="calcInput('1')" class="btn bg-white border-2 py-3 rounded-lg">1</button>
+              <button onclick="calcInput('2')" class="btn bg-white border-2 py-3 rounded-lg">2</button>
+              <button onclick="calcInput('3')" class="btn bg-white border-2 py-3 rounded-lg">3</button>
+              <button onclick="calcEqual()" class="btn btn-primary row-span-2 rounded-lg">=</button>
+              <button onclick="calcInput('0')" class="btn bg-white border-2 py-3 rounded-lg col-span-2">0</button>
+              <button onclick="calcInput('.')" class="btn bg-white border-2 py-3 rounded-lg">.</button>
+            </div>
+          </div>
+
+          <div class="card p-6 lg:col-span-2">
+            <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+              التقويم الميلادي والهجري
+            </h3>
+            <div class="flex items-center justify-between mb-4">
+              <button onclick="changeMonth(-1)" class="btn bg-gray-100 p-2 rounded-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </button>
+              <div class="text-center">
+                <p class="font-bold" id="calendarMonth"></p>
+                <p class="text-sm text-teal-600" id="calendarMonthHijri"></p>
+              </div>
+              <button onclick="changeMonth(1)" class="btn bg-gray-100 p-2 rounded-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+              </button>
+            </div>
+            <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-500 mb-2">
+              <div>ح</div><div>ن</div><div>ث</div><div>ر</div><div>خ</div><div>ج</div><div>س</div>
+            </div>
+            <div class="grid grid-cols-7 gap-1" id="calendarGrid"></div>
+          </div>
+        </div>
+
+        <div class="card p-6">
+          <h3 class="font-bold text-lg mb-4">نظرة عامة على الإيرادات</h3>
+          <canvas id="revenueChart" height="80"></canvas>
+        </div>
+      </section>
+
+      <section id="studentsSection" class="section hidden space-y-6">
+        <div class="flex justify-between items-center mobile-stack gap-4">
+          <div class="flex gap-2 mobile-full">
+            <input type="search" id="studentSearch" class="input px-4 py-2 rounded-xl flex-1" placeholder="بحث بالاسم أو الرقم...">
+          </div>
+          <button onclick="openStudentModal()" class="btn btn-primary px-6 py-2 rounded-xl mobile-full">+ طالب جديد</button>
+        </div>
+        <div class="card p-6">
+          <div class="table-wrap">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">الاسم</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">الهاتف</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">النظام</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">شنطة الأدوات</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">ملف الالتحاق</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">كورس إنجليزي</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="studentsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="scheduleSection" class="section hidden space-y-6">
+        <div class="flex justify-between items-center mobile-stack gap-4">
+          <h2 class="text-xl font-bold">جدول المحاضرات</h2>
+          <div class="flex gap-2 mobile-full">
+            <button onclick="openLectureModal()" class="btn btn-primary px-6 py-2 rounded-xl mobile-full">+ محاضرة جديدة</button>
+            <button onclick="openTaskModal()" class="btn bg-amber-500 text-white px-6 py-2 rounded-xl mobile-full">+ مهمة جديدة</button>
+          </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="scheduleGrid"></div>
+      </section>
+
+      <section id="subjectsSection" class="section hidden space-y-6">
+        <div class="flex justify-between items-center">
+          <h2 class="text-xl font-bold">المواد الدراسية</h2>
+          <button onclick="openSubjectModal()" class="btn btn-primary px-6 py-2 rounded-xl">+ مادة جديدة</button>
+        </div>
+        <div class="card p-6">
+          <div class="table-wrap">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">اسم المادة</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">الكود</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">الساعات</th>
+                  <th class="px-4 py-3 text-right text-sm font-semibold">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="subjectsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="examsSection" class="section hidden space-y-6">
+        <div class="flex justify-between items-center">
+          <h2 class="text-xl font-bold">الامتحانات والدرجات</h2>
+          <button onclick="openExamModal()" class="btn btn-primary px-6 py-2 rounded-xl">+ امتحان جديد</button>
+        </div>
+        <div id="examsList" class="space-y-4"></div>
+      </section>
+
+      <section id="feesSection" class="section hidden space-y-6">
+        <div class="card p-6">
+          <h2 class="text-xl font-bold mb-6">المصروفات والمدفوعات</h2>
+          <div id="selectStudentForFees" class="mb-6">
+            <label class="block text-sm font-semibold mb-2">اختر الطالب</label>
+            <select id="feeStudentSelect" class="input w-full px-4 py-3 rounded-xl" onchange="loadStudentFees()">
+              <option value="">-- اختر طالب --</option>
+            </select>
+          </div>
+          <div id="feesDetails" class="hidden space-y-6"></div>
+        </div>
+      </section>
+
+      <section id="certificatesSection" class="section hidden space-y-6">
+        <div class="card p-6">
+          <h2 class="text-xl font-bold mb-6">إصدار الشهادات</h2>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold mb-2">رفع تصميم الشهادة</label>
+              <input type="file" id="certImageUpload" accept="image/*" class="input w-full px-4 py-3 rounded-xl" onchange="loadCertificateImage(event)">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-2">اختر الطالب</label>
+              <select id="certStudentSelect" class="input w-full px-4 py-3 rounded-xl">
+                <option value="">-- اختر طالب --</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-2">حجم الخط</label>
+              <input type="range" id="fontSizeSlider" min="16" max="72" value="24" class="w-full" oninput="updateFontSize()">
+              <span id="fontSizeValue" class="text-sm text-gray-600">24px</span>
+            </div>
+            <button onclick="generateCertificate()" class="btn btn-primary w-full py-3 rounded-xl">توليد الشهادة</button>
+            <div id="certCanvasContainer" class="cert-canvas hidden" style="height: 500px;">
+              <img id="certImage" class="w-full h-full object-contain" hidden>
+              <canvas id="certCanvas"></canvas>
+              <div id="certNameElement" class="draggable-name" contenteditable="true">اسم الطالب</div>
+            </div>
+            <button onclick="downloadCertificate()" id="downloadCertBtn" class="btn bg-green-600 text-white w-full py-3 rounded-xl hidden">تحميل الشهادة</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="reportsSection" class="section hidden space-y-6">
+        <h2 class="text-xl font-bold">التقارير</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="card p-6">
+            <h3 class="font-bold mb-4">تقرير الحضور الشهري</h3>
+            <canvas id="attendanceChart"></canvas>
+          </div>
+          <div class="card p-6">
+            <h3 class="font-bold mb-4">توزيع الطلاب على الأنظمة</h3>
+            <canvas id="systemChart"></canvas>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="studentModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+  <div class="card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 animate-slide-up">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-xl font-bold" id="studentModalTitle">طالب جديد</h3>
+      <button onclick="closeStudentModal()" class="text-gray-500 hover:text-gray-700">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <form id="studentForm" onsubmit="saveStudent(event)" class="space-y-4">
+      <input type="hidden" id="studentId">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold mb-2">الاسم الكامل *</label>
+          <input type="text" id="studentName" class="input w-full px-4 py-3 rounded-xl" required>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-2">رقم الهاتف *</label>
+          <input type="tel" id="studentPhone" class="input w-full px-4 py-3 rounded-xl" required>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-2">رقم الواتساب</label>
+          <input type="tel" id="studentWhatsApp" class="input w-full px-4 py-3 rounded-xl">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-2">النظام *</label>
+          <select id="studentSystem" class="input w-full px-4 py-3 rounded-xl" required onchange="updateSystemFees()">
+            <option value="">-- اختر النظام --</option>
+            <option value="basic">أساسي - 9 شهور / 7500 جنيه</option>
+            <option value="professional">احترافي - 12 شهر / 10000 جنيه</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-2">الدرجة الكلية لامتحان الإنجليزي</label>
+          <input type="number" id="englishTotalScore" class="input w-full px-4 py-3 rounded-xl" min="0" oninput="calculateEnglishResult()">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-2">درجة الطالب في الإنجليزي</label>
+          <input type="number" id="englishStudentScore" class="input w-full px-4 py-3 rounded-xl" min="0" oninput="calculateEnglishResult()">
+        </div>
+      </div>
+      
+      <div class="space-y-3 pt-4 border-t">
+        <h4 class="font-semibold">المستحقات والمتطلبات</h4>
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="toolkitPaid" class="w-5 h-5 text-teal-600">
+            <span>شنطة الأدوات</span>
+          </label>
+          <span id="toolkitStatus" class="badge badge-danger">لم يتم الدفع</span>
+        </div>
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="filePaid" class="w-5 h-5 text-teal-600">
+            <span>ملف الالتحاق</span>
+          </label>
+          <span id="fileStatus" class="badge badge-danger">لم يتم الدفع</span>
+        </div>
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <span class="font-semibold">كورس الإنجليزي الإلزامي</span>
+          <span id="englishStatus" class="badge bg-gray-200 text-gray-600">غير محدد</span>
+        </div>
+      </div>
+
+      <div class="flex gap-3 pt-4">
+        <button type="submit" class="btn btn-primary flex-1 py-3 rounded-xl">حفظ</button>
+        <button type="button" onclick="closeStudentModal()" class="btn bg-gray-200 flex-1 py-3 rounded-xl">إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="lectureModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+  <div class="card w-full max-w-lg p-6 animate-slide-up">
+    <h3 class="text-xl font-bold mb-6">محاضرة جديدة</h3>
+    <form id="lectureForm" onsubmit="saveLecture(event)" class="space-y-4">
+      <div>
+        <label class="block text-sm font-semibold mb-2">المادة *</label>
+        <select id="lectureSubject" class="input w-full px-4 py-3 rounded-xl" required>
+          <option value="">-- اختر المادة --</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-2">التاريخ *</label>
+        <input type="date" id="lectureDate" class="input w-full px-4 py-3 rounded-xl" required>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold mb-2">وقت البداية *</label>
+          <input type="time" id="lectureStartTime" class="input w-full px-4 py-3 rounded-xl" required onchange="calcDuration()">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-2">وقت النهاية *</label>
+          <input type="time" id="lectureEndTime" class="input w-full px-4 py-3 rounded-xl" required onchange="calcDuration()">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-2">المدة</label>
+        <input type="text" id="lectureDuration" class="input w-full px-4 py-3 rounded-xl bg-gray-50" readonly>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-2">ملاحظات</label>
+        <textarea id="lectureNotes" class="input w-full px-4 py-3 rounded-xl" rows="3"></textarea>
+      </div>
+      <div class="flex gap-3 pt-4">
+        <button type="submit" class="btn btn-primary flex-1 py-3 rounded-xl">حفظ</button>
+        <button type="button" onclick="closeLectureModal()" class="btn bg-gray-200 flex-1 py-3 rounded-xl">إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="taskModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+  <div class="card w-full max-w-lg p-6 animate-slide-up">
+    <h3 class="text-xl font-bold mb-6">مهمة جديدة</h3>
+    <form id="taskForm" onsubmit="saveTask(event)" class="space-y-4">
+      <div>
+        <label class="block text-sm font-semibold mb-2">عنوان المهمة *</label>
+        <input type="text" id="taskTitle" class="input w-full px-4 py-3 rounded-xl" required>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-2">التاريخ *</label>
+        <input type="date" id="taskDate" class="input w-full px-4 py-3 rounded-xl" required>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-2">الوصف</label>
+        <textarea id="taskDesc" class="input w-full px-4 py-3 rounded-xl" rows="3"></textarea>
+      </div>
+      <div class="flex gap-3 pt-4">
+        <button type="submit" class="btn btn-primary flex-1 py-3 rounded-xl">حفظ</button>
+        <button type="button" onclick="closeTaskModal()" class="btn bg-gray-200 flex-1 py-3 rounded-xl">إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="subjectModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+  <div class="card w-full max-w-lg p-6 animate-slide-up">
+    <h3 class="text-xl font-bold mb-6">مادة جديدة</h3>
+    <form id="subjectForm" onsubmit="saveSubject(event)" class="space-y-4">
+      <input type="hidden" id="subjectId">
+      <div>
+        <label class="block text-sm font-semibold mb-2">اسم المادة *</label>
+        <input type="text" id="subjectName" class="input w-full px-4 py-3 rounded-xl" required>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-2">الكود</label>
+        <input type="text" id="subjectCode" class="input w-full px-4 py-3 rounded-xl">
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-2">عدد الساعات</label>
+        <input type="number" id="subjectHours" class="input w-full px-4 py-3 rounded-xl" min="1">
+      </div>
+      <div class="flex gap-3 pt-4">
+        <button type="submit" class="btn btn-primary flex-1 py-3 rounded-xl">حفظ</button>
+        <button type="button" onclick="closeSubjectModal()" class="btn bg-gray-200 flex-1 py-3 rounded-xl">إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="examModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+  <div class="card w-full max-w-lg p-6 animate-slide-up">
+    <h3 class="text-xl font-bold mb-6">امتحان جديد</h3>
+    <form id="examForm" onsubmit="saveExam(event)" class="space-y-4">
+      <div>
+        <label class="block text-sm font-semibold mb-2">المادة *</label>
+        <select id="examSubject" class="input w-full px-4 py-3 rounded-xl" required>
+          <option value="">-- اختر المادة --</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-2">تاريخ الامتحان *</label>
+        <input type="date" id="examDate" class="input w-full px-4 py-3 rounded-xl" required>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-2">الدرجة الكلية *</label>
+        <input type="number" id="examTotalScore" class="input w-full px-4 py-3 rounded-xl" required min="1">
+      </div>
+      <div class="flex gap-3 pt-4">
+        <button type="submit" class="btn btn-primary flex-1 py-3 rounded-xl">حفظ</button>
+        <button type="button" onclick="closeExamModal()" class="btn bg-gray-200 flex-1 py-3 rounded-xl">إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="examScoreModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+  <div class="card w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 animate-slide-up">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-xl font-bold" id="examScoreTitle">تسجيل درجات الطلاب</h3>
+      <button onclick="closeExamScoreModal()" class="text-gray-500 hover:text-gray-700">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div class="table-wrap">
+      <table class="w-full">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-right text-sm font-semibold">الطالب</th>
+            <th class="px-4 py-3 text-center text-sm font-semibold">الدرجة</th>
+            <th class="px-4 py-3 text-center text-sm font-semibold">النسبة</th>
+            <th class="px-4 py-3 text-center text-sm font-semibold">النتيجة</th>
+          </tr>
+        </thead>
+        <tbody id="examScoreTable"></tbody>
+      </table>
+    </div>
+    <div class="flex gap-3 pt-6">
+      <button onclick="saveExamScores()" class="btn btn-primary flex-1 py-3 rounded-xl">حفظ الدرجات</button>
+      <button onclick="closeExamScoreModal()" class="btn bg-gray-200 flex-1 py-3 rounded-xl">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<div id="attendanceModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+  <div class="card w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 animate-slide-up">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-xl font-bold" id="attendanceModalTitle">تسجيل الحضور</h3>
+      <button onclick="closeAttendanceModal()" class="text-gray-500 hover:text-gray-700">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div class="table-wrap">
+      <table class="w-full">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-right text-sm font-semibold">الطالب</th>
+            <th class="px-4 py-3 text-right text-sm font-semibold">رقم الهاتف</th>
+            <th class="px-4 py-3 text-center text-sm font-semibold">الحالة</th>
+            <th class="px-4 py-3 text-center text-sm font-semibold">واتساب</th>
+          </tr>
+        </thead>
+        <tbody id="attendanceTable"></tbody>
+      </table>
+    </div>
+    <div class="flex gap-3 pt-6">
+      <button onclick="saveAttendance()" class="btn btn-primary flex-1 py-3 rounded-xl">حفظ الحضور</button>
+      <button onclick="closeAttendanceModal()" class="btn bg-gray-200 flex-1 py-3 rounded-xl">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ CONFIG & INIT ============
+// Fixed: Declare supabase ONCE only
+const SUPABASE_URL = 'https://placeholder.supabase.co';
+const SUPABASE_KEY = 'placeholder-key';
+const { createClient } = supabase;
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// All functions in global scope - NO DOMContentLoaded wrapper for onclick to work
+let currentUser = null;
+let currentMonth = moment();
+let certImageData = null;
+let currentLectureId = null;
+let currentExamId = null;
+
+let mockData = {
+  students: [],
+  subjects: [
+    {id: 1, name: 'تشريح ووظائف الأعضاء', code: 'NRS101', hours: 40},
+    {id: 2, name: 'الإسعافات الأولية', code: 'NRS102', hours: 30},
+    {id: 3, name: 'أساسيات التمريض', code: 'NRS103', hours: 50},
+    {id: 4, name: 'مكافحة العدوى', code: 'NRS104', hours: 25}
+  ],
+  lectures: [],
+  tasks: [],
+  attendance: [],
+  exams: [],
+  fees: []
+};
+
+// ============ AUTH ============
+async function handleLogin() {
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  
+  if(!email || !password) {
+    alert('يرجى إدخال البريد وكلمة المرور');
+    return;
+  }
+  
+  // Demo login - replace with actual Supabase auth
+  currentUser = {email, role: 'admin', name: 'أحمد محمد'};
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('appScreen').classList.remove('hidden');
+  document.getElementById('userName').textContent = currentUser.name;
+  document.getElementById('userRole').textContent = 'مدير النظام';
+  initApp();
+  
+  // Actual Supabase code:
+  // const {data, error} = await supabaseClient.auth.signInWithPassword({email, password});
+  // if(error) return alert(error.message);
+}
+
+function handleLogout() {
+  currentUser = null;
+  document.getElementById('authScreen').classList.remove('hidden');
+  document.getElementById('appScreen').classList.add('hidden');
+}
+
+// ============ APP INIT ============
+function initApp() {
+  updateDates();
+  initCalendar();
+  loadDashboard();
+  loadSubjects();
+  loadStudents();
+  loadLecturesAndTasks();
+  loadExams();
+  initCharts();
+  setInterval(updateDates, 60000);
+}
+
+function updateDates() {
+  moment.locale('ar');
+  const now = moment();
+  const hijri = now.format('iYYYY/iM/iD');
+  const hijriMonthName = now.format('iMMMM');
+  document.getElementById('gregorianDate').textContent = now.format('dddd، D MMMM YYYY - hh:mm A');
+  document.getElementById('hijriDate').textContent = `${hijriMonthName} ${hijri}`;
+}
+
+function showSection(section) {
+  document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+  document.getElementById(section + 'Section').classList.remove('hidden');
+  event.target.closest('.sidebar-item').classList.add('active');
+  
+  const titles = {
+    dashboard: 'الرئيسية',
+    students: 'الطلاب',
+    schedule: 'جدول المحاضرات',
+    subjects: 'المواد الدراسية',
+    exams: 'الامتحانات والدرجات',
+    fees: 'المصروفات',
+    certificates: 'الشهادات',
+    reports: 'التقارير'
+  };
+  document.getElementById('sectionTitle').textContent = titles[section];
+  
+  if(section === 'fees') loadStudentsForFees();
+  if(section === 'certificates') loadStudentsForCert();
+  if(section === 'exams') loadExams();
+}
+
+// ============ DASHBOARD & CALCULATOR ============
+let calcExpression = '0';
+function calcInput(val) {
+  if(calcExpression === '0') calcExpression = '';
+  calcExpression += val;
+  document.getElementById('calcDisplay').value = calcExpression;
+}
+function calcClear() {
+  calcExpression = '0';
+  document.getElementById('calcDisplay').value = calcExpression;
+}
+function calcBackspace() {
+  calcExpression = calcExpression.slice(0, -1) || '0';
+  document.getElementById('calcDisplay').value = calcExpression;
+}
+function calcEqual() {
+  try {
+    calcExpression = eval(calcExpression).toString();
+    document.getElementById('calcDisplay').value = calcExpression;
+  } catch(e) {
+    calcExpression = '0';
+    document.getElementById('calcDisplay').value = 'خطأ';
+  }
+}
+
+// Calendar
+function initCalendar() {
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const start = currentMonth.clone().startOf('month').startOf('week');
+  const end = currentMonth.clone().endOf('month').endOf('week');
+  const grid = document.getElementById('calendarGrid');
+  grid.innerHTML = '';
+  
+  document.getElementById('calendarMonth').textContent = currentMonth.format('MMMM YYYY');
+  document.getElementById('calendarMonthHijri').textContent = currentMonth.format('iMMMM iYYYY');
+  
+  let day = start.clone();
+  const today = moment();
+  
+  while(day.isBefore(end)) {
+    const isCurrentMonth = day.month() === currentMonth.month();
+    const isToday = day.isSame(today, 'day');
+    const hijriDay = day.format('iD');
+    
+    const dayEl = document.createElement('div');
+    dayEl.className = `calendar-day rounded-lg p-2 text-sm ${isToday ? 'active' : ''} ${!isCurrentMonth ? 'text-gray-300' : ''}`;
+    dayEl.innerHTML = `
+      <div class="font-bold">${day.date()}</div>
+      <div class="text-xs ${isToday ? 'text-white' : 'text-teal-600'}">${hijriDay}</div>
+    `;
+    grid.appendChild(dayEl);
+    day.add(1, 'day');
+  }
+}
+
+function changeMonth(dir) {
+  currentMonth.add(dir, 'month');
+  renderCalendar();
+}
+
+function loadDashboard() {
+  document.getElementById('totalStudents').textContent = mockData.students.length;
+  const todayStr = moment().format('YYYY-MM-DD');
+  const todayLects = mockData.lectures.filter(l => l.date === todayStr).length;
+  document.getElementById('todayLectures').textContent = todayLects;
+  
+  let totalRev = 0;
+  mockData.students.forEach(s => {
+    const fees = mockData.fees.filter(f => f.student_id === s.id);
+    totalRev += fees.reduce((sum, f) => sum + (f.paid || 0), 0);
+  });
+  document.getElementById('totalRevenue').textContent = totalRev.toLocaleString() + ' ج.م';
+  
+  const totalAttend = mockData.attendance.length;
+  const present = mockData.attendance.filter(a => a.status === 'present').length;
+  const rate = totalAttend ? Math.round((present / totalAttend) * 100) : 0;
+  document.getElementById('attendanceRate').textContent = rate + '%';
+}
+
+// ============ STUDENTS ============
+function openStudentModal(studentId = null) {
+  document.getElementById('studentModal').classList.remove('hidden');
+  document.getElementById('studentForm').reset();
+  document.getElementById('studentId').value = '';
+  document.getElementById('studentModalTitle').textContent = 'طالب جديد';
+  
+  if(studentId) {
+    const student = mockData.students.find(s => s.id === studentId);
+    if(student) {
+      document.getElementById('studentId').value = student.id;
+      document.getElementById('studentName').value = student.name;
+      document.getElementById('studentPhone').value = student.phone;
+      document.getElementById('studentWhatsApp').value = student.whatsapp || '';
+      document.getElementById('studentSystem').value = student.system;
+      document.getElementById('englishTotalScore').value = student.english_total || '';
+      document.getElementById('englishStudentScore').value = student.english_score || '';
+      document.getElementById('toolkitPaid').checked = student.toolkit_paid || false;
+      document.getElementById('filePaid').checked = student.file_paid || false;
+      document.getElementById('studentModalTitle').textContent = 'تعديل بيانات الطالب';
+      updateStatusBadges();
+      calculateEnglishResult();
+    }
+  }
+}
+
+function closeStudentModal() {
+  document.getElementById('studentModal').classList.add('hidden');
+}
+
+function updateStatusBadges() {
+  const toolkitPaid = document.getElementById('toolkitPaid').checked;
+  const filePaid = document.getElementById('filePaid').checked;
+  
+  document.getElementById('toolkitStatus').className = `badge ${toolkitPaid ? 'badge-success' : 'badge-danger'}`;
+  document.getElementById('toolkitStatus').textContent = toolkitPaid ? 'تم الدفع' : 'لم يتم الدفع';
+  
+  document.getElementById('fileStatus').className = `badge ${filePaid ? 'badge-success' : 'badge-danger'}`;
+  document.getElementById('fileStatus').textContent = filePaid ? 'تم الدفع' : 'لم يتم الدفع';
+}
+
+// Fixed: يستحق للكورس وليس للكورس
+function calculateEnglishResult() {
+  const total = parseFloat(document.getElementById('englishTotalScore').value) || 0;
+  const score = parseFloat(document.getElementById('englishStudentScore').value) || 0;
+  
+  if(total > 0) {
+    const percentage = (score / total) * 100;
+    const passed = percentage >= 50;
+    document.getElementById('englishStatus').className = `badge ${passed ? 'badge-success' : 'badge-danger'}`;
+    document.getElementById('englishStatus').textContent = passed ? 'يستحق - ناجح' : 'لا يستحق - راسب';
+    mockData.tempEnglishEligible = passed;
+  } else {
+    document.getElementById('englishStatus').className = 'badge bg-gray-200 text-gray-600';
+    document.getElementById('englishStatus').textContent = 'غير محدد';
+    mockData.tempEnglishEligible = false;
+  }
+}
+
+async function saveStudent(e) {
+  e.preventDefault();
+  
+  const name = document.getElementById('studentName').value.trim();
+  const phone = document.getElementById('studentPhone').value.trim();
+  const system = document.getElementById('studentSystem').value;
+  
+  // Fixed Guard: يمنع الحفظ بدون البيانات المطلوبة
+  if(!name || !phone || !system) {
+    alert('يرجى ملء جميع الحقول المطلوبة *');
+    return false;
+  }
+  
+  const id = document.getElementById('studentId').value;
+  const studentData = {
+    name,
+    phone,
+    whatsapp: document.getElementById('studentWhatsApp').value.trim(),
+    system,
+    english_total: parseFloat(document.getElementById('englishTotalScore').value) || 0,
+    english_score: parseFloat(document.getElementById('englishStudentScore').value) || 0,
+    toolkit_paid: document.getElementById('toolkitPaid').checked,
+    file_paid: document.getElementById('filePaid').checked,
+    english_eligible: mockData.tempEnglishEligible || false
+  };
+  
+  if(id) {
+    const idx = mockData.students.findIndex(s => s.id == id);
+    mockData.students[idx] = {...mockData.students[idx], ...studentData};
+  } else {
+    studentData.id = Date.now();
+    mockData.students.push(studentData);
+    
+    const feeAmount = system === 'basic' ? 7500 : 10000;
+    const installments = system === 'basic' ? 8 : 11;
+    mockData.fees.push({
+      id: Date.now(),
+      student_id: studentData.id,
+      type: 'course',
+      total: feeAmount,
+      paid: 0,
+      installments: installments,
+      description: `رسوم الكورس - نظام ${system === 'basic' ? 'أساسي' : 'احترافي'}`
+    });
+  }
+  
+  loadStudents();
+  loadDashboard();
+  closeStudentModal();
+}
+
+function loadStudents() {
+  const tbody = document.getElementById('studentsTable');
+  const search = document.getElementById('studentSearch').value.toLowerCase();
+  
+  const filtered = mockData.students.filter(s => 
+    s.name.toLowerCase().includes(search) || s.phone.includes(search)
+  );
+  
+  tbody.innerHTML = filtered.map(s => `
+    <tr class="border-b hover:bg-gray-50">
+      <td class="px-4 py-3 font-semibold">${s.name}</td>
+      <td class="px-4 py-3">${s.phone}</td>
+      <td class="px-4 py-3">
+        <span class="badge ${s.system === 'basic' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">
+          ${s.system === 'basic' ? 'أساسي' : 'احترافي'}
+        </span>
+      </td>
+      <td class="px-4 py-3">
+        <span class="badge ${s.toolkit_paid ? 'badge-success' : 'badge-danger'}">
+          ${s.toolkit_paid ? 'تم الدفع' : 'لم يتم الدفع'}
+        </span>
+      </td>
+      <td class="px-4 py-3">
+        <span class="badge ${s.file_paid ? 'badge-success' : 'badge-danger'}">
+          ${s.file_paid ? 'تم الدفع' : 'لم يتم الدفع'}
+        </span>
+      </td>
+      <td class="px-4 py-3">
+        <span class="badge ${s.english_eligible ? 'badge-success' : 'badge-danger'}">
+          ${s.english_eligible ? 'يستحق' : 'لا يستحق'}
+        </span>
+      </td>
+      <td class="px-4 py-3">
+        <button onclick="openStudentModal(${s.id})" class="text-teal-600 hover:text-teal-700 font-semibold">تعديل</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('studentSearch')?.addEventListener('input', loadStudents);
+document.getElementById('toolkitPaid').addEventListener('change', updateStatusBadges);
+document.getElementById('filePaid').addEventListener('change', updateStatusBadges);
+
+function updateSystemFees() {}
+
+// ============ SUBJECTS ============
+function openSubjectModal(id = null) {
+  document.getElementById('subjectModal').classList.remove('hidden');
+  document.getElementById('subjectForm').reset();
+  document.getElementById('subjectId').value = '';
+  
+  if(id) {
+    const subject = mockData.subjects.find(s => s.id === id);
+    if(subject) {
+      document.getElementById('subjectId').value = subject.id;
+      document.getElementById('subjectName').value = subject.name;
+      document.getElementById('subjectCode').value = subject.code;
+      document.getElementById('subjectHours').value = subject.hours;
+    }
+  }
+}
+
+function closeSubjectModal() {
+  document.getElementById('subjectModal').classList.add('hidden');
+}
+
+function saveSubject(e) {
+  e.preventDefault();
+  const id = document.getElementById('subjectId').value;
+  const data = {
+    name: document.getElementById('subjectName').value,
+    code: document.getElementById('subjectCode').value,
+    hours: parseInt(document.getElementById('subjectHours').value) || 0
+  };
+  
+  if(id) {
+    const idx = mockData.subjects.findIndex(s => s.id == id);
+    mockData.subjects[idx] = {...mockData.subjects[idx], ...data};
+  } else {
+    data.id = Date.now();
+    mockData.subjects.push(data);
+  }
+  
+  loadSubjects();
+  updateLectureSubjectSelect();
+  updateExamSubjectSelect();
+  closeSubjectModal();
+}
+
+function loadSubjects() {
+  const tbody = document.getElementById('subjectsTable');
+  tbody.innerHTML = mockData.subjects.map(s => `
+    <tr class="border-b hover:bg-gray-50">
+      <td class="px-4 py-3 font-semibold">${s.name}</td>
+      <td class="px-4 py-3">${s.code || '-'}</td>
+      <td class="px-4 py-3">${s.hours || 0} ساعة</td>
+      <td class="px-4 py-3">
+        <button onclick="openSubjectModal(${s.id})" class="text-teal-600 hover:text-teal-700 font-semibold">تعديل</button>
+      </td>
+    </tr>
+  `).join('');
+  updateLectureSubjectSelect();
+  updateExamSubjectSelect();
+}
+
+function updateLectureSubjectSelect() {
+  const select = document.getElementById('lectureSubject');
+  select.innerHTML = '<option value="">-- اختر المادة --</option>' + 
+    mockData.subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+function updateExamSubjectSelect() {
+  const select = document.getElementById('examSubject');
+  if(select) {
+    select.innerHTML = '<option value="">-- اختر المادة --</option>' + 
+      mockData.subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  }
+}
+
+// ============ LECTURES & TASKS ============
+function openLectureModal() {
+  document.getElementById('lectureModal').classList.remove('hidden');
+  document.getElementById('lectureForm').reset();
+  document.getElementById('lectureDate').value = moment().format('YYYY-MM-DD');
+}
+
+function closeLectureModal() {
+  document.getElementById('lectureModal').classList.add('hidden');
+}
+
+function calcDuration() {
+  const start = document.getElementById('lectureStartTime').value;
+  const end = document.getElementById('lectureEndTime').value;
+  
+  if(start && end) {
+    const startM = moment(start, 'HH:mm');
+    const endM = moment(end, 'HH:mm');
+    const duration = moment.duration(endM.diff(startM));
+    const hours = Math.floor(duration.asHours());
+    const minutes = duration.minutes();
+    document.getElementById('lectureDuration').value = `${hours} ساعة ${minutes} دقيقة`;
+  }
+}
+
+function saveLecture(e) {
+  e.preventDefault();
+  const data = {
+    id: Date.now(),
+    subject_id: parseInt(document.getElementById('lectureSubject').value),
+    date: document.getElementById('lectureDate').value,
+    start_time: document.getElementById('lectureStartTime').value,
+    end_time: document.getElementById('lectureEndTime').value,
+    duration: document.getElementById('lectureDuration').value,
+    notes: document.getElementById('lectureNotes').value
+  };
+  
+  mockData.lectures.push(data);
+  loadLecturesAndTasks();
+  loadDashboard();
+  closeLectureModal();
+}
+
+function openTaskModal() {
+  document.getElementById('taskModal').classList.remove('hidden');
+  document.getElementById('taskForm').reset();
+  document.getElementById('taskDate').value = moment().format('YYYY-MM-DD');
+}
+
+function closeTaskModal() {
+  document.getElementById('taskModal').classList.add('hidden');
+}
+
+function saveTask(e) {
+  e.preventDefault();
+  const data = {
+    id: Date.now(),
+    title: document.getElementById('taskTitle').value,
+    date: document.getElementById('taskDate').value,
+    description: document.getElementById('taskDesc').value,
+    completed: false
+  };
+  
+  mockData.tasks.push(data);
+  loadLecturesAndTasks();
+  closeTaskModal();
+}
+
+function loadLecturesAndTasks() {
+  const grid = document.getElementById('scheduleGrid');
+  const all = [
+    ...mockData.lectures.map(l => ({...l, type: 'lecture'})),
+    ...mockData.tasks.map(t => ({...t, type: 'task'}))
+  ].sort((a, b) => moment(b.date).diff(moment(a.date)));
+  
+  grid.innerHTML = all.map(item => {
+    if(item.type === 'lecture') {
+      const subject = mockData.subjects.find(s => s.id === item.subject_id);
+      return `
+        <div class="card p-6 cursor-pointer" onclick="openAttendanceModal(${item.id})">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <span class="badge bg-teal-100 text-teal-700">محاضرة</span>
+              <h4 class="font-bold text-lg mt-2">${subject?.name || 'غير محدد'}</h4>
+            </div>
+            <div class="text-left">
+              <p class="text-sm text-gray-500">${moment(item.date).format('D MMM')}</p>
+              <p class="text-xs text-gray-400">${moment(item.start_time, 'HH:mm').format('hh:mm A')}</p>
+            </div>
+          </div>
+          <p class="text-sm text-gray-600">${item.notes || 'لا توجد ملاحظات'}</p>
+          <div class="mt-4 pt-4 border-t flex items-center justify-between">
+            <span class="text-xs text-gray-500">${item.duration}</span>
+            <span class="text-teal-600 text-sm font-semibold">اضغط لتسجيل الحضور →</span>
+          </div>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="card p-6 border-r-4 border-amber-500">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <span class="badge bg-amber-100 text-amber-700">مهمة</span>
+              <h4 class="font-bold text-lg mt-2">${item.title}</h4>
+            </div>
+            <p class="text-sm text-gray-500">${moment(item.date).format('D MMM')}</p>
+          </div>
+          <p class="text-sm text-gray-600">${item.description || 'لا يوجد وصف'}</p>
+        </div>
+      `;
+    }
+  }).join('');
+}
+
+// ============ ATTENDANCE ============
+function openAttendanceModal(lectureId) {
+  currentLectureId = lectureId;
+  const lecture = mockData.lectures.find(l => l.id === lectureId);
+  const subject = mockData.subjects.find(s => s.id === lecture.subject_id);
+  
+  document.getElementById('attendanceModalTitle').textContent = `تسجيل الحضور - ${subject?.name}`;
+  document.getElementById('attendanceModal').classList.remove('hidden');
+  
+  const tbody = document.getElementById('attendanceTable');
+  const existing = mockData.attendance.filter(a => a.lecture_id === lectureId);
+  
+  tbody.innerHTML = mockData.students.map(s => {
+    const record = existing.find(a => a.student_id === s.id);
+    const status = record?.status || 'absent';
+    return `
+      <tr class="border-b hover:bg-gray-50">
+        <td class="px-4 py-3 font-semibold">${s.name}</td>
+        <td class="px-4 py-3 text-gray-600">${s.phone}</td>
+        <td class="px-4 py-3 text-center">
+          <div class="flex gap-2 justify-center">
+            <button onclick="toggleAttendance(${s.id}, 'present')" class="btn px-4 py-2 rounded-lg ${status === 'present' ? 'bg-green-600 text-white' : 'bg-gray-100'}">
+              حاضر
+            </button>
+            <button onclick="toggleAttendance(${s.id}, 'absent')" class="btn px-4 py-2 rounded-lg ${status === 'absent' ? 'bg-red-600 text-white' : 'bg-gray-100'}">
+              غائب
+            </button>
+          </div>
+        </td>
+        <td class="px-4 py-3 text-center">
+          ${s.whatsapp ? `<button onclick="sendWhatsApp('${s.whatsapp}', '${s.name}')" class="text-green-600 hover:text-green-700"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg></button>` : '-'}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function closeAttendanceModal() {
+  document.getElementById('attendanceModal').classList.add('hidden');
+  currentLectureId = null;
+}
+
+function toggleAttendance(studentId, status) {
+  const idx = mockData.attendance.findIndex(a => a.lecture_id === currentLectureId && a.student_id === studentId);
+  if(idx >= 0) {
+    mockData.attendance[idx].status = status;
+  } else {
+    mockData.attendance.push({lecture_id: currentLectureId, student_id: studentId, status});
+  }
+  openAttendanceModal(currentLectureId);
+}
+
+function saveAttendance() {
+  alert('تم حفظ سجل الحضور بنجاح');
+  loadDashboard();
+  closeAttendanceModal();
+}
+
+function sendWhatsApp(number, name) {
+  const lecture = mockData.lectures.find(l => l.id === currentLectureId);
+  const subject = mockData.subjects.find(s => s.id === lecture.subject_id);
+  const message = `مرحباً ${name}،\nهذا تذكير بمحاضرة ${subject?.name} بتاريخ ${moment(lecture.date).format('DD/MM/YYYY')}.`;
+  window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, '_blank');
+}
+
+// ============ EXAMS & TOP STUDENTS ============
+function openExamModal() {
+  updateExamSubjectSelect();
+  document.getElementById('examModal').classList.remove('hidden');
+  document.getElementById('examForm').reset();
+  document.getElementById('examDate').value = moment().format('YYYY-MM-DD');
+}
+
+function closeExamModal() {
+  document.getElementById('examModal').classList.add('hidden');
+}
+
+function saveExam(e) {
+  e.preventDefault();
+  const data = {
+    id: Date.now(),
+    subject_id: parseInt(document.getElementById('examSubject').value),
+    date: document.getElementById('examDate').value,
+    total_score: parseInt(document.getElementById('examTotalScore').value)
+  };
+  
+  mockData.exams.push(data);
+  loadExams();
+  closeExamModal();
+}
+
+function loadExams() {
+  const list = document.getElementById('examsList');
+  const subjects = mockData.subjects;
+  
+  list.innerHTML = subjects.map(sub => {
+    const subjectExams = mockData.exams.filter(e => e.subject_id === sub.id);
+    const latestExam = subjectExams[subjectExams.length - 1];
+    
+    if(!latestExam) return '';
+    
+    const examStudents = mockData.students.filter(s => s['exam_' + latestExam.id + '_score'] !== undefined);
+    const sorted = [...examStudents].sort((a, b) => (b['exam_' + latestExam.id + '_score'] || 0) - (a['exam_' + latestExam.id + '_score'] || 0));
+    
+    return `
+      <div class="card p-6">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <h4 class="font-bold text-lg">${sub.name}</h4>
+            <p class="text-sm text-gray-500">الدرجة الكلية: ${latestExam.total_score}</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="openExamScoreModal(${latestExam.id})" class="btn bg-teal-600 text-white px-4 py-2 rounded-lg text-sm">تسجيل الدرجات</button>
+            <button onclick="showTopStudents(${latestExam.id})" class="btn bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2 rounded-lg text-sm">🏆 الأوائل</button>
+          </div>
+        </div>
+        ${sorted.length > 0 ? `
+        <div class="table-wrap">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-right">الطالب</th>
+                <th class="px-3 py-2 text-center">الدرجة</th>
+                <th class="px-3 py-2 text-center">النسبة</th>
+                <th class="px-3 py-2 text-center">النتيجة</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sorted.map((s, i) => {
+                const score = s['exam_' + latestExam.id + '_score'] || 0;
+                const percentage = ((score / latestExam.total_score) * 100).toFixed(1);
+                return `
+                <tr class="border-b ${i < 3 ? 'bg-amber-50' : ''}">
+                  <td class="px-3 py-2 font-semibold">${i < 3 ? '🏆 ' : ''}${s.name}</td>
+                  <td class="px-3 py-2 text-center">${score}/${latestExam.total_score}</td>
+                  <td class="px-3 py-2 text-center">${percentage}%</td>
+                  <td class="px-3 py-2 text-center">
+                    <span class="badge ${score >= latestExam.total_score * 0.5 ? 'badge-success' : 'badge-danger'}">
+                      ${score >= latestExam.total_score * 0.5 ? 'ناجح' : 'راسب'}
+                    </span>
+                  </td>
+                </tr>
+              `}).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : '<p class="text-gray-500 text-sm">لم تسجل درجات بعد</p>'}
+      </div>
+    `;
+  }).join('');
+}
+
+function openExamScoreModal(examId) {
+  currentExamId = examId;
+  const exam = mockData.exams.find(e => e.id === examId);
+  const subject = mockData.subjects.find(s => s.id === exam.subject_id);
+  
+  document.getElementById('examScoreTitle').textContent = `تسجيل درجات - ${subject?.name}`;
+  document.getElementById('examScoreModal').classList.remove('hidden');
+  
+  const tbody = document.getElementById('examScoreTable');
+  tbody.innerHTML = mockData.students.map(s => {
+    const score = s['exam_' + examId + '_score'] || 0;
+    const percentage = exam.total_score > 0 ? ((score / exam.total_score) * 100).toFixed(1) : 0;
+    const passed = score >= exam.total_score * 0.5;
+    return `
+      <tr class="border-b hover:bg-gray-50">
+        <td class="px-4 py-3 font-semibold">${s.name}</td>
+        <td class="px-4 py-3 text-center">
+          <input type="number" id="score_${s.id}" class="input w-20 px-2 py-1 rounded text-center" min="0" max="${exam.total_score}" value="${score}" onchange="updateExamScore(${s.id}, ${examId}, ${exam.total_score})">
+        </td>
+        <td class="px-4 py-3 text-center">
+          <span id="percent_${s.id}">${percentage}%</span>
+        </td>
+        <td class="px-4 py-3 text-center">
+          <span id="result_${s.id}" class="badge ${passed ? 'badge-success' : 'badge-danger'}">
+            ${passed ? 'ناجح' : 'راسب'}
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function updateExamScore(studentId, examId, totalScore) {
+  const score = parseFloat(document.getElementById('score_' + studentId).value) || 0;
+  const percentage = ((score / totalScore) * 100).toFixed(1);
+  const passed = score >= totalScore * 0.5;
+  
+  document.getElementById('percent_' + studentId).textContent = percentage + '%';
+  const resultEl = document.getElementById('result_' + studentId);
+  resultEl.className = `badge ${passed ? 'badge-success' : 'badge-danger'}`;
+  resultEl.textContent = passed ? 'ناجح' : 'راسب';
+}
+
+function saveExamScores() {
+  const exam = mockData.exams.find(e => e.id === currentExamId);
+  mockData.students.forEach(s => {
+    const score = parseFloat(document.getElementById('score_' + s.id).value) || 0;
+    s['exam_' + currentExamId + '_score'] = score;
+  });
+  alert('تم حفظ الدرجات بنجاح');
+  loadExams();
+  closeExamScoreModal();
+}
+
+function closeExamScoreModal() {
+  document.getElementById('examScoreModal').classList.add('hidden');
+  currentExamId = null;
+}
+
+function showTopStudents(examId) {
+  const exam = mockData.exams.find(e => e.id === examId);
+  const subject = mockData.subjects.find(s => s.id === exam.subject_id);
+  const students = mockData.students
+    .filter(s => s['exam_' + examId + '_score'] !== undefined)
+    .sort((a, b) => (b['exam_' + examId + '_score'] || 0) - (a['exam_' + examId + '_score'] || 0))
+    .slice(0, 3);
+  
+  if(students.length === 0) {
+    alert('لا توجد درجات مسجلة لهذا الامتحان بعد');
+    return;
+  }
+  
+  const topList = students.map((s, i) => `${i+1}. ${s.name} - ${s['exam_' + examId + '_score']}/${exam.total_score} درجة`).join('\n');
+  alert(`🏆 الأوائل في ${subject.name}:\n\n${topList}`);
+}
+
+// ============ FEES ============
+function loadStudentsForFees() {
+  const select = document.getElementById('feeStudentSelect');
+  select.innerHTML = '<option value="">-- اختر طالب --</option>' + 
+    mockData.students.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+function loadStudentFees() {
+  const studentId = parseInt(document.getElementById('feeStudentSelect').value);
+  if(!studentId) {
+    document.getElementById('feesDetails').classList.add('hidden');
+    return;
+  }
+  
+  const student = mockData.students.find(s => s.id === studentId);
+  const fees = mockData.fees.filter(f => f.student_id === studentId);
+  
+  document.getElementById('feesDetails').classList.remove('hidden');
+  document.getElementById('feesDetails').innerHTML = `
+    <div class="border-t pt-6">
+      <h4 class="font-bold mb-4">تفاصيل مدفوعات: ${student.name}</h4>
+      <div class="space-y-3">
+        ${fees.map(f => {
+          const remaining = f.total - (f.paid || 0);
+          return `
+            <div class="p-4 bg-gray-50 rounded-xl">
+              <div class="flex justify-between items-center mb-3">
+                <span class="font-semibold">${f.description}</span>
+                <span class="text-lg font-bold text-teal-600">${f.total} ج.م</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div><span class="text-gray-500">المدفوع:</span> <span class="font-semibold text-green-600">${f.paid || 0} ج.م</span></div>
+                <div><span class="text-gray-500">المتبقي:</span> <span class="font-semibold text-red-600">${remaining} ج.م</span></div>
+              </div>
+              <div class="mt-3 flex gap-2">
+                <input type="number" id="pay_${f.id}" class="input flex-1 px-3 py-2 rounded-lg text-sm" placeholder="مبلغ الدفع">
+                <button onclick="addPayment(${f.id})" class="btn bg-green-600 text-white px-4 py-2 rounded-lg text-sm">إضافة دفع</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function addPayment(feeId) {
+  const amount = parseFloat(document.getElementById('pay_' + feeId).value) || 0;
+  if(amount <= 0) {
+    alert('يرجى إدخال مبلغ صحيح');
+    return;
+  }
+  
+  const fee = mockData.fees.find(f => f.id === feeId);
+  fee.paid = (fee.paid || 0) + amount;
+  loadStudentFees();
+  loadDashboard();
+  alert('تم تسجيل الدفعة بنجاح');
+}
+
+// ============ CERTIFICATES ============
+function loadStudentsForCert() {
+  const select = document.getElementById('certStudentSelect');
+  select.innerHTML = '<option value="">-- اختر طالب --</option>' + 
+    mockData.students.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+function loadCertificateImage(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    certImageData = event.target.result;
+    const img = document.getElementById('certImage');
+    img.src = certImageData;
+    img.hidden = false;
+    document.getElementById('certCanvasContainer').classList.remove('hidden');
+    document.getElementById('downloadCertBtn').classList.remove('hidden');
+    
+    const nameEl = document.getElementById('certNameElement');
+    nameEl.style.transform = 'translate(50px, 100px)';
+    
+    // Fixed: Use container element, not image src
+    interact(nameEl).draggable({
+      listeners: {
+        move(event) {
+          const target = event.target;
+          const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+          const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+          target.style.transform = `translate(${x}px, ${y}px)`;
+          target.setAttribute('data-x', x);
+          target.setAttribute('data-y', y);
+        }
+      }
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateFontSize() {
+  const size = document.getElementById('fontSizeSlider').value;
+  document.getElementById('fontSizeValue').textContent = size + 'px';
+  document.getElementById('certNameElement').style.fontSize = size + 'px';
+}
+
+function generateCertificate() {
+  const studentId = document.getElementById('certStudentSelect').value;
+  if(!studentId) {
+    alert('يرجى اختيار طالب');
+    return;
+  }
+  if(!certImageData) {
+    alert('يرجى رفع تصميم الشهادة أولاً');
+    return;
+  }
+  
+  const student = mockData.students.find(s => s.id == studentId);
+  document.getElementById('certNameElement').textContent = student.name;
+  alert('تم توليد الشهادة! يمكنك سحب الاسم لتعديل موضعه ثم تحميل الشهادة');
+}
+
+function downloadCertificate() {
+  const container = document.getElementById('certCanvasContainer');
+  const canvas = document.getElementById('certCanvas');
+  const ctx = canvas.getContext('2d');
+  const img = document.getElementById('certImage');
+  const nameEl = document.getElementById('certNameElement');
+  
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  ctx.drawImage(img, 0, 0);
+  
+  const x = parseFloat(nameEl.getAttribute('data-x')) || 50;
+  const y = parseFloat(nameEl.getAttribute('data-y')) || 100;
+  const fontSize = parseInt(nameEl.style.fontSize) || 24;
+  
+  ctx.font = `bold ${fontSize}px Cairo`;
+  ctx.fillStyle = '#1e293b';
+  ctx.fillText(nameEl.textContent, x, y + fontSize);
+  
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `certificate_${nameEl.textContent}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+// ============ CHARTS ============
+function initCharts() {
+  const ctxRev = document.getElementById('revenueChart');
+  new Chart(ctxRev, {
+    type: 'line',
+    data: {
+      labels: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو'],
+      datasets: [{
+        label: 'الإيرادات',
+        data: [12000, 19000, 15000, 25000, 22000, 30000],
+        borderColor: '#0f766e',
+        backgroundColor: 'rgba(15,118,110,0.1)',
+        fill: true,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {legend: {display: false}}
+    }
+  });
+  
+  const ctxAtt = document.getElementById('attendanceChart');
+  new Chart(ctxAtt, {
+    type: 'bar',
+    data: {
+      labels: ['الأسبوع 1', 'الأسبوع 2', 'الأسبوع 3', 'الأسبوع 4'],
+      datasets: [{
+        label: 'نسبة الحضور',
+        data: [85, 88, 92, 90],
+        backgroundColor: '#0f766e'
+      }]
+    },
+    options: {responsive: true, plugins: {legend: {display: false}}}
+  });
+  
+  const ctxSys = document.getElementById('systemChart');
+  new Chart(ctxSys, {
+    type: 'doughnut',
+    data: {
+      labels: ['أساسي', 'احترافي'],
+      datasets: [{
+        data: [65, 35],
+        backgroundColor: ['#0f766e', '#f59e0b']
+      }]
+    },
+    options: {responsive: true}
+  });
+}
+
+// ============ PWA ============
+if('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('data:text/javascript,console.log("SW loaded")').catch(()=>{});
+}
+</script>
+
+<script>(function(){document.addEventListener("click",function(e){var a=e.target.closest("[data-product-id]");if(!a)return;e.preventDefault();var pid=a.getAttribute("data-product-id");if(pid)parent.postMessage({type:"ecto-artifact-link-click",productId:pid},"*")})})();</script>
+</body>
+</html>
