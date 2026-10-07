@@ -428,6 +428,13 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
   h1,h2,h3,h4{color:#000 !important;}
   .badge{border:1px solid #ccc !important;}
 }
+
+/* ANDALUS AI LAUNCHER */
+#andalus-ai-launcher{position:fixed;left:22px;bottom:22px;z-index:9998;border:0;border-radius:18px;padding:12px 17px;background:linear-gradient(135deg,#152238,#1f3562);color:#fff;font-family:Cairo,sans-serif;font-weight:900;cursor:pointer;box-shadow:0 10px 30px rgba(21,34,56,.28)}
+#andalus-ai-overlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,15,28,.55);align-items:center;justify-content:center;padding:18px}
+#andalus-ai-overlay.open{display:flex}
+#andalus-ai-frame{width:min(900px,96vw);height:min(820px,94vh);border:0;border-radius:22px;background:#fff;box-shadow:0 25px 80px rgba(0,0,0,.3)}
+
 </style>
 </head>
 <body>
@@ -7514,7 +7521,13 @@ function buildWordDoc(sections) {
 <head><meta charset="utf-8"><title>مركز الاندلس للتدريب</title>
 <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
 </head>
-<body dir="rtl" style="direction:rtl;text-align:right;">${body}</body></html>`;
+<body dir="rtl" style="direction:rtl;text-align:right;">${body}
+<!-- ANDALUS_AI_LAUNCHER -->
+<button id="andalus-ai-launcher" onclick="openAndalusAI()">🧠 Andalus AI</button>
+<div id="andalus-ai-overlay" onclick="if(event.target===this)closeAndalusAI()"><iframe id="andalus-ai-frame" src="andalus-ai.html" title="Andalus AI"></iframe></div>
+<script>function openAndalusAI(){document.getElementById('andalus-ai-overlay').classList.add('open')}function closeAndalusAI(){document.getElementById('andalus-ai-overlay').classList.remove('open')}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAndalusAI()})</script>
+
+</body></html>`;
   return new Blob(['\ufeff' + html], { type: 'application/msword' });
 }
 
