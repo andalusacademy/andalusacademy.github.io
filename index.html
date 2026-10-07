@@ -7522,10 +7522,7 @@ function buildWordDoc(sections) {
 <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
 </head>
 <body dir="rtl" style="direction:rtl;text-align:right;">${body}
-<!-- ANDALUS_AI_LAUNCHER -->
-<button id="andalus-ai-launcher" onclick="openAndalusAI()">🧠 Andalus AI</button>
-<div id="andalus-ai-overlay" onclick="if(event.target===this)closeAndalusAI()"><iframe id="andalus-ai-frame" src="andalus-ai.html" title="Andalus AI"></iframe></div>
-<script>function openAndalusAI(){document.getElementById('andalus-ai-overlay').classList.add('open')}function closeAndalusAI(){document.getElementById('andalus-ai-overlay').classList.remove('open')}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAndalusAI()})</script>
+
 
 </body></html>`;
   return new Blob(['\ufeff' + html], { type: 'application/msword' });
@@ -13896,6 +13893,10 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   });
 }
 </script>
+
+
+<!-- /ANDALUS_AI_LAUNCHER -->
+
 
 <!-- ANDALUS_AI_LAUNCHER -->
 <button id="andalus-ai-launcher" type="button" onclick="openAndalusAI()">🧠 Andalus AI</button>
