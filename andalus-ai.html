@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Andalus AI — مركز الأندلس للتدريب</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+:root{--navy:#152238;--navy2:#243b68;--gold:#c9a24c;--bg:#f3f5fa;--white:#fff;--text:#172033;--muted:#718096;--border:#e2e8f0;--danger:#dc2626;}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#eef2f8,#f8fafc);font-family:Cairo,sans-serif;color:var(--text);min-height:100vh}.wrap{max-width:1100px;margin:auto;padding:24px}.hero{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;border-radius:22px;padding:28px 30px;box-shadow:0 15px 45px #15223825;display:flex;justify-content:space-between;align-items:center;gap:20px}.brand{display:flex;align-items:center;gap:16px}.logo{width:58px;height:58px;border-radius:16px;background:var(--gold);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900}.hero h1{margin:0;font-size:25px}.hero p{margin:5px 0 0;color:#dbe5f5;font-size:13px}.status{font-size:12px;color:#dbe5f5}.card{background:#fff;border:1px solid var(--border);border-radius:20px;box-shadow:0 8px 30px #1522380b;margin-top:18px;overflow:hidden}.quick{padding:18px;display:flex;gap:9px;flex-wrap:wrap}.quick button{border:1px solid var(--border);background:#f8fafc;border-radius:12px;padding:9px 13px;font-family:inherit;cursor:pointer;font-weight:700;color:var(--navy)}.quick button:hover{border-color:var(--gold);background:#fffaf0}.messages{height:460px;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:14px}.msg{max-width:86%;padding:13px 16px;border-radius:15px;line-height:1.9;font-size:14px;white-space:pre-wrap}.user{align-self:flex-start;background:var(--navy);color:#fff;border-bottom-left-radius:4px}.ai{align-self:flex-end;background:#f1f5f9;color:var(--text);border-bottom-right-radius:4px}.system{align-self:center;background:#fff8e8;color:#7c5b17;border:1px solid #f3dfad;font-size:12px;max-width:95%}.composer{padding:16px;border-top:1px solid var(--border);display:flex;gap:10px}.composer textarea{flex:1;resize:none;min-height:58px;max-height:150px;border:1.5px solid var(--border);border-radius:13px;padding:12px 14px;font-family:inherit;font-size:14px;outline:none}.composer textarea:focus{border-color:var(--navy)}.send{min-width:110px;border:0;border-radius:13px;background:var(--gold);color:var(--navy);font-family:inherit;font-weight:900;cursor:pointer}.send:disabled{opacity:.55;cursor:not-allowed}.typing{display:none;padding:0 22px 14px;color:var(--muted);font-size:12px}.error{color:var(--danger);background:#fef2f2;border:1px solid #fecaca;padding:10px 14px;border-radius:10px;margin:12px 18px;display:none;font-size:12px}@media(max-width:650px){.wrap{padding:12px}.hero{padding:20px}.hero h1{font-size:19px}.messages{height:55vh}.composer{flex-direction:column}.send{height:48px}.msg{max-width:94%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero"><div class="brand"><div class="logo">AI</div><div><h1>Andalus AI</h1><p>المساعد الإداري الذكي لمركز الأندلس للتدريب</p></div></div><div class="status" id="status">جاري التحقق من الدخول...</div></div>
+  <div class="card"><div class="quick">
+    <button data-q="اعطني ملخص سريع عن حالة المركز اليوم">📊 ملخص المركز</button>
+    <button data-q="من هم الطلاب المتأخرون في سداد المدفوعات؟">💰 المتأخرون في السداد</button>
+    <button data-q="ابحث عن الطالب الذي سأذكر اسمه لك">👨‍🎓 البحث عن طالب</button>
+    <button data-q="ما الذي تستطيع مساعدتي فيه داخل نظام الأندلس؟">🤖 ماذا تستطيع؟</button>
+  </div></div>
+  <div class="card"><div id="messages" class="messages"><div class="msg system">مرحبًا بك في <b>Andalus AI</b> 👋<br>اسألني عن الطلاب، المدفوعات، الحضور، الدرجات أو مؤشرات المركز.</div></div><div id="typing" class="typing">Andalus AI يفكر ويقرأ البيانات المطلوبة…</div><div id="error" class="error"></div><div class="composer"><textarea id="input" placeholder="اكتب سؤالك هنا…"></textarea><button id="send" class="send">إرسال ↵</button></div></div>
+</div>
+<script>
+const SUPABASE_URL='https://uvwarprsghwvrfmdaaqv.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ2h3dnJmbWRhYXF2IiwicmVmIjoidXZ3YXJwcnNnaHd2cmZtZGFhcXYiLCJyb2xlIjoiYW5vbiJ9';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const $=id=>document.getElementById(id); const messages=$('messages');
+function add(text,type){const el=document.createElement('div');el.className='msg '+type;el.textContent=text;messages.appendChild(el);messages.scrollTop=messages.scrollHeight}
+function showError(text){$('error').textContent=text;$('error').style.display='block'}
+async function session(){const {data,error}=await sb.auth.getSession();if(error||!data.session){$('status').textContent='غير مسجل الدخول';showError('يجب تسجيل الدخول إلى نظام الأندلس أولًا، ثم فتح صفحة Andalus AI من نفس المتصفح.');$('send').disabled=true;return null}$('status').textContent='متصل بحسابك الآمن';return data.session}
+async function ask(){const input=$('input');const text=input.value.trim();if(!text)return;const s=await session();if(!s)return;input.value='';$('error').style.display='none';add(text,'user');$('typing').style.display='block';$('send').disabled=true;try{const r=await fetch(SUPABASE_URL+'/functions/v1/andalus-ai',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.access_token,'apikey':SUPABASE_KEY},body:JSON.stringify({message:text})});const data=await r.json();if(!r.ok)throw new Error(data.error||'تعذر الاتصال بـ Andalus AI');add(data.answer||'لم تصل إجابة.','ai')}catch(e){showError(e.message||'حدث خطأ غير متوقع')}finally{$('typing').style.display='none';$('send').disabled=false;input.focus()}}
+$('send').onclick=ask;$('input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask()}});document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{$('input').value=b.dataset.q;$('input').focus()});session();
+</script>
+</body></html>
