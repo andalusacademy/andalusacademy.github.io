@@ -12,15 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inject AI launcher
+      - name: Fix and inject AI launcher
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('index.html')
           h=p.read_text(encoding='utf-8')
-          if '<!-- ANDALUS_AI_LAUNCHER -->' in h:
-              print('AI launcher already integrated; nothing to do.')
-              raise SystemExit(0)
+          start='<!-- ANDALUS_AI_LAUNCHER -->'
+          end='<!-- /ANDALUS_AI_LAUNCHER -->'
+          while start in h and end in h:
+              a=h.index(start)
+              b=h.index(end,a)+len(end)
+              h=h[:a]+h[b:]
           css='''
           /* ANDALUS AI LAUNCHER */
           #andalus-ai-launcher{position:fixed;left:22px;bottom:22px;z-index:9998;border:0;border-radius:18px;padding:12px 17px;background:linear-gradient(135deg,#152238,#1f3562);color:#fff;font-family:Cairo,sans-serif;font-weight:900;cursor:pointer;box-shadow:0 10px 30px rgba(21,34,56,.28)}
@@ -30,13 +33,19 @@ jobs:
           '''
           body='''
           <!-- ANDALUS_AI_LAUNCHER -->
-          <button id="andalus-ai-launcher" onclick="openAndalusAI()">🧠 Andalus AI</button>
+          <button id="andalus-ai-launcher" type="button" onclick="openAndalusAI()">🧠 Andalus AI</button>
           <div id="andalus-ai-overlay" onclick="if(event.target===this)closeAndalusAI()"><iframe id="andalus-ai-frame" src="andalus-ai.html" title="Andalus AI"></iframe></div>
           <script>function openAndalusAI(){document.getElementById('andalus-ai-overlay').classList.add('open')}function closeAndalusAI(){document.getElementById('andalus-ai-overlay').classList.remove('open')}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAndalusAI()})</script>
+          <!-- /ANDALUS_AI_LAUNCHER -->
           '''
-          if '</style>' not in h or '</body>' not in h:
-              raise SystemExit('index.html markers not found')
-          h=h.replace('</style>',css+'\n</style>',1).replace('</body>',body+'\n</body>',1)
+          # Avoid duplicating CSS if it was already added to the real stylesheet.
+          if '/* ANDALUS AI LAUNCHER */' not in h:
+              pos=h.rfind('</style>')
+              if pos < 0: raise SystemExit('real style closing tag not found')
+              h=h[:pos]+css+'\n'+h[pos:]
+          pos=h.rfind('</body>')
+          if pos < 0: raise SystemExit('real body closing tag not found')
+          h=h[:pos]+body+'\n'+h[pos:]
           p.write_text(h,encoding='utf-8')
           PY
       - name: Commit integration
