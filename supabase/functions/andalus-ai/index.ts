@@ -64,7 +64,7 @@ const tools = [
   {
     type: "function",
     name: "search_students",
-    description: "البحث عن طلاب بالاسم أو رقم القيد. استخدمها فقط عندما يطلب المستخدم بيانات طالب محدد أو قائمة صغيرة.",
+    description: "البحث عن طلاب بالاسم أو رقم القيد. رقم القيد في نظام الأندلس هو حقل id في جدول الطلاب. استخدمها فقط عندما يطلب المستخدم بيانات طالب محدد أو قائمة صغيرة.",
     parameters: {
       type: "object",
       properties: { query: { type: "string", description: "اسم الطالب أو رقم القيد" } },
@@ -120,39 +120,39 @@ async function runTool(name: string, args: Record<string, unknown>, db: ReturnTy
     const escaped = q.replace(/[%_]/g, "");
     const { data, error } = await db
       .from("students")
-      .select("id,name,branch,program_id,registration_no")
+      .select("id,name,branch,program_id")
       .is("deleted_at", null)
-      .or(`name.ilike.%${escaped}%,id.ilike.%${escaped}%,registration_no.ilike.%${escaped}%`)
+      .or(`name.ilike.%${escaped}%,id.ilike.%${escaped}%`)
       .order("created_at", { ascending: false })
       .limit(10);
     if (error) throw new Error("تعذر البحث عن الطالب.");
-    return { students: (data || []).map((s: any) => ({ id: s.id, registration_no: s.registration_no ?? s.id, name: s.name, branch: s.branch, program_id: s.program_id })) };
+    return { students: (data || []).map((s: any) => ({ id: s.id, registration_no: s.id, name: s.name, branch: s.branch, program_id: s.program_id })) };
   }
 
   if (name === "get_student_finance") {
     const studentId = cleanText(args.student_id, 100);
     const [{ data: student }, { data: payments }] = await Promise.all([
-      db.from("students").select("id,name,registration_no,program_id").eq("id", studentId).maybeSingle(),
+      db.from("students").select("id,name,program_id").eq("id", studentId).maybeSingle(),
       db.from("payments").select("payment_type,amount,paid,paid_date,due_date,notes").eq("student_id", studentId).order("due_date"),
     ]);
     if (!student) return { error: "الطالب غير موجود." };
     const rows = payments || [];
     const paid = rows.filter((p: any) => p.paid).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
     const due = rows.filter((p: any) => !p.paid).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-    return { student: { id: student.id, registration_no: student.registration_no ?? student.id, name: student.name }, total_paid: paid, total_due: due, payments: rows.slice(0, 30) };
+    return { student: { id: student.id, registration_no: student.id, name: student.name }, total_paid: paid, total_due: due, payments: rows.slice(0, 30) };
   }
 
   if (name === "get_student_academic") {
     const studentId = cleanText(args.student_id, 100);
     const [{ data: student }, { data: grades }, { data: attendance }] = await Promise.all([
-      db.from("students").select("id,name,registration_no,program_id,branch").eq("id", studentId).maybeSingle(),
+      db.from("students").select("id,name,program_id,branch").eq("id", studentId).maybeSingle(),
       db.from("grades").select("*").eq("student_id", studentId),
       db.from("attendance").select("date,status,session_id").eq("student_id", studentId).order("date", { ascending: false }).limit(100),
     ]);
     if (!student) return { error: "الطالب غير موجود." };
     const att = attendance || [];
     const present = att.filter((x: any) => String(x.status || "").includes("حاضر") || String(x.status || "").toLowerCase() === "present").length;
-    return { student: { id: student.id, registration_no: student.registration_no ?? student.id, name: student.name, branch: student.branch }, grades: grades || [], attendance: { total_records: att.length, present, percentage: att.length ? Math.round((present / att.length) * 100) : null } };
+    return { student: { id: student.id, registration_no: student.id, name: student.name, branch: student.branch }, grades: grades || [], attendance: { total_records: att.length, present, percentage: att.length ? Math.round((present / att.length) * 100) : null } };
   }
 
   if (name === "get_payment_risk") {
@@ -160,9 +160,9 @@ async function runTool(name: string, args: Record<string, unknown>, db: ReturnTy
     if (error) throw new Error("تعذر قراءة حالة المدفوعات.");
     const ids = [...new Set((payments || []).map((p: any) => p.student_id).filter(Boolean))].slice(0, 100);
     if (!ids.length) return { students: [] };
-    const { data: students } = await db.from("students").select("id,name,registration_no").in("id", ids).is("deleted_at", null);
+    const { data: students } = await db.from("students").select("id,name").in("id", ids).is("deleted_at", null);
     const byId = new Map((students || []).map((s: any) => [s.id, s]));
-    return { students: ids.map(id => { const s: any = byId.get(id); const ps = (payments || []).filter((p: any) => p.student_id === id); return { id, registration_no: s?.registration_no ?? id, name: s?.name ?? "غير معروف", unpaid_count: ps.length, unpaid_amount: ps.reduce((n: number, p: any) => n + (Number(p.amount) || 0), 0), nearest_due_date: ps.map((p: any) => p.due_date).filter(Boolean).sort()[0] ?? null }; }).slice(0, 50) };
+    return { students: ids.map(id => { const s: any = byId.get(id); const ps = (payments || []).filter((p: any) => p.student_id === id); return { id, registration_no: id, name: s?.name ?? "غير معروف", unpaid_count: ps.length, unpaid_amount: ps.reduce((n: number, p: any) => n + (Number(p.amount) || 0), 0), nearest_due_date: ps.map((p: any) => p.due_date).filter(Boolean).sort()[0] ?? null }; }).slice(0, 50) };
   }
 
   throw new Error("أداة غير معروفة.");
