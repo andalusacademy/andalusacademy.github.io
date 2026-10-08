@@ -100,7 +100,91 @@ const tools=[
  }
 ];
 
+function cairoDateISO(){
+ return new Intl.DateTimeFormat("en-CA",{
+  timeZone:"Africa/Cairo",
+  year:"numeric",
+  month:"2-digit",
+  day:"2-digit"
+ }).format(new Date());
+}
+
+function isOverduePaymentQuestion(message:string){
+ return /متأخر|متاخر|المتأخرين|المتاخرين|متأخرون|متاخرون|تأخير.*سداد|سداد.*تأخير|متأخر.*سداد|سداد.*متأخر/i.test(message);
+}
+
+async function getVerifiedOverdueStudents(db:any){
+ const today=cairoDateISO();
+
+ const {data:payments,error:pe}=await db.from("payments")
+   .select("student_id,amount,due_date")
+   .eq("paid",false)
+   .gt("amount",0)
+   .lt("due_date",today)
+   .not("student_id","is",null)
+   .limit(1000);
+
+ if(pe)throw Error(pe.message);
+
+ const rows=Array.isArray(payments)?payments:[];
+ if(!rows.length){
+  return {today,total_students:0,total_overdue:0,students:[]};
+ }
+
+ const ids=[...new Set(rows.map((x:any)=>String(x.student_id)).filter(Boolean))];
+
+ const {data:students,error:se}=await db.from("students")
+   .select("id,name,branch,phone,program")
+   .in("id",ids);
+
+ if(se)throw Error(se.message);
+
+ const byId=new Map((students||[]).map((s:any)=>[String(s.id),s]));
+ const grouped=new Map<string,any>();
+
+ for(const p of rows){
+  const id=String(p.student_id);
+  const amount=Number(p.amount)||0;
+  const s=byId.get(id);
+  if(!s)continue;
+
+  if(!grouped.has(id)){
+   grouped.set(id,{
+    student_id:id,
+    name:s.name||"غير مسجل",
+    branch:s.branch||"",
+    phone:s.phone||"",
+    program:s.program||"",
+    overdue_amount:0,
+    installments:0,
+    oldest_due_date:p.due_date
+   });
+  }
+
+  const item=grouped.get(id);
+  item.overdue_amount+=amount;
+  item.installments+=1;
+  if(String(p.due_date)<String(item.oldest_due_date||p.due_date)){
+   item.oldest_due_date=p.due_date;
+  }
+ }
+
+ const result=[...grouped.values()]
+   .sort((a,b)=>b.overdue_amount-a.overdue_amount);
+
+ return {
+  today,
+  total_students:result.length,
+  total_overdue:result.reduce((sum,x)=>sum+x.overdue_amount,0),
+  students:result.slice(0,500)
+ };
+}
+
 async function tool(name:string,args:any,db:any){
+ if(name==="get_verified_overdue_students"){
+  return await getVerifiedOverdueStudents(db);
+ }
+
  if(name==="get_database_schema"){
   const {data,error}=await db.rpc("ai_schema");
   if(error)throw Error(error.message);
@@ -164,6 +248,9 @@ const INSTRUCTIONS=`
 15. لو البيانات غير موجودة فعلًا، قل بالضبط ما الذي ينقص.
 16. عند وجود نتيجة رقمية، اعرض الحساب بشكل مختصر ومفهوم.
 17. استخدم الجنيه المصري عند التعامل مع مبالغ مالية.
+18. بيانات الطلاب والمدفوعات والدرجات والحضور وغيرها بيانات حقيقية وحساسة: لا تنشئ أسماء أو أرقام أو هواتف أو فروع أو مبالغ من عندك تحت أي ظرف.
+19. عند السؤال عن المتأخرين في السداد يجب استخدام get_verified_overdue_students، والنتيجة التي تعود منها هي المصدر الوحيد للأسماء والمبالغ في الإجابة.
+20. "متأخر" يعني دفعة غير مسددة، قيمتها أكبر من صفر، وتاريخ استحقاقها أقدم من تاريخ اليوم بتوقيت القاهرة. الدفعة المستحقة اليوم ليست متأخرة.
 `;
 
 async function gemini(input:any,previous?:string){
@@ -230,6 +317,49 @@ Deno.serve(async(req)=>{
   const {data:ctx}=await db.from("ai_conversations")
     .select("previous_interaction_id,last_question,last_answer")
     .eq("user_id",user.id).maybeSingle();
+
+  // أسئلة المتأخرين في السداد تُجاب من قاعدة البيانات مباشرة لمنع أي هلوسة.
+  if(isOverduePaymentQuestion(message)){
+   const verified=await getVerifiedOverdueStudents(db);
+
+   let answer="";
+   if(!verified.total_students){
+    answer=`لا يوجد حاليًا طلاب عليهم دفعات متأخرة في قاعدة البيانات حتى ${verified.today}.`;
+   }else{
+    const lines=verified.students.map((s:any,i:number)=>
+     `${i+1}. ${s.name} — ${s.overdue_amount.toLocaleString("ar-EG")} جنيه${s.branch?\` — الفرع: ${s.branch}\`:""}`
+    );
+
+    answer=[
+     `عدد الطلاب المتأخرين: ${verified.total_students}`,
+     `إجمالي المبالغ المتأخرة: ${verified.total_overdue.toLocaleString("ar-EG")} جنيه`,
+     "",
+     ...lines
+    ].join("\\n");
+
+    if(verified.total_students>verified.students.length){
+     answer+=`\\n\\nتم عرض أول ${verified.students.length} طالبًا حسب قيمة المتأخرات.`;
+    }
+   }
+
+   await db.from("ai_conversations").upsert({
+    user_id:user.id,
+    previous_interaction_id:ctx?.previous_interaction_id||null,
+    last_question:message,
+    last_answer:answer,
+    updated_at:new Date().toISOString()
+   });
+
+   try{
+    await db.from("activity_log").insert({
+     user_id:user.id,
+     action:"andalus_ai_query",
+     details:JSON.stringify({question:message.slice(0,500),model:"verified_database"})
+    });
+   }catch{}
+
+   return json({answer,model:"verified_database"});
+  }
 
   let input:any[]=[{
    type:"user_input",
