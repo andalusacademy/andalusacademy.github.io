@@ -5669,11 +5669,19 @@ function getFilteredStudents() {
     const mq = !q || String(s.name || '').toLowerCase().includes(q) || String(s.id || '').toLowerCase().includes(q);
     const mb = !branch || normalizeStudentsBranch(s.branch) === normalizeStudentsBranch(branch);
     const mp = !prog || (s.program_id + '|' + (s.system_name || '')) === prog || (s.program_id + '|') === prog;
-    const meta = [s.system_name,s.program,s.batch,s.batch_name,s.cohort,s.group_name,s.enrollment_number,s.notes].filter(Boolean).join(' ').toLowerCase();
-    const professional = /احتراف|professional/.test(meta);
-    const basic = /أساس|اساس|basic/.test(meta);
-    const batch8 = /دفعة\s*8|batch\s*8|(^|[^0-9])8([^0-9]|$)/i.test(meta);
-    const batch10 = /دفعة\s*10|batch\s*10|(^|[^0-9])10([^0-9]|$)/i.test(meta);
+    const systemMeta = [s.system_name, s.program].filter(Boolean).join(' ').toLowerCase();
+    const professional = /احتراف|professional/.test(systemMeta);
+    const basic = /أساس|اساس|basic/.test(systemMeta);
+
+    // رقم الدفعة يُقرأ من حقول الدفعة فقط، وليس رقم القيد الذي قد يحتوي على 8 أو 10.
+    const batchMeta = [s.batch, s.batch_name, s.cohort, s.group_name, s.notes].filter(Boolean).join(' ').toLowerCase();
+    const hasExplicitBatch = /دفعة\s*\d+|batch\s*\d+/i.test(batchMeta);
+    const batch8Explicit = /دفعة\s*8(?!\d)|batch\s*8(?!\d)/i.test(batchMeta);
+    const batch10 = /دفعة\s*10(?!\d)|batch\s*10(?!\d)/i.test(batchMeta);
+
+    // السجلات القديمة التي أُضيفت قبل اعتماد تقسيم الدفعات تُعامل كدفعة 8،
+    // إلا إذا كانت محددة صراحةً كدفعة 10.
+    const batch8 = batch8Explicit || (!hasExplicitBatch && !batch10);
     const mc = category === 'all' ||
       (category === 'professional8' && professional && batch8) ||
       (category === 'basic8' && basic && batch8) ||
