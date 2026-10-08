@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Andalus AI — منفذ مستقل</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Arial,Tahoma,sans-serif;background:#eef2f7;color:#172033}
+body{padding:20px}.app{max-width:1050px;margin:auto}.hero{background:linear-gradient(135deg,#152238,#243b68);color:#fff;border-radius:20px;padding:24px;display:flex;justify-content:space-between;align-items:center;gap:15px}.hero h1{margin:0 0 6px;font-size:25px}.hero p{margin:0;color:#dbe5f5}.status{font-size:13px}.card{background:#fff;border-radius:18px;margin-top:16px;border:1px solid #dfe5ee;overflow:hidden;box-shadow:0 8px 28px #15223812}.quick{padding:14px;display:flex;gap:8px;flex-wrap:wrap}.quick button{border:1px solid #d9e0ea;background:#f8fafc;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:700}.messages{height:55vh;min-height:360px;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:12px}.msg{max-width:88%;padding:12px 15px;border-radius:14px;line-height:1.8;white-space:pre-wrap}.user{align-self:flex-start;background:#152238;color:#fff}.ai{align-self:flex-end;background:#f1f5f9}.system{align-self:center;background:#fff8e8;border:1px solid #f0dfad}.composer{border-top:1px solid #e3e8ef;padding:14px;display:flex;gap:10px}.composer textarea{flex:1;min-height:58px;resize:none;border:1px solid #ccd5e1;border-radius:12px;padding:12px;font:inherit}.send{width:110px;border:0;border-radius:12px;background:#c9a24c;color:#152238;font-weight:900;cursor:pointer}.send:disabled{opacity:.5}.error{display:none;margin:12px;padding:10px;border-radius:10px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}@media(max-width:650px){body{padding:10px}.hero{padding:18px;display:block}.status{margin-top:10px}.composer{flex-direction:column}.send{width:100%;height:48px}}
+</style>
+</head>
+<body>
+<div class="app">
+<section class="hero"><div><h1>🧠 Andalus AI</h1><p>المساعد الإداري الذكي لمركز الأندلس للتدريب — منفذ مستقل</p></div><div class="status" id="status">جاري الاتصال…</div></section>
+<section class="card"><div class="quick">
+<button data-q="اعطني ملخص سريع عن حالة المركز اليوم">📊 ملخص المركز</button>
+<button data-q="من هم الطلاب المتأخرون في سداد المدفوعات؟">💰 المتأخرون</button>
+<button data-q="مين أعلى 10 طلاب في الدرجات؟">🏆 أعلى الطلاب</button>
+<button data-q="ما الذي تستطيع مساعدتي فيه داخل نظام الأندلس؟">🤖 ماذا تستطيع؟</button>
+</div></section>
+<section class="card"><div id="messages" class="messages"><div class="msg system">مرحبًا بك في Andalus AI 👋<br>هذا منفذ مستقل لا يستخدم iframe ولا Service Worker.</div></div><div id="error" class="error"></div><div class="composer"><textarea id="input" placeholder="اكتب سؤالك هنا…"></textarea><button id="send" class="send">إرسال ↵</button></div></section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const URL='https://uvwarprsghwvrfmdaaqv.supabase.co';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZWh3dnJmbWRhYXF2IiwicmVmIjoidXZ3YXJwcnNnaHd2cmZtZGFhcXYiLCJyb2xlIjoiYW5vbiJ9';
+const sb=supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const $=id=>document.getElementById(id), box=$('messages');
+function add(t,c){const e=document.createElement('div');e.className='msg '+c;e.textContent=t;box.appendChild(e);box.scrollTop=box.scrollHeight}
+function err(t){$('error').textContent=t;$('error').style.display='block'}
+async function getSession(){const r=await sb.auth.getSession();if(!r.data.session){$('status').textContent='غير مسجل الدخول';err('سجل الدخول إلى نظام الأندلس أولًا ثم افتح هذا المنفذ.');$('send').disabled=true;return null}$('status').textContent='متصل بحسابك الآمن';return r.data.session}
+async function ask(){const i=$('input'),q=i.value.trim();if(!q)return;const s=await getSession();if(!s)return;i.value='';$('error').style.display='none';add(q,'user');$('send').disabled=true;$('status').textContent='Andalus AI يفكر…';try{const r=await fetch(URL+'/functions/v1/andalus-ai',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.access_token,'apikey':KEY},body:JSON.stringify({message:q})});let d={};try{d=await r.json()}catch(_){ }if(!r.ok)throw Error(d.error||('HTTP '+r.status));add(d.answer||'لم تصل إجابة.','ai');$('status').textContent='متصل بحسابك الآمن'}catch(e){err(e.message||'حدث خطأ غير متوقع');$('status').textContent='حدث خطأ'}finally{$('send').disabled=false;i.focus()}}
+$('send').onclick=ask;$('input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask()}});document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{$('input').value=b.dataset.q;$('input').focus()});getSession();
+</script>
+</body>
+</html>
