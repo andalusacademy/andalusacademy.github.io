@@ -907,13 +907,28 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           </div>
           <div id="students-branch-content" style="display:none;">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;"><button class="btn btn-outline" onclick="backToStudentsBranches()">← الفروع</button><strong id="students-current-branch" style="font-size:16px;color:var(--navy);"></strong></div>
-            <div class="branch-filter-tabs" id="students-category-tabs" style="margin-bottom:14px;flex-wrap:wrap;">
-              <button class="branch-tab active" data-category="all" onclick="setStudentsCategory('all')">جميع الطلاب</button>
-              <button class="branch-tab" data-category="professional8" onclick="setStudentsCategory('professional8')">طلاب النظام الاحترافي – دفعة 8</button>
-              <button class="branch-tab" data-category="basic8" onclick="setStudentsCategory('basic8')">طلاب النظام الأساسي – دفعة 8</button>
-              <button class="branch-tab" data-category="professional10" onclick="setStudentsCategory('professional10')">طلاب النظام الاحترافي – دفعة 10</button>
-              <button class="branch-tab" data-category="basic10" onclick="setStudentsCategory('basic10')">طلاب النظام الأساسي – دفعة 10</button>
+            <div id="students-category-tabs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:8px 0 20px;">
+              <button type="button" class="card students-category-card active" data-category="all" onclick="setStudentsCategory('all')" style="padding:22px 14px;text-align:center;cursor:pointer;border:2px solid var(--primary);font-family:inherit;min-height:145px;transition:transform .15s,box-shadow .15s;">
+                <div style="font-size:42px;line-height:1.2;margin-bottom:10px;">👥</div><div style="font-size:16px;font-weight:900;color:var(--navy);">جميع الطلاب</div><div style="font-size:12px;color:var(--muted);margin-top:6px;">عرض كل طلاب الفرع</div>
+              </button>
+              <button type="button" class="card students-category-card" data-category="professional8" onclick="setStudentsCategory('professional8')" style="padding:22px 14px;text-align:center;cursor:pointer;border:2px solid var(--border);font-family:inherit;min-height:145px;transition:transform .15s,box-shadow .15s;">
+                <div style="font-size:42px;line-height:1.2;margin-bottom:10px;">🎓</div><div style="font-size:16px;font-weight:900;color:var(--navy);">النظام الاحترافي</div><div style="font-size:13px;font-weight:800;color:var(--primary);margin-top:6px;">دفعة 8</div>
+              </button>
+              <button type="button" class="card students-category-card" data-category="basic8" onclick="setStudentsCategory('basic8')" style="padding:22px 14px;text-align:center;cursor:pointer;border:2px solid var(--border);font-family:inherit;min-height:145px;transition:transform .15s,box-shadow .15s;">
+                <div style="font-size:42px;line-height:1.2;margin-bottom:10px;">📘</div><div style="font-size:16px;font-weight:900;color:var(--navy);">النظام الأساسي</div><div style="font-size:13px;font-weight:800;color:var(--primary);margin-top:6px;">دفعة 8</div>
+              </button>
+              <button type="button" class="card students-category-card" data-category="professional10" onclick="setStudentsCategory('professional10')" style="padding:22px 14px;text-align:center;cursor:pointer;border:2px solid var(--border);font-family:inherit;min-height:145px;transition:transform .15s,box-shadow .15s;">
+                <div style="font-size:42px;line-height:1.2;margin-bottom:10px;">🏆</div><div style="font-size:16px;font-weight:900;color:var(--navy);">النظام الاحترافي</div><div style="font-size:13px;font-weight:800;color:var(--primary);margin-top:6px;">دفعة 10</div>
+              </button>
+              <button type="button" class="card students-category-card" data-category="basic10" onclick="setStudentsCategory('basic10')" style="padding:22px 14px;text-align:center;cursor:pointer;border:2px solid var(--border);font-family:inherit;min-height:145px;transition:transform .15s,box-shadow .15s;">
+                <div style="font-size:42px;line-height:1.2;margin-bottom:10px;">📚</div><div style="font-size:16px;font-weight:900;color:var(--navy);">النظام الأساسي</div><div style="font-size:13px;font-weight:800;color:var(--primary);margin-top:6px;">دفعة 10</div>
+              </button>
             </div>
+            <style>
+              .students-category-card:hover{transform:translateY(-3px);box-shadow:0 8px 22px rgba(15,45,90,.12);}
+              .students-category-card.active{border-color:var(--primary)!important;background:linear-gradient(145deg,#eff6ff,#fff);}
+              @media(max-width:520px){#students-category-tabs{grid-template-columns:repeat(2,minmax(0,1fr))!important}.students-category-card{padding:16px 8px!important;min-height:130px!important}.students-category-card div:first-child{font-size:34px!important}}
+            </style>
           </div>
           <div class="search-bar">
             <input type="text" class="search-input" placeholder="🔍 ابحث باسم أو رقم قيد..." id="search-input" oninput="debouncedFilterStudents()">
@@ -5675,7 +5690,11 @@ function openStudentsBranch(branch) {
   document.getElementById('students-branch-home').style.display = 'none';
   document.getElementById('students-branch-content').style.display = '';
   document.getElementById('students-current-branch').textContent = branch === 'كفر الدوار' ? '📍 فرع كفر الدوار' : '📍 فرع الإسكندرية';
-  document.querySelectorAll('#students-category-tabs .branch-tab').forEach(b => b.classList.toggle('active', b.dataset.category === 'all'));
+  document.querySelectorAll('#students-category-tabs .students-category-card').forEach(b => {
+    const active = b.dataset.category === 'all';
+    b.classList.toggle('active', active);
+    b.style.borderColor = active ? 'var(--primary)' : 'var(--border)';
+  });
   studentsShowAllFlag = false;
   renderStudents();
 }
@@ -5690,7 +5709,11 @@ function backToStudentsBranches() {
 }
 function setStudentsCategory(category) {
   window.studentsCategory = category;
-  document.querySelectorAll('#students-category-tabs .branch-tab').forEach(b => b.classList.toggle('active', b.dataset.category === category));
+  document.querySelectorAll('#students-category-tabs .students-category-card').forEach(b => {
+    const active = b.dataset.category === category;
+    b.classList.toggle('active', active);
+    b.style.borderColor = active ? 'var(--primary)' : 'var(--border)';
+  });
   studentsShowAllFlag = false;
   renderStudents();
 }
