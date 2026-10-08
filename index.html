@@ -13887,7 +13887,7 @@ function applyRolePermissions() {
 console.log('✅ Andalus Academy v6.6 loaded — Daily Revenue Log');
 
 // تسجيل Service Worker (PWA + offline cache)
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+if ('serviceWorker' in navigator && location.protocol !== 'file:' && !location.pathname.endsWith('/andalus-ai.html')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW failed:', err));
   });
