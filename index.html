@@ -897,15 +897,23 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 
         <!-- STUDENTS -->
         <div id="page-students" class="page">
-          <div style="padding:0 0 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <strong style="font-size:13px;color:var(--navy);">🏢 عرض طلاب:</strong>
-            <div class="branch-filter-tabs" id="students-branch-tabs">
-              <button class="branch-tab active" data-branch="" onclick="setStudentsBranchTab('')">الكل <span id="stu-tab-count-all"></span></button>
-              <button class="branch-tab" data-branch="كفر الدوار" onclick="setStudentsBranchTab('كفر الدوار')">كفر الدوار <span id="stu-tab-count-kafr"></span></button>
-              <button class="branch-tab" data-branch="فرع اسكندرية" onclick="setStudentsBranchTab('فرع اسكندرية')">فرع اسكندرية <span id="stu-tab-count-vic"></span></button>
+          <div id="students-branch-home" style="margin-bottom:18px;">
+            <div style="font-size:15px;font-weight:900;color:var(--navy);margin-bottom:12px;">📍 اختار الفرع</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
+              <button type="button" class="card" style="padding:22px;text-align:center;cursor:pointer;border:2px solid var(--border);font-family:inherit;" onclick="openStudentsBranch('كفر الدوار')"><div style="font-size:30px;">🏢</div><div style="font-size:16px;font-weight:900;color:var(--navy);">فرع كفر الدوار</div><div id="stu-home-count-kafr" style="font-size:12px;color:var(--muted);margin-top:5px;">عدد الطلاب: —</div></button>
+              <button type="button" class="card" style="padding:22px;text-align:center;cursor:pointer;border:2px solid var(--border);font-family:inherit;" onclick="openStudentsBranch('فرع اسكندرية')"><div style="font-size:30px;">🏙️</div><div style="font-size:16px;font-weight:900;color:var(--navy);">فرع الإسكندرية</div><div id="stu-home-count-vic" style="font-size:12px;color:var(--muted);margin-top:5px;">عدد الطلاب: —</div></button>
             </div>
-            <button class="btn btn-outline btn-sm admin-only" style="display:none;margin-right:auto;" onclick="openRecycleBin()">🗑 سلة المحذوفات</button>
-            <button class="btn btn-outline btn-sm" onclick="openDuplicateScanner()">🔍 كاشف تكرار البيانات</button>
+            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm admin-only" style="display:none;" onclick="openRecycleBin()">🗑 سلة المحذوفات</button><button class="btn btn-outline btn-sm" onclick="openDuplicateScanner()">🔍 كاشف تكرار البيانات</button></div>
+          </div>
+          <div id="students-branch-content" style="display:none;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;"><button class="btn btn-outline" onclick="backToStudentsBranches()">← الفروع</button><strong id="students-current-branch" style="font-size:16px;color:var(--navy);"></strong></div>
+            <div class="branch-filter-tabs" id="students-category-tabs" style="margin-bottom:14px;flex-wrap:wrap;">
+              <button class="branch-tab active" data-category="all" onclick="setStudentsCategory('all')">جميع الطلاب</button>
+              <button class="branch-tab" data-category="professional8" onclick="setStudentsCategory('professional8')">طلاب النظام الاحترافي – دفعة 8</button>
+              <button class="branch-tab" data-category="basic8" onclick="setStudentsCategory('basic8')">طلاب النظام الأساسي – دفعة 8</button>
+              <button class="branch-tab" data-category="professional10" onclick="setStudentsCategory('professional10')">طلاب النظام الاحترافي – دفعة 10</button>
+              <button class="branch-tab" data-category="basic10" onclick="setStudentsCategory('basic10')">طلاب النظام الأساسي – دفعة 10</button>
+            </div>
           </div>
           <div class="search-bar">
             <input type="text" class="search-input" placeholder="🔍 ابحث باسم أو رقم قيد..." id="search-input" oninput="debouncedFilterStudents()">
@@ -5628,16 +5636,67 @@ function openDuplicateScanner() {
   document.getElementById('modal-duplicate-scanner').classList.add('open');
 }
 
+function normalizeStudentsBranch(value) {
+  const v = String(value || '').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').trim().toLowerCase();
+  if (v.includes('كفر')) return 'كفر الدوار';
+  if (v.includes('اسكند') || v.includes('اسكندر') || v.includes('alex')) return 'فرع اسكندرية';
+  return v;
+}
+window.studentsBranch = '';
+window.studentsCategory = 'all';
+
 function getFilteredStudents() {
   const q = (document.getElementById('search-input')?.value || '').toLowerCase();
   const branch = document.getElementById('filter-branch')?.value || '';
   const prog = document.getElementById('filter-program')?.value || '';
+  const category = window.studentsCategory || 'all';
   return allStudents.filter(s => {
-    const mq = !q || s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-    const mb = !branch || s.branch === branch;
+    const mq = !q || String(s.name || '').toLowerCase().includes(q) || String(s.id || '').toLowerCase().includes(q);
+    const mb = !branch || normalizeStudentsBranch(s.branch) === normalizeStudentsBranch(branch);
     const mp = !prog || (s.program_id + '|' + (s.system_name || '')) === prog || (s.program_id + '|') === prog;
-    return mq && mb && mp;
+    const meta = [s.system_name,s.program,s.batch,s.batch_name,s.cohort,s.group_name,s.enrollment_number,s.notes].filter(Boolean).join(' ').toLowerCase();
+    const professional = /احتراف|professional/.test(meta);
+    const basic = /أساس|اساس|basic/.test(meta);
+    const batch8 = /دفعة\\s*8|batch\\s*8|(^|[^0-9])8([^0-9]|$)/i.test(meta);
+    const batch10 = /دفعة\\s*10|batch\\s*10|(^|[^0-9])10([^0-9]|$)/i.test(meta);
+    const mc = category === 'all' ||
+      (category === 'professional8' && professional && batch8) ||
+      (category === 'basic8' && basic && batch8) ||
+      (category === 'professional10' && professional && batch10) ||
+      (category === 'basic10' && basic && batch10);
+    return mq && mb && mp && mc;
   });
+}
+function openStudentsBranch(branch) {
+  window.studentsBranch = branch;
+  window.studentsCategory = 'all';
+  document.getElementById('filter-branch').value = branch;
+  document.getElementById('filter-program').value = '';
+  document.getElementById('students-branch-home').style.display = 'none';
+  document.getElementById('students-branch-content').style.display = '';
+  document.getElementById('students-current-branch').textContent = branch === 'كفر الدوار' ? '📍 فرع كفر الدوار' : '📍 فرع الإسكندرية';
+  document.querySelectorAll('#students-category-tabs .branch-tab').forEach(b => b.classList.toggle('active', b.dataset.category === 'all'));
+  studentsShowAllFlag = false;
+  renderStudents();
+}
+function backToStudentsBranches() {
+  document.getElementById('students-branch-home').style.display = '';
+  document.getElementById('students-branch-content').style.display = 'none';
+  document.getElementById('filter-branch').value = '';
+  window.studentsBranch = '';
+  window.studentsCategory = 'all';
+  studentsShowAllFlag = false;
+  renderStudents();
+}
+function setStudentsCategory(category) {
+  window.studentsCategory = category;
+  document.querySelectorAll('#students-category-tabs .branch-tab').forEach(b => b.classList.toggle('active', b.dataset.category === category));
+  studentsShowAllFlag = false;
+  renderStudents();
+}
+function setStudentsBranchTab(branch) {
+  if (branch) openStudentsBranch(branch);
+  else backToStudentsBranches();
 }
 
 function renderMissingDataCard() {
@@ -5697,16 +5756,17 @@ function showAllStudents() {
   renderStudents();
 }
 
+function updateStudentsBranchCounts() {
+  const count = branch => allStudents.filter(s => normalizeStudentsBranch(s.branch) === branch).length;
+  const a = document.getElementById('stu-home-count-kafr');
+  const b = document.getElementById('stu-home-count-vic');
+  if (a) a.textContent = 'عدد الطلاب: ' + count('كفر الدوار');
+  if (b) b.textContent = 'عدد الطلاب: ' + count('فرع اسكندرية');
+}
 function renderStudents(list) {
   const fullData = list || getFilteredStudents();
   document.getElementById('student-count').textContent = fullData.length + ' طالب';
-  const allCount = allStudents.length;
-  const kafrCount = allStudents.filter(s => s.branch === 'كفر الدوار').length;
-  const vicCount = allStudents.filter(s => s.branch === 'فرع اسكندرية').length;
-  const setCount = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = '(' + n + ')'; };
-  setCount('stu-tab-count-all', allCount);
-  setCount('stu-tab-count-kafr', kafrCount);
-  setCount('stu-tab-count-vic', vicCount);
+  updateStudentsBranchCounts();
   const tbody = document.getElementById('students-table');
   if (!fullData.length) {
     tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="emoji">👨‍🎓</div><h4>لا يوجد طلاب</h4></div></td></tr>';
