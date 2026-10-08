@@ -179,6 +179,8 @@ async function gemini(input:any,previous?:string){
 
  if(previous)body.previous_interaction_id=previous;
 
+ let lastError="";
+ for(let attempt=0;attempt<3;attempt++){
  const r=await fetch(GEMINI,{
   method:"POST",
   headers:{"Content-Type":"application/json","x-goog-api-key":key},
@@ -186,8 +188,15 @@ async function gemini(input:any,previous?:string){
  });
 
  const d=await r.json();
- if(!r.ok)throw Error(d?.error?.message||"تعذر الاتصال بـ Gemini.");
- return d;
+ if(r.ok)return d;
+ lastError=d?.error?.message||"تعذر الاتصال بـ Gemini.";
+ if(/high demand|try again later|temporarily|rate limit|429/i.test(lastError) && attempt<2){
+  await new Promise(resolve=>setTimeout(resolve,1500*(attempt+1)));
+  continue;
+ }
+ throw Error(lastError);
+ }
+ throw Error(lastError||"تعذر الاتصال بـ Gemini.");
 }
 
 function callsOf(r:any){
@@ -276,7 +285,10 @@ Deno.serve(async(req)=>{
    r=await gemini(results,r.id);
   }
 
-  const answer=textOf(r);
+  let answer=textOf(r);\n  if(answer==="لم أتمكن من تكوين إجابة الآن." && r?.status==="completed" && Array.isArray(r?.steps)){
+   const texts=r.steps.flatMap((s:any)=>Array.isArray(s?.content)?s.content:[]).filter((x:any)=>x?.type==="text"&&typeof x.text==="string").map((x:any)=>x.text.trim()).filter(Boolean);
+   if(texts.length)answer=texts[texts.length-1];
+  }
 
   await db.from("ai_conversations").upsert({
    user_id:user.id,
