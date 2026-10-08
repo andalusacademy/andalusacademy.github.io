@@ -2725,9 +2725,9 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 const SUPABASE_URL = 'https://uvwarprsghwvrfmdaaqv.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2d2FycHJzZ2h3dnJmbWRhYXF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTgzNjQsImV4cCI6MjA5Njg3NDM2NH0.bPfXaNqmWUIM7pYU8rHfRtHNs6Z7fsZs2nf8-Vo5T7E';
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+const sb = SUPABASE_KEY ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-});
+}) : null;
 
 let currentUser = null;          // user_profiles row
 let currentAuth = null;          // supabase auth user

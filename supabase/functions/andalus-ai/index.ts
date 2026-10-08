@@ -174,7 +174,7 @@ async function gemini(input:any,previous?:string){
   model:MODEL,
   input,
   tools,
-  instructions:INSTRUCTIONS
+  system_instruction:INSTRUCTIONS
  };
 
  if(previous)body.previous_interaction_id=previous;
