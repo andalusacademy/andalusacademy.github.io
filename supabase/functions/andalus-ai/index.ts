@@ -1,231 +1,302 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json; charset=utf-8",
+const CORS={
+  "Access-Control-Allow-Origin":"*",
+  "Access-Control-Allow-Headers":"authorization,x-client-info,apikey,content-type",
+  "Access-Control-Allow-Methods":"POST,OPTIONS",
+  "Content-Type":"application/json; charset=utf-8"
 };
 
-const OPENAI_URL = "https://api.openai.com/v1/responses";
-const MODEL = Deno.env.get("ANDALUS_AI_MODEL") || "gpt-6-luna";
+const GEMINI="https://generativelanguage.googleapis.com/v1beta/interactions";
+const MODEL=Deno.env.get("ANDALUS_AI_MODEL")||"gemini-3.5-flash-lite";
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: corsHeaders });
+const clean=(v:any,n=6000)=>String(v??"").replace(/\s+/g," ").trim().slice(0,n);
+const json=(x:any,s=200)=>new Response(JSON.stringify(x),{status:s,headers:CORS});
+
+async function auth(req:Request){
+ const token=(req.headers.get("Authorization")||"").replace(/^Bearer\s+/i,"").trim();
+ if(!token)throw Error("غير مصرح: يلزم تسجيل الدخول.");
+
+ const url=Deno.env.get("SUPABASE_URL")!;
+ const anon=Deno.env.get("SUPABASE_ANON_KEY")!;
+ const service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+ const ac=createClient(url,anon,{global:{headers:{Authorization:`Bearer ${token}`}}});
+ const {data:{user},error}=await ac.auth.getUser(token);
+ if(error||!user)throw Error("جلسة الدخول غير صالحة.");
+
+ const db=createClient(url,service);
+ const {data:p,error:pe}=await db.from("user_profiles")
+   .select("id,role,full_name,allowed_pages")
+   .eq("id",user.id).maybeSingle();
+
+ if(pe)throw Error("تعذر التحقق من الصلاحيات.");
+ if(p?.role!=="admin" && Array.isArray(p?.allowed_pages) && !p.allowed_pages.includes("dashboard"))
+   throw Error("ليس لديك صلاحية استخدام Andalus AI.");
+
+ return {user,profile:p,db};
 }
 
-function cleanText(value: unknown, max = 4000) {
-  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-}
-
-async function requireAdmin(req: Request) {
-  const auth = req.headers.get("Authorization") || "";
-  const jwt = auth.replace(/^Bearer\s+/i, "").trim();
-  if (!jwt) throw new Error("غير مصرح: يلزم تسجيل الدخول.");
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-  const authClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: { user }, error: authError } = await authClient.auth.getUser(jwt);
-  if (authError || !user) throw new Error("جلسة الدخول غير صالحة.");
-
-  const adminClient = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: profile, error: profileError } = await adminClient
-    .from("user_profiles")
-    .select("id,role,full_name,name,allowed_pages")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) throw new Error("تعذر التحقق من صلاحيات المستخدم.");
-  const isAdmin = profile?.role === "admin";
-  const allowed = Array.isArray(profile?.allowed_pages) ? profile.allowed_pages : null;
-  if (!isAdmin && allowed && !allowed.includes("dashboard")) {
-    throw new Error("ليس لديك صلاحية استخدام Andalus AI.");
+const tools=[
+ {
+  type:"function",
+  name:"get_database_schema",
+  description:"قراءة هيكل قاعدة بيانات مركز الأندلس لمعرفة الجداول والأعمدة قبل بناء أي استعلام.",
+  parameters:{type:"object",properties:{},additionalProperties:false}
+ },
+ {
+  type:"function",
+  name:"query_database",
+  description:"قراءة بيانات من جدول حقيقي بعد معرفة الـschema. استخدمها للقوائم والتفاصيل والبحث والترتيب.",
+  parameters:{
+   type:"object",
+   properties:{
+    table:{type:"string"},
+    columns:{type:"array",items:{type:"string"}},
+    filters:{type:"array",items:{
+     type:"object",
+     properties:{
+      column:{type:"string"},
+      operator:{type:"string",enum:["eq","neq","gt","gte","lt","lte","ilike","in","is_null","not_null"]},
+      value:{}
+     },
+     required:["column","operator"],
+     additionalProperties:false
+    }},
+    order_by:{type:["string","null"]},
+    order_desc:{type:"boolean"},
+    limit:{type:"integer"}
+   },
+   required:["table","columns","filters","order_by","order_desc","limit"],
+   additionalProperties:false
   }
-
-  return { user, profile, db: adminClient };
-}
-
-const tools = [
-  {
-    type: "function",
-    name: "get_center_overview",
-    description: "إرجاع أرقام آمنة ومختصرة عن المركز: عدد الطلاب والبرامج والمواد والليدز، دون بيانات شخصية.",
-    parameters: { type: "object", properties: {}, additionalProperties: false },
-    strict: true,
-  },
-  {
-    type: "function",
-    name: "search_students",
-    description: "البحث عن طلاب بالاسم أو رقم القيد. رقم القيد في نظام الأندلس هو حقل id في جدول الطلاب. استخدمها فقط عندما يطلب المستخدم بيانات طالب محدد أو قائمة صغيرة.",
-    parameters: {
-      type: "object",
-      properties: { query: { type: "string", description: "اسم الطالب أو رقم القيد" } },
-      required: ["query"], additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: "function",
-    name: "get_student_finance",
-    description: "إرجاع ملخص مدفوعات طالب محدد: المدفوع والمتبقي وسجل الدفعات. لا تستخدمها إلا بعد معرفة رقم القيد أو student_id.",
-    parameters: {
-      type: "object",
-      properties: { student_id: { type: "string" } },
-      required: ["student_id"], additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: "function",
-    name: "get_student_academic",
-    description: "إرجاع درجات وحضور طالب محدد. استخدمها لأسئلة المستوى الدراسي والدرجات والحضور.",
-    parameters: {
-      type: "object",
-      properties: { student_id: { type: "string" } },
-      required: ["student_id"], additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: "function",
-    name: "get_payment_risk",
-    description: "إرجاع قائمة مختصرة بالطلاب الذين لديهم دفعات غير مسددة أو متأخرة، مع أرقام القيد والمبالغ فقط.",
-    parameters: { type: "object", properties: {}, additionalProperties: false },
-    strict: true,
-  },
+ },
+ {
+  type:"function",
+  name:"aggregate_database",
+  description:"حساب count/sum/avg/min/max مع grouping والفلاتر.",
+  parameters:{
+   type:"object",
+   properties:{
+    table:{type:"string"},
+    group_by:{type:"array",items:{type:"string"}},
+    measure_column:{type:["string","null"]},
+    operation:{type:"string",enum:["count","sum","avg","min","max"]},
+    filters:{type:"array",items:{
+     type:"object",
+     properties:{
+      column:{type:"string"},
+      operator:{type:"string",enum:["eq","neq","gt","gte","lt","lte","ilike","in","is_null","not_null"]},
+      value:{}
+     },
+     required:["column","operator"],
+     additionalProperties:false
+    }},
+    limit:{type:"integer"}
+   },
+   required:["table","group_by","measure_column","operation","filters","limit"],
+   additionalProperties:false
+  }
+ }
 ];
 
-async function runTool(name: string, args: Record<string, unknown>, db: ReturnType<typeof createClient>) {
-  if (name === "get_center_overview") {
-    const [students, programs, subjects, leads] = await Promise.all([
-      db.from("students").select("id", { count: "exact", head: true }).is("deleted_at", null),
-      db.from("programs").select("id", { count: "exact", head: true }),
-      db.from("subjects").select("id", { count: "exact", head: true }),
-      db.from("leads").select("id", { count: "exact", head: true }),
-    ]);
-    return { الطلاب: students.count ?? 0, البرامج: programs.count ?? 0, المواد: subjects.count ?? 0, الاستفسارات: leads.count ?? 0 };
-  }
-
-  if (name === "search_students") {
-    const q = cleanText(args.query, 100);
-    if (!q) return { students: [] };
-    const escaped = q.replace(/[%_]/g, "");
-    const { data, error } = await db
-      .from("students")
-      .select("id,name,branch,program_id")
-      .is("deleted_at", null)
-      .or(`name.ilike.%${escaped}%,id.ilike.%${escaped}%`)
-      .order("created_at", { ascending: false })
-      .limit(10);
-    if (error) throw new Error("تعذر البحث عن الطالب.");
-    return { students: (data || []).map((s: any) => ({ id: s.id, registration_no: s.id, name: s.name, branch: s.branch, program_id: s.program_id })) };
-  }
-
-  if (name === "get_student_finance") {
-    const studentId = cleanText(args.student_id, 100);
-    const [{ data: student }, { data: payments }] = await Promise.all([
-      db.from("students").select("id,name,program_id").eq("id", studentId).maybeSingle(),
-      db.from("payments").select("payment_type,amount,paid,paid_date,due_date,notes").eq("student_id", studentId).order("due_date"),
-    ]);
-    if (!student) return { error: "الطالب غير موجود." };
-    const rows = payments || [];
-    const paid = rows.filter((p: any) => p.paid).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-    const due = rows.filter((p: any) => !p.paid).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-    return { student: { id: student.id, registration_no: student.id, name: student.name }, total_paid: paid, total_due: due, payments: rows.slice(0, 30) };
-  }
-
-  if (name === "get_student_academic") {
-    const studentId = cleanText(args.student_id, 100);
-    const [{ data: student }, { data: grades }, { data: attendance }] = await Promise.all([
-      db.from("students").select("id,name,program_id,branch").eq("id", studentId).maybeSingle(),
-      db.from("grades").select("*").eq("student_id", studentId),
-      db.from("attendance").select("date,status,session_id").eq("student_id", studentId).order("date", { ascending: false }).limit(100),
-    ]);
-    if (!student) return { error: "الطالب غير موجود." };
-    const att = attendance || [];
-    const present = att.filter((x: any) => String(x.status || "").includes("حاضر") || String(x.status || "").toLowerCase() === "present").length;
-    return { student: { id: student.id, registration_no: student.id, name: student.name, branch: student.branch }, grades: grades || [], attendance: { total_records: att.length, present, percentage: att.length ? Math.round((present / att.length) * 100) : null } };
-  }
-
-  if (name === "get_payment_risk") {
-    const { data: payments, error } = await db.from("payments").select("student_id,amount,paid,paid_date,due_date").eq("paid", false).order("due_date").limit(200);
-    if (error) throw new Error("تعذر قراءة حالة المدفوعات.");
-    const ids = [...new Set((payments || []).map((p: any) => p.student_id).filter(Boolean))].slice(0, 100);
-    if (!ids.length) return { students: [] };
-    const { data: students } = await db.from("students").select("id,name").in("id", ids).is("deleted_at", null);
-    const byId = new Map((students || []).map((s: any) => [s.id, s]));
-    return { students: ids.map(id => { const s: any = byId.get(id); const ps = (payments || []).filter((p: any) => p.student_id === id); return { id, registration_no: id, name: s?.name ?? "غير معروف", unpaid_count: ps.length, unpaid_amount: ps.reduce((n: number, p: any) => n + (Number(p.amount) || 0), 0), nearest_due_date: ps.map((p: any) => p.due_date).filter(Boolean).sort()[0] ?? null }; }).slice(0, 50) };
-  }
-
-  throw new Error("أداة غير معروفة.");
-}
-
-async function callOpenAI(input: unknown, previousResponseId?: string) {
-  const key = Deno.env.get("OPENAI_API_KEY");
-  if (!key) throw new Error("مفتاح OpenAI غير مضبوط على الخادم.");
-  const payload: Record<string, unknown> = {
-    model: MODEL,
-    input,
-    tools,
-    tool_choice: "auto",
-    instructions: `أنت Andalus AI، المساعد الإداري الذكي لمركز الأندلس للتدريب.\n- أجب بالعربية المصرية الواضحة والمباشرة.\n- بيانات المركز لا تُخمن: استخدم الأدوات عندما يكون السؤال عن النظام أو الطلاب أو المدفوعات أو الحضور أو الدرجات.\n- لا تخترع أرقامًا أو أسماء. إذا لم تتوفر البيانات قل ذلك بوضوح.\n- لا تعرض أسرارًا أو مفاتيح أو بيانات لا علاقة لها بالسؤال.\n- عند عرض بيانات طالب، اعرض الحد الأدنى اللازم فقط.\n- لا تنفذ أي تعديل أو حذف؛ هذه النسخة للقراءة والتحليل فقط.`,
-    max_output_tokens: 1200,
-  };
-  if (previousResponseId) payload.previous_response_id = previousResponseId;
-
-  const response = await fetch(OPENAI_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data?.error?.message || "تعذر الاتصال بخدمة الذكاء الاصطناعي.");
+async function tool(name:string,args:any,db:any){
+ if(name==="get_database_schema"){
+  const {data,error}=await db.rpc("ai_schema");
+  if(error)throw Error(error.message);
   return data;
+ }
+
+ if(name==="query_database"){
+  const {data,error}=await db.rpc("ai_read",{
+   p_table:clean(args.table,100),
+   p_columns:args.columns||[],
+   p_filters:args.filters||[],
+   p_order_by:args.order_by||null,
+   p_order_desc:!!args.order_desc,
+   p_limit:Math.min(Number(args.limit)||100,500)
+  });
+  if(error)throw Error(error.message);
+  return data;
+ }
+
+ if(name==="aggregate_database"){
+  const {data,error}=await db.rpc("ai_aggregate",{
+   p_table:clean(args.table,100),
+   p_group_by:args.group_by||[],
+   p_measure_column:args.measure_column||null,
+   p_operation:args.operation||"count",
+   p_filters:args.filters||[],
+   p_limit:Math.min(Number(args.limit)||100,500)
+  });
+  if(error)throw Error(error.message);
+  return data;
+ }
+
+ throw Error("أداة غير معروفة.");
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+const INSTRUCTIONS=`
+أنت Andalus AI، المساعد الإداري الذكي لمركز الأندلس للتدريب.
 
-  try {
-    const { db, profile } = await requireAdmin(req);
-    const body = await req.json();
-    const message = cleanText(body?.message, 6000);
-    if (!message) return json({ error: "اكتب سؤالك أولًا." }, 400);
+أنت مساعد عام للنظام ولست مجرد chatbot بسيط.
 
-    let response = await callOpenAI([{ role: "user", content: message }]);
-    for (let round = 0; round < 4; round++) {
-      const calls = (response.output || []).filter((item: any) => item.type === "function_call");
-      if (!calls.length) break;
-      const outputs = [];
-      for (const call of calls) {
-        let args: Record<string, unknown> = {};
-        try { args = JSON.parse(call.arguments || "{}"); } catch { args = {}; }
-        const result = await runTool(call.name, args, db);
-        outputs.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(result) });
-      }
-      response = await callOpenAI(outputs, response.id);
-    }
+قواعد أساسية:
+1. أجب بالعربية المصرية الواضحة والمباشرة.
+2. تستطيع الإجابة عن الطلاب والبرامج والمواد والدرجات والحضور والمدفوعات والإيرادات والمصروفات والبيانات الإدارية وأي معلومة موجودة في قاعدة البيانات.
+3. لا تخمن أي رقم.
+4. قبل استخدام جدول أو عمود غير معروف استخدم get_database_schema.
+5. استخدم query_database للبيانات والقوائم والتفاصيل.
+6. استخدم aggregate_database للحسابات والتجميعات.
+7. يمكنك تنفيذ الحسابات الرياضية بنفسك بعد الحصول على البيانات.
+8. إذا قال المستخدم "هم" أو "ده" أو "دي" أو "اقسمهم" أو "احسبهم" فحاول ربطها بنتيجة السؤال السابق في نفس المحادثة ولا تسأل سؤالًا توضيحيًا إذا كان المقصود واضحًا.
+9. إذا قال "كل" أو "جميع" فاجلب كل النتائج المتاحة ضمن الحد الآمن 500، واذكر العدد الإجمالي.
+10. إذا طلب دخل شهري ففرّق بوضوح بين:
+   - المحصل فعليًا.
+   - المستحق.
+   - المتأخر.
+   - متوسط الدخل.
+   ولا تعتبر عدد الطلاب دخلاً إلا إذا كانت قيمة الرسوم معروفة.
+11. إذا كان السؤال يحتاج أكثر من جدول، استخدم أكثر من أداة ثم اربط النتائج منطقيًا.
+12. لا تنفذ INSERT أو UPDATE أو DELETE أو أي تعديل.
+13. لا تعرض مفاتيح API أو service role أو بيانات سرية.
+14. لا تقل "لا أستطيع" لمجرد أن السؤال جديد؛ ابحث في الـschema والبيانات أولًا.
+15. لو البيانات غير موجودة فعلًا، قل بالضبط ما الذي ينقص.
+16. عند وجود نتيجة رقمية، اعرض الحساب بشكل مختصر ومفهوم.
+17. استخدم الجنيه المصري عند التعامل مع مبالغ مالية.
+`;
 
-    const answer = response.output_text || "لم أتمكن من تكوين إجابة الآن.";
-    try {
-      await db.from("activity_log").insert({
-        action: "andalus_ai_query",
-        details: { user_id: profile?.id, question: message.slice(0, 500), model: MODEL },
-      });
-    } catch (_) { /* logging must not block the answer */ }
+async function gemini(input:any,previous?:string){
+ const key=Deno.env.get("GEMINI_API_KEY");
+ if(!key)throw Error("مفتاح Gemini غير مضبوط على الخادم.");
 
-    return json({ answer, model: MODEL });
-  } catch (error) {
-    console.error("andalus-ai:", error);
-    return json({ error: error instanceof Error ? error.message : "حدث خطأ غير متوقع." }, 500);
+ const body:any={
+  model:MODEL,
+  input,
+  tools,
+  instructions:INSTRUCTIONS
+ };
+
+ if(previous)body.previous_interaction_id=previous;
+
+ const r=await fetch(GEMINI,{
+  method:"POST",
+  headers:{"Content-Type":"application/json","x-goog-api-key":key},
+  body:JSON.stringify(body)
+ });
+
+ const d=await r.json();
+ if(!r.ok)throw Error(d?.error?.message||"تعذر الاتصال بـ Gemini.");
+ return d;
+}
+
+function callsOf(r:any){
+ return (r?.output||r?.steps||[]).filter((x:any)=>
+   x.type==="function_call" || x.type==="function_call_request"
+ );
+}
+
+function textOf(r:any){
+ if(typeof r?.output_text==="string" && r.output_text.trim())return r.output_text;
+ for(const x of (r?.output||r?.steps||[])){
+  if(x.type==="text" && typeof x.text==="string")return x.text;
+  if(x.content)for(const c of x.content){
+   if(c.type==="text"&&typeof c.text==="string")return c.text;
   }
+ }
+ return "لم أتمكن من تكوين إجابة الآن.";
+}
+
+Deno.serve(async(req)=>{
+ if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
+ if(req.method!=="POST")return json({error:"Method not allowed"},405);
+
+ try{
+  const {db,profile,user}=await auth(req);
+  const body=await req.json();
+  const message=clean(body?.message);
+
+  if(!message)return json({error:"اكتب سؤالك أولًا."},400);
+
+  const {data:ctx}=await db.from("ai_conversations")
+    .select("previous_interaction_id,last_question,last_answer")
+    .eq("user_id",user.id).maybeSingle();
+
+  let input:any[]=[{
+   type:"user_input",
+   content:[{type:"text",text:message}]
+  }];
+
+  if(ctx?.last_question && ctx?.last_answer){
+   input.unshift({
+    type:"user_input",
+    content:[{
+     type:"text",
+     text:`السياق السابق:
+السؤال السابق: ${ctx.last_question}
+الإجابة السابقة: ${ctx.last_answer.slice(0,5000)}
+
+السؤال الحالي: ${message}`
+    }]
+   });
+  }
+
+  let r=await gemini(input,ctx?.previous_interaction_id||undefined);
+
+  for(let round=0;round<8;round++){
+   const calls=callsOf(r);
+   if(!calls.length)break;
+
+   const results:any[]=[];
+
+   for(const call of calls){
+    let args:any={};
+    try{
+     args=JSON.parse(call.arguments||call.args||"{}");
+    }catch{}
+
+    try{
+     const result=await tool(call.name,args,db);
+     results.push({
+      type:"function_result",
+      name:call.name,
+      call_id:call.id||call.call_id,
+      result:[{type:"text",text:JSON.stringify(result)}]
+     });
+    }catch(e:any){
+     results.push({
+      type:"function_result",
+      name:call.name,
+      call_id:call.id||call.call_id,
+      result:[{type:"text",text:JSON.stringify({error:e?.message||"Tool error"})}]
+     });
+    }
+   }
+
+   r=await gemini(results,r.id);
+  }
+
+  const answer=textOf(r);
+
+  await db.from("ai_conversations").upsert({
+   user_id:user.id,
+   previous_interaction_id:r.id||null,
+   last_question:message,
+   last_answer:answer,
+   updated_at:new Date().toISOString()
+  });
+
+  try{
+   await db.from("activity_log").insert({
+    user_id:user.id,
+    action:"andalus_ai_query",
+    details:JSON.stringify({question:message.slice(0,500),model:MODEL})
+   });
+  }catch{}
+
+  return json({answer,model:MODEL});
+ }catch(e:any){
+  console.error("andalus-ai",e);
+  return json({error:e?.message||"حدث خطأ غير متوقع."},500);
+ }
 });
