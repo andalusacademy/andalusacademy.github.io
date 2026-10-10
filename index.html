@@ -3773,10 +3773,11 @@ async function renderParentPortalDashboard() {
   const scheduleRows = schedule.map(item => {
     const rec = payMap[item.type] || {};
     const amount = Number(rec.amount ?? item.amount) || 0;
-    totalDue += amount;
     if (rec.paid) totalPaid += amount;
     return { ...item, rec, amount };
   });
+  const savedTotalDue = Number(student.total_due) || 0;
+  const totalDue = savedTotalDue > 0 ? savedTotalDue : (SYSTEM_TOTAL_DUE[student.system_name] || 0);
   const remaining = Math.max(0, totalDue - totalPaid);
   const today = new Date().toISOString().split('T')[0];
   const nextDue = scheduleRows
@@ -8920,7 +8921,7 @@ const SYSTEM_TOTAL_DUE = {
   'النظام الأساسي': 7500,
   'النظام الاحترافي': 10000
 };
-const ordinals = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر', 'الحادي عشر'];
+const ordinals = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر', 'الحادي عشر', 'الثاني عشر'];
 
 function addMonths(dateStr, n) {
   const d = new Date(dateStr);
@@ -8943,16 +8944,12 @@ const FIXED_EXTRA_ITEMS = [
 function getPaymentSchedule(student) {
   const reg = student.date || new Date().toISOString().split('T')[0];
   const schedule = [];
-  if (student.system_name === 'النظام الأساسي') {
-    // ✅ مقدم مفتوح + 8 أقساط مفتوحة — كل القيم تبدأ صفر (تُكتب يدويًا)
-    schedule.push({ type: 'مقدم', label: 'المقدم', amount: 0, due: reg });
-    for (let i = 1; i <= 7; i++) schedule.push({ type: 'قسط_' + i, label: 'القسط ' + ordinals[i - 1], amount: 0, due: fmtDate(addMonths(reg, i)) });
-    schedule.push({ type: 'قسط_8', label: 'القسط الثامن (الأخير)', amount: 0, due: fmtDate(addMonths(reg, 8)) });
-  } else if (student.system_name === 'النظام الاحترافي') {
-    // ✅ مقدم مفتوح + 11 قسط مفتوح — كل القيم تبدأ صفر (تُكتب يدويًا)
-    schedule.push({ type: 'مقدم', label: 'المقدم', amount: 0, due: reg });
-    for (let i = 1; i <= 10; i++) schedule.push({ type: 'قسط_' + i, label: 'القسط ' + ordinals[i - 1], amount: 0, due: fmtDate(addMonths(reg, i)) });
-    schedule.push({ type: 'قسط_11', label: 'القسط ' + ordinals[10] + ' (الأخير)', amount: 0, due: fmtDate(addMonths(reg, 11)) });
+  if (student.system_name === 'النظام الأساسي' || student.system_name === 'النظام الاحترافي') {
+    // المقدمة ثم 12 قسطًا بالترتيب لكلا النظامين.
+    schedule.push({ type: 'مقدم', label: 'المقدمة', amount: 0, due: reg });
+    for (let i = 1; i <= 12; i++) {
+      schedule.push({ type: 'قسط_' + i, label: 'القسط ' + ordinals[i - 1], amount: 0, due: fmtDate(addMonths(reg, i)) });
+    }
   }
   // لا ننشئ بند "رسوم الكورس" الثابت؛ إجمالي الرسوم يُقرأ من إجمالي المستحق المسجل للطالب.
   return schedule;
@@ -9066,7 +9063,8 @@ function getStudentPayStatus(student) {
   });
 
   // ✅ إجمالي المستحق: رقم يدوي يُكتب مرة واحدة في بيانات الطالب — ثابت دايمًا ولا يتأثر بالخصومات
-  let totalDue = (student.total_due !== null && student.total_due !== undefined) ? parseFloat(student.total_due) : 0;
+  const savedTotalDue = Number(student.total_due) || 0;
+  let totalDue = savedTotalDue > 0 ? savedTotalDue : (SYSTEM_TOTAL_DUE[student.system_name] || 0);
 
   let status = 'gray';
   if (allPaid) status = 'green';
@@ -9276,7 +9274,8 @@ function renderStudentFinance(s, container) {
   });
 
   // ✅ إجمالي المستحق: رقم يدوي يُكتب مرة واحدة في فورم بيانات الطالب — ثابت دايمًا ولا يتأثر بالبنود/الخصومات
-  let totalDue = (s.total_due !== null && s.total_due !== undefined) ? parseFloat(s.total_due) : 0;
+  const savedTotalDue = Number(s.total_due) || 0;
+  let totalDue = savedTotalDue > 0 ? savedTotalDue : (SYSTEM_TOTAL_DUE[s.system_name] || 0);
   const remaining = Math.max(0, totalDue - totalPaid);
 
   function rowHtml(type, label, amount, applicable, isOptional = false, isExtra = false, isOpenAmount = false, useStatusLabel = false) {
