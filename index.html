@@ -3288,12 +3288,24 @@ async function tryOfflineLogin(email, password) {
   return { ok: true, profile: cached.profile };
 }
 
+function withLoginTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(label || 'انتهت مهلة الاتصال')), ms); })
+  ]).finally(() => clearTimeout(timer));
+}
+
 async function doLogin() {
-  clearFieldErrors();
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
+  const emailInput = document.getElementById('login-email');
+  const passwordInput = document.getElementById('login-password');
   const errBox = document.getElementById('login-error');
   const btn = document.getElementById('login-btn');
+  if (!emailInput || !passwordInput || !errBox || !btn || btn.dataset.loginBusy === '1') return;
+
+  clearFieldErrors();
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
   errBox.style.display = 'none';
 
   let valid = true;
@@ -3307,57 +3319,65 @@ async function doLogin() {
   }
   if (!valid) return;
 
+  btn.dataset.loginBusy = '1';
   btn.disabled = true;
   btn.textContent = 'جاري الدخول...';
 
-  // 📴 مفيش نت: جرّب الدخول بالبيانات المحفوظة محليًا من آخر دخول أونلاين على الجهاز ده
-  if (!navigator.onLine) {
-    const result = await tryOfflineLogin(email, password);
-    if (result.ok) {
-      currentAuth = { id: result.profile.id, email };
-      currentUser = result.profile;
-      showToast('📴 دخلت أوفلاين ببياناتك المحفوظة — التسجيل هيتزامن لما النت يرجع');
-      initApp();
-    } else if (result.reason === 'no-cache') {
-      errBox.textContent = 'لسه ما سجلت دخول قبل كده وانت متصل بالنت على الجهاز/المتصفح ده — أول دخول لازم يكون فيه نت';
-      errBox.style.display = 'block';
-    } else {
-      errBox.textContent = 'البريد أو كلمة المرور غلط';
-      errBox.style.display = 'block';
-    }
-    btn.disabled = false;
-    btn.textContent = 'دخول';
-    return;
-  }
-
   try {
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) {
-      errBox.textContent = error.message.includes('Invalid') ? 'البريد أو كلمة المرور غلط' : error.message;
-      errBox.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'دخول';
+    if (!navigator.onLine) {
+      const result = await withLoginTimeout(tryOfflineLogin(email, password), 10000, 'تعذر التحقق من بيانات الدخول المحفوظة');
+      if (result.ok) {
+        currentAuth = { id: result.profile.id, email };
+        currentUser = result.profile;
+        showToast('📴 دخلت أوفلاين ببياناتك المحفوظة — التسجيل هيتزامن لما النت يرجع');
+        initApp();
+      } else {
+        errBox.textContent = result.reason === 'no-cache'
+          ? 'أول دخول لازم يكون فيه إنترنت، أو سجّل دخولك أونلاين على هذا الجهاز أولًا'
+          : 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+        errBox.style.display = 'block';
+      }
       return;
     }
+
+    const authResult = await withLoginTimeout(
+      sb.auth.signInWithPassword({ email, password }),
+      20000,
+      'الاتصال بخدمة تسجيل الدخول استغرق وقتًا طويلًا. تأكد من الإنترنت وحاول مرة أخرى.'
+    );
+    const { data, error } = authResult;
+    if (error) {
+      errBox.textContent = /invalid login credentials/i.test(error.message)
+        ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
+        : 'تعذر تسجيل الدخول: ' + error.message;
+      errBox.style.display = 'block';
+      return;
+    }
+
     currentAuth = data.user;
-    await loadUserProfile();
+    await withLoginTimeout(loadUserProfile(), 12000, 'تم التحقق من كلمة المرور لكن تحميل ملف المستخدم تأخر. حاول مرة أخرى.');
     if (!currentUser || !currentUser.is_active) {
-      await sb.auth.signOut();
+      await sb.auth.signOut().catch(() => {});
       errBox.textContent = currentUser ? 'حسابك موقوف. تواصل مع المدير' : 'لم يتم العثور على ملفك الشخصي. تواصل مع المدير';
       errBox.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'دخول';
       return;
     }
-    await cacheOfflineCredentials(email, password, currentUser);
-    await startSession();
-    await logActivity('login', 'تسجيل دخول للنظام');
+
+    try { await withLoginTimeout(cacheOfflineCredentials(email, password, currentUser), 5000, ''); } catch (e) {}
+    // تسجيل الجلسة وسجل النشاط ليسا شرطًا لفتح النظام؛ لا نترك الشاشة عالقة بسببهما.
+    withLoginTimeout(startSession(), 5000, 'session log timeout').catch(e => console.warn('Session logging skipped:', e));
+    withLoginTimeout(logActivity('login', 'تسجيل دخول للنظام'), 5000, 'activity log timeout').catch(e => console.warn('Activity logging skipped:', e));
     initApp();
   } catch (e) {
-    errBox.textContent = 'خطأ في الاتصال: ' + e.message;
+    console.error('Login error:', e);
+    errBox.textContent = e && e.message
+      ? (e.message.includes('Failed to fetch') ? 'تعذر الاتصال بالخادم. تأكد من الإنترنت ثم حدّث الصفحة.' : e.message)
+      : 'حدث خطأ غير متوقع أثناء تسجيل الدخول. حاول مرة أخرى.';
     errBox.style.display = 'block';
+  } finally {
     btn.disabled = false;
     btn.textContent = 'دخول';
+    btn.dataset.loginBusy = '0';
   }
 }
 
