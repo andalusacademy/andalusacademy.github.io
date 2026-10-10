@@ -9108,9 +9108,18 @@ function getUpcomingReminders() {
   const todayStr = toLocalDateStr(today);
   const results = [];
   allStudents.filter(s => s.program_id).forEach(s => {
-    const schedule = getPaymentSchedule(s);
     const payments = allPayments[s.id] || {};
-    schedule.forEach(item => {
+    const schedule = getPaymentSchedule(s);
+    const scheduledTypes = new Set(schedule.map(i => i.type));
+    const fixedTypes = new Set(FIXED_EXTRA_ITEMS.map(i => i.type));
+    const customExpenses = Object.values(payments)
+      .filter(p => p.payment_type && !scheduledTypes.has(p.payment_type) && !fixedTypes.has(p.payment_type)
+        && p.payment_type !== '_notes' && p.payment_type !== 'رسوم_كاملة' && !p.is_discount);
+    const allDueItems = [
+      ...schedule.map(item => ({ ...item, isCustom: false })),
+      ...customExpenses.map(rec => ({ type: rec.payment_type, label: rec.label || rec.payment_type, amount: rec.amount || 0, due: rec.due_date, isCustom: true }))
+    ];
+    allDueItems.forEach(item => {
       const rec = payments[item.type] || {};
       if (rec.paid) return;
       const due = rec.due_date || item.due;
@@ -9118,7 +9127,6 @@ function getUpcomingReminders() {
       const dueDate = new Date(due); dueDate.setHours(0, 0, 0, 0);
       const daysLeft = Math.round((dueDate - today) / 86400000);
       if (daysLeft < 0 || daysLeft > REMINDER_WINDOW_DAYS) return;
-      // ✅ متذكّرش نفس القسط مرتين فى نفس اليوم
       if (rec.last_reminder_sent === todayStr) return;
       results.push({ student: s, item, rec, due, daysLeft });
     });
@@ -9152,8 +9160,10 @@ async function sendPaymentReminder(studentId, paymentType) {
   const s = allStudents.find(x => x.id === studentId);
   if (!s) return;
   const schedule = getPaymentSchedule(s);
-  const item = schedule.find(i => i.type === paymentType);
   const rec = (allPayments[studentId] || {})[paymentType] || {};
+  const item = schedule.find(i => i.type === paymentType) || (rec.payment_type && rec.payment_type !== '_notes'
+    ? { type: paymentType, label: rec.label || paymentType, amount: rec.amount || 0, due: rec.due_date }
+    : null);
   const waPhone = s.guardian_phone || s.phone;
   if (!waPhone || !item) return;
   const due = rec.due_date || item.due;
@@ -9326,10 +9336,7 @@ function renderStudentFinance(s, container) {
           <button class="btn btn-success btn-sm" id="regbtn_${type.replace(/[^a-zA-Z0-9]/g, '_')}" style="font-size:12px" onclick="registerPayment('${s.id}','${type}','paydate_${type.replace(/[^a-zA-Z0-9]/g, '_')}')" disabled>💵 تسجيل الدفع</button>
         </div>`;
 
-    const notesCell = `<div style="display:flex;flex-direction:column;gap:5px;min-width:130px">
-      <input type="text" class="pay-date-input" style="width:130px" value="${escapeHtml(rec.notes || '')}" placeholder="ملاحظة..." onchange="updatePayNote('${s.id}','${type}',this.value)">
-      ${isExtra ? `<label style="font-size:11px;display:flex;align-items:center;gap:4px"><span>الاستحقاق:</span><input type="date" class="pay-date-input" style="width:125px" value="${escapeHtml(rec.due_date || '')}" onchange="updateDueDate('${s.id}','${type}',this.value)"></label>` : ''}
-    </div>`;
+    const notesCell = `<input type="text" class="pay-date-input" style="width:130px" value="${escapeHtml(rec.notes || '')}" placeholder="ملاحظة..." onchange="updatePayNote('${s.id}','${type}',this.value)">`;
 
     const deleteBtn = isExtra ? `<button class="btn btn-danger btn-sm del-action" style="font-size:11px" onclick="deleteExtraItem('${s.id}','${type}')">🗑</button>` : '';
 
@@ -9340,7 +9347,7 @@ function renderStudentFinance(s, container) {
     return `<tr style="${rowBg}">
       <td><strong>${escapeHtml(label)}</strong>${applyToggle}</td>
       <td style="font-weight:700;text-align:center">${amountCell}</td>
-      <td style="text-align:center;color:var(--muted);font-size:12px">${escapeHtml(dueStr || '—')}</td>
+      <td style="text-align:center;color:var(--muted);font-size:12px">${isExtra ? `<input type="date" class="pay-date-input" style="width:130px" value="${escapeHtml(dueStr || '')}" onchange="updateDueDate('${s.id}','${type}',this.value)">` : escapeHtml(dueStr || '—')}</td>
       <td>${actionCell}</td>
       <td>${lateFeeHtml}</td>
       <td>${notesCell}${deleteBtn}</td>
@@ -9718,13 +9725,39 @@ async function toggleApplicable(studentId, type, applicable) {
 async function updatePayLabel(studentId, type, label) {
   const existing = allPayments[studentId]?.[type] || {};
   await sb.from('payments').upsert({
-    student_id: studentId, payment_type: type,
+    ...existing, student_id: studentId, payment_type: type,
     amount: existing.amount || 0,
     late_fee_amount: existing.late_fee_amount || LATE_FEE_DEFAULT,
     label
   }, { onConflict: 'student_id,payment_type' });
   if (!allPayments[studentId]) allPayments[studentId] = {};
   allPayments[studentId][type] = { ...existing, label };
+}
+
+async function updateDueDate(studentId, type, dueDate) {
+  const existing = allPayments[studentId]?.[type] || {};
+  const { error } = await sb.from('payments').upsert({
+    ...existing, student_id: studentId, payment_type: type,
+    amount: existing.amount || 0, due_date: dueDate || null
+  }, { onConflict: 'student_id,payment_type' });
+  if (error) { showToast('❌ لم يتم حفظ تاريخ الاستحقاق: ' + error.message, 'error'); return; }
+  if (!allPayments[studentId]) allPayments[studentId] = {};
+  allPayments[studentId][type] = { ...existing, due_date: dueDate || null };
+  const student = allStudents.find(x => x.id === studentId);
+  if (student) renderStudentFinance(student, document.getElementById('finance-content'));
+  renderPaymentReminders();
+  showToast('✅ تم حفظ تاريخ الاستحقاق');
+}
+
+async function updatePayNote(studentId, type, notes) {
+  const existing = allPayments[studentId]?.[type] || {};
+  const { error } = await sb.from('payments').upsert({
+    ...existing, student_id: studentId, payment_type: type,
+    amount: existing.amount || 0, notes
+  }, { onConflict: 'student_id,payment_type' });
+  if (error) { showToast('❌ لم يتم حفظ الملاحظة: ' + error.message, 'error'); return; }
+  if (!allPayments[studentId]) allPayments[studentId] = {};
+  allPayments[studentId][type] = { ...existing, notes };
 }
 
 async function togglePaidFinance(studentId, type, checked) {
