@@ -12,7 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
@@ -3774,15 +3774,15 @@ async function renderParentPortalDashboard() {
   const payMap = {};
   payments.forEach(p => { payMap[p.payment_type] = p; });
   const schedule = getPaymentSchedule(student);
-  let totalDue = 0, totalPaid = 0;
+  let parentPortalTotalDue = 0, totalPaid = 0;
   const scheduleRows = schedule.map(item => {
     const rec = payMap[item.type] || {};
     const amount = Number(rec.amount ?? item.amount) || 0;
-    totalDue += amount;
+    parentPortalTotalDue += amount;
     if (rec.paid) totalPaid += amount;
     return { ...item, rec, amount };
   });
-  const remaining = Math.max(0, totalDue - totalPaid);
+  const remaining = Math.max(0, parentPortalTotalDue - totalPaid);
   const today = new Date().toISOString().split('T')[0];
   const nextDue = scheduleRows
     .filter(r => !r.rec.paid && r.amount > 0 && (r.rec.due_date || r.due))
@@ -3877,7 +3877,7 @@ async function renderParentPortalDashboard() {
 
     <div class="sc-stats" style="margin-bottom:18px;">
       <div class="sc-stat"><div class="v">${attendancePct !== null ? attendancePct + '%' : '—'}</div><div class="l">نسبة الحضور</div></div>
-      <div class="sc-stat"><div class="v">${money(totalDue)}</div><div class="l">إجمالي المستحق</div></div>
+      <div class="sc-stat"><div class="v">${money(parentPortalTotalDue)}</div><div class="l">إجمالي المستحق</div></div>
       <div class="sc-stat"><div class="v" style="color:#22c55e">${money(totalPaid)}</div><div class="l">إجمالي المدفوع</div></div>
       <div class="sc-stat"><div class="v" style="color:#ef4444">${money(remaining)}</div><div class="l">المتبقي</div></div>
     </div>
@@ -3892,7 +3892,7 @@ async function renderParentPortalDashboard() {
     <div class="card" style="margin-bottom:14px;">
       <div class="card-header"><h3>💰 المدفوعات والأقساط</h3></div>
       <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
-        <div style="padding:12px;border-radius:9px;background:#f8fafc;border:1px solid var(--border);"><div style="font-size:11px;color:var(--muted)">إجمالي البرنامج</div><strong>${money(totalDue)}</strong></div>
+        <div style="padding:12px;border-radius:9px;background:#f8fafc;border:1px solid var(--border);"><div style="font-size:11px;color:var(--muted)">إجمالي البرنامج</div><strong>${money(parentPortalTotalDue)}</strong></div>
         <div style="padding:12px;border-radius:9px;background:#f0fdf4;border:1px solid #bbf7d0;"><div style="font-size:11px;color:#166534">المدفوع</div><strong style="color:#16a34a">${money(totalPaid)}</strong></div>
         <div style="padding:12px;border-radius:9px;background:#fef2f2;border:1px solid #fecaca;"><div style="font-size:11px;color:#991b1b">المتبقي</div><strong style="color:#dc2626">${money(remaining)}</strong></div>
         <div style="padding:12px;border-radius:9px;background:#fffbeb;border:1px solid #fde68a;"><div style="font-size:11px;color:#92400e">القسط القادم</div><strong>${nextDue ? escapeHtml(nextDue.label) : 'لا يوجد'}</strong><div style="font-size:11px;margin-top:3px;">${nextDue ? fmt(nextDue.rec.due_date || nextDue.due) + ' — ' + money(nextDue.amount) : '—'}</div></div>
