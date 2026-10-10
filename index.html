@@ -3273,6 +3273,15 @@ async function tryOfflineLogin(email, password) {
   return { ok: true, profile: cached.profile };
 }
 
+// يمنع تعليق شاشة الدخول إلى أجل غير مسمى عند بطء الشبكة أو توقف طلب Supabase.
+function loginWithTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label + ' — انتهت مهلة الانتظار. تحقق من الاتصال وحاول مرة أخرى.')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function doLogin() {
   clearFieldErrors();
   const email = document.getElementById('login-email').value.trim();
@@ -3295,52 +3304,63 @@ async function doLogin() {
   btn.disabled = true;
   btn.textContent = 'جاري الدخول...';
 
-  // 📴 مفيش نت: جرّب الدخول بالبيانات المحفوظة محليًا من آخر دخول أونلاين على الجهاز ده
-  if (!navigator.onLine) {
-    const result = await tryOfflineLogin(email, password);
-    if (result.ok) {
-      currentAuth = { id: result.profile.id, email };
-      currentUser = result.profile;
-      showToast('📴 دخلت أوفلاين ببياناتك المحفوظة — التسجيل هيتزامن لما النت يرجع');
-      initApp();
-    } else if (result.reason === 'no-cache') {
-      errBox.textContent = 'لسه ما سجلت دخول قبل كده وانت متصل بالنت على الجهاز/المتصفح ده — أول دخول لازم يكون فيه نت';
-      errBox.style.display = 'block';
-    } else {
-      errBox.textContent = 'البريد أو كلمة المرور غلط';
-      errBox.style.display = 'block';
-    }
-    btn.disabled = false;
-    btn.textContent = 'دخول';
-    return;
-  }
-
   try {
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (!navigator.onLine) {
+      const result = await loginWithTimeout(tryOfflineLogin(email, password), 10000, 'تعذر إكمال الدخول دون اتصال');
+      if (result.ok) {
+        currentAuth = { id: result.profile.id, email };
+        currentUser = result.profile;
+        showToast('📴 دخلت أوفلاين ببياناتك المحفوظة — التسجيل هيتزامن لما النت يرجع');
+        initApp();
+      } else if (result.reason === 'no-cache') {
+        errBox.textContent = 'لسه ما سجلت دخول قبل كده وانت متصل بالنت على الجهاز/المتصفح ده — أول دخول لازم يكون فيه نت';
+        errBox.style.display = 'block';
+      } else {
+        errBox.textContent = 'البريد أو كلمة المرور غلط';
+        errBox.style.display = 'block';
+      }
+      return;
+    }
+
+    const authResult = await loginWithTimeout(
+      sb.auth.signInWithPassword({ email, password }),
+      15000,
+      'خدمة تسجيل الدخول لا تستجيب'
+    );
+    const { data, error } = authResult;
     if (error) {
-      errBox.textContent = error.message.includes('Invalid') ? 'البريد أو كلمة المرور غلط' : error.message;
+      errBox.textContent = error.message && error.message.includes('Invalid')
+        ? 'البريد أو كلمة المرور غلط'
+        : (error.message || 'تعذر تسجيل الدخول. حاول مرة أخرى.');
       errBox.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'دخول';
       return;
     }
+    if (!data || !data.user) throw new Error('تم تسجيل الدخول دون إرجاع بيانات المستخدم');
+
     currentAuth = data.user;
-    await loadUserProfile();
+    currentUser = null;
+    await loginWithTimeout(loadUserProfile(), 12000, 'تعذر تحميل ملف المستخدم');
     if (!currentUser || !currentUser.is_active) {
-      await sb.auth.signOut();
-      errBox.textContent = currentUser ? 'حسابك موقوف. تواصل مع المدير' : 'لم يتم العثور على ملفك الشخصي. تواصل مع المدير';
+      try { await loginWithTimeout(sb.auth.signOut(), 5000, 'تعذر إنهاء الجلسة'); } catch (_) {}
+      errBox.textContent = currentUser
+        ? 'حسابك موقوف. تواصل مع المدير'
+        : 'لم يتم العثور على ملفك الشخصي أو تعذر تحميله. تحقق من اتصال Supabase وسياسات user_profiles ثم حاول مرة أخرى.';
       errBox.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'دخول';
       return;
     }
-    await cacheOfflineCredentials(email, password, currentUser);
-    await startSession();
-    await logActivity('login', 'تسجيل دخول للنظام');
+
+    // لا تجعل عمليات الحفظ الثانوية تمنع فتح النظام بعد نجاح المصادقة.
+    try { await loginWithTimeout(cacheOfflineCredentials(email, password, currentUser), 5000, ''); } catch (_) {}
     initApp();
+    Promise.resolve().then(() => startSession()).catch(e => console.warn('startSession:', e));
+    Promise.resolve().then(() => logActivity('login', 'تسجيل دخول للنظام')).catch(e => console.warn('logActivity:', e));
   } catch (e) {
-    errBox.textContent = 'خطأ في الاتصال: ' + e.message;
+    console.error('doLogin error:', e);
+    errBox.textContent = e && e.message
+      ? 'تعذر إكمال تسجيل الدخول: ' + e.message
+      : 'حدث خطأ غير متوقع أثناء تسجيل الدخول. حاول مرة أخرى.';
     errBox.style.display = 'block';
+  } finally {
     btn.disabled = false;
     btn.textContent = 'دخول';
   }
