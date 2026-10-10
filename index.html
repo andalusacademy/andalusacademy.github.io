@@ -11046,9 +11046,9 @@ async function uploadExamMaterialPdfs(fileList) {
   const bucket = sb.storage.from('exam-materials');
   let succeeded = 0;
   for (const file of files) {
-    // Encode the original filename so the Storage key contains ASCII characters only.
-    const encodedName = encodeURIComponent(file.name).replace(/'/g, '%27');
-    const path = activeExamMaterialFolder + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '_' + encodedName;
+    // Store an ASCII-only object key; keep the original Arabic filename encoded in base64url.
+    const encodedName = btoa(unescape(encodeURIComponent(file.name))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    const path = activeExamMaterialFolder + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '_' + encodedName + '.pdf';
     const { error } = await bucket.upload(path, file, { contentType:'application/pdf', upsert:false });
     if (error) {
       showToast('تعذر رفع '+file.name+': '+error.message, 'error');
@@ -11075,7 +11075,7 @@ async function loadExamMaterialFiles() {
   container.innerHTML = files.map(f => {
     const path = activeExamMaterialFolder+'/'+f.name;
     const size = f.metadata?.size ? examMaterialFormatSize(f.metadata.size) : 'PDF';
-    return '<label class="exam-material-file"><input class="exam-material-file-cb" type="checkbox" value="'+escapeHtml(path)+'"><span style="font-size:27px;">📕</span><span style="min-width:0;flex:1"><span class="file-name">'+escapeHtml((() => { const stored = f.name.replace(/^\d+_[a-z0-9]+_/i,''); try { return decodeURIComponent(stored); } catch (_) { return stored; } })())+'</span><span class="file-meta">'+escapeHtml(size)+' · PDF</span></span><span class="file-actions"><button type="button" class="btn btn-danger btn-sm" onclick="event.preventDefault();event.stopPropagation();deleteExamMaterialFile(\''+escapeHtml(path).replace(/'/g,'\\\'')+'\')">🗑</button></span></label>';
+    return '<label class="exam-material-file"><input class="exam-material-file-cb" type="checkbox" value="'+escapeHtml(path)+'"><span style="font-size:27px;">📕</span><span style="min-width:0;flex:1"><span class="file-name">'+escapeHtml((() => { const stored = f.name.replace(/^\d+_[a-z0-9]+_/i,'').replace(/\.pdf$/i,''); try { const base64 = stored.replace(/-/g,'+').replace(/_/g,'/'); const padded = base64 + '='.repeat((4 - base64.length % 4) % 4); return decodeURIComponent(escape(atob(padded))); } catch (_) { return f.name; } })())+'</span><span class="file-meta">'+escapeHtml(size)+' · PDF</span></span><span class="file-actions"><button type="button" class="btn btn-danger btn-sm" onclick="event.preventDefault();event.stopPropagation();deleteExamMaterialFile(\''+escapeHtml(path).replace(/'/g,'\\\'')+'\')">🗑</button></span></label>';
   }).join('');
 }
 async function deleteExamMaterialFile(path) {
