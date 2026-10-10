@@ -3777,7 +3777,7 @@ async function renderParentPortalDashboard() {
     return { ...item, rec, amount };
   });
   const savedTotalDue = Number(student.total_due) || 0;
-  const totalDue = savedTotalDue > 0 ? savedTotalDue : (SYSTEM_TOTAL_DUE[student.system_name] || 0);
+  const totalDue = SYSTEM_TOTAL_DUE[student.system_name] ?? savedTotalDue;
   const remaining = Math.max(0, totalDue - totalPaid);
   const today = new Date().toISOString().split('T')[0];
   const nextDue = scheduleRows
@@ -9064,7 +9064,7 @@ function getStudentPayStatus(student) {
 
   // ✅ إجمالي المستحق: رقم يدوي يُكتب مرة واحدة في بيانات الطالب — ثابت دايمًا ولا يتأثر بالخصومات
   const savedTotalDue = Number(student.total_due) || 0;
-  let totalDue = savedTotalDue > 0 ? savedTotalDue : (SYSTEM_TOTAL_DUE[student.system_name] || 0);
+  let totalDue = SYSTEM_TOTAL_DUE[student.system_name] ?? savedTotalDue;
 
   let status = 'gray';
   if (allPaid) status = 'green';
@@ -9275,7 +9275,7 @@ function renderStudentFinance(s, container) {
 
   // ✅ إجمالي المستحق: رقم يدوي يُكتب مرة واحدة في فورم بيانات الطالب — ثابت دايمًا ولا يتأثر بالبنود/الخصومات
   const savedTotalDue = Number(s.total_due) || 0;
-  let totalDue = savedTotalDue > 0 ? savedTotalDue : (SYSTEM_TOTAL_DUE[s.system_name] || 0);
+  let totalDue = SYSTEM_TOTAL_DUE[s.system_name] ?? savedTotalDue;
   const remaining = Math.max(0, totalDue - totalPaid);
 
   function rowHtml(type, label, amount, applicable, isOptional = false, isExtra = false, isOpenAmount = false, useStatusLabel = false) {
