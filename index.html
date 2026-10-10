@@ -9048,14 +9048,21 @@ function getStudentPayStatus(student) {
     }
     if (rec.late_fee_paid) totalPaid += (rec.late_fee_amount || LATE_FEE_DEFAULT);
   });
-  // ✅ خصومات وبنود إضافية (غير شنطة الأدوات/فتح الملف وغير الإنجليزي)
+  // البنود المنقولة إلى جدول المصروفات: متابعة مواعيدها وغراماتها مع الحفاظ على طريقة حساب الخصومات.
   const scheduleTypes = new Set(schedule.map(i => i.type));
   const fixedTypes = new Set(FIXED_EXTRA_ITEMS.map(i => i.type));
   Object.values(payments).forEach(rec => {
-    if (scheduleTypes.has(rec.payment_type) || fixedTypes.has(rec.payment_type) || rec.payment_type === '_notes') return;
+    if (scheduleTypes.has(rec.payment_type) || fixedTypes.has(rec.payment_type) || rec.payment_type === '_notes' || rec.payment_type === 'رسوم_كاملة') return;
     if (rec.applicable === false) return;
-    // بند "يخصم من المستحق" لما يُدفع بيتحسب مدفوع (بيقلل المتبقي) — و"مستقل" لا يدخل فى الحساب خالص
-    if (rec.is_discount) { if (rec.paid) totalPaid += rec.amount || 0; }
+    if (rec.is_discount && rec.paid) totalPaid += rec.amount || 0;
+    if (rec.late_fee_paid) totalPaid += rec.late_fee_amount || LATE_FEE_DEFAULT;
+    if (!rec.is_discount && !rec.paid && rec.due_date) {
+      const due = new Date(rec.due_date); due.setHours(0, 0, 0, 0);
+      const graceEnd = new Date(due); graceEnd.setDate(graceEnd.getDate() + 5);
+      if (today > graceEnd) hasRed = true;
+      else if (today >= due) hasYellow = true;
+      allPaid = false;
+    }
   });
 
   // ✅ إجمالي المستحق: رقم يدوي يُكتب مرة واحدة في بيانات الطالب — ثابت دايمًا ولا يتأثر بالخصومات
@@ -9263,8 +9270,9 @@ function renderStudentFinance(s, container) {
   });
   extraItems.forEach(rec => {
     if (rec.applicable === false) return;
-    // "يخصم من المستحق" لما يتسجل دفعه بيتحسب مدفوع (بيقلل المتبقي) — "مستقل" لا يدخل الحساب خالص
-    if (rec.is_discount) { if (rec.paid) totalPaid += rec.amount || 0; }
+    // الحفاظ على حساب الخصومات، واحتساب الغرامات المدفوعة ضمن المدفوع.
+    if (rec.is_discount && rec.paid) totalPaid += rec.amount || 0;
+    if (rec.late_fee_paid) totalPaid += rec.late_fee_amount || LATE_FEE_DEFAULT;
   });
 
   // ✅ إجمالي المستحق: رقم يدوي يُكتب مرة واحدة في فورم بيانات الطالب — ثابت دايمًا ولا يتأثر بالبنود/الخصومات
