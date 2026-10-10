@@ -81,6 +81,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);-webk
 .nav-card.c12{background:linear-gradient(135deg,#db2777,#be185d);}
 
 
+
+.exam-material-file{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;}
+.exam-material-file input{width:18px;height:18px;flex:0 0 auto;}
+.exam-material-file .file-name{font-weight:800;font-size:13px;overflow-wrap:anywhere;}
+.exam-material-file .file-meta{font-size:11px;color:var(--muted);margin-top:3px;}
+.exam-material-file .file-actions{margin-right:auto;display:flex;gap:6px;align-items:center;}
+
 .exam-subject-tile{appearance:none;border:1px solid var(--border);border-radius:14px;background:linear-gradient(145deg,#fff,#f8fafc);padding:20px 14px;min-height:145px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--navy);transition:transform .18s,box-shadow .18s,border-color .18s;}
 .exam-subject-tile:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:var(--gold);}
 .exam-subject-tile span{font-size:31px;line-height:1.2;}
@@ -1126,17 +1133,17 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
               <span class="badge badge-navy">11 مادة</span>
             </div>
             <div id="exam-subject-cards" style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;">
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('أساسيات الرعاية الصحية')"><span>🩺</span><strong>أساسيات الرعاية الصحية</strong><small>إعداد امتحان للمادة</small></button>
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('مكافحة العدوى')"><span>🦠</span><strong>مكافحة العدوى</strong><small>إعداد امتحان للمادة</small></button>
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('تمريض الباطنة والطوارئ')"><span>🏥</span><strong>تمريض الباطنة والطوارئ</strong><small>إعداد امتحان للمادة</small></button>
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('أساسيات التمريض النظري والمصطلحات الطبية')"><span>📚</span><strong>أساسيات التمريض النظري والمصطلحات الطبية</strong><small>إعداد امتحان للمادة</small></button>
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('العناية المركزة')"><span>❤️‍🩹</span><strong>العناية المركزة</strong><small>إعداد امتحان للمادة</small></button>
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('التغذية العلاجية')"><span>🥗</span><strong>التغذية العلاجية</strong><small>إعداد امتحان للمادة</small></button>
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('النساء والتوليد')"><span>🤰</span><strong>النساء والتوليد</strong><small>إعداد امتحان للمادة</small></button>
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('الفسيولوجي')"><span>🫀</span><strong>الفسيولوجي</strong><small>إعداد امتحان للمادة</small></button>
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('الإسعافات الأولية')"><span>🚑</span><strong>الإسعافات الأولية</strong><small>إعداد امتحان للمادة</small></button>
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('تمريض الأطفال')"><span>👶</span><strong>تمريض الأطفال</strong><small>إعداد امتحان للمادة</small></button>
-              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('تأسيس اللغة الإنجليزية')"><span>🇬🇧</span><strong>تأسيس اللغة الإنجليزية</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('أساسيات الرعاية الصحية')"><span>🩺</span><strong>أساسيات الرعاية الصحية</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('مكافحة العدوى')"><span>🦠</span><strong>مكافحة العدوى</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('تمريض الباطنة والطوارئ')"><span>🏥</span><strong>تمريض الباطنة والطوارئ</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('أساسيات التمريض النظري والمصطلحات الطبية')"><span>📚</span><strong>أساسيات التمريض النظري والمصطلحات الطبية</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('العناية المركزة')"><span>❤️‍🩹</span><strong>العناية المركزة</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('التغذية العلاجية')"><span>🥗</span><strong>التغذية العلاجية</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('النساء والتوليد')"><span>🤰</span><strong>النساء والتوليد</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('الفسيولوجي')"><span>🫀</span><strong>الفسيولوجي</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('الإسعافات الأولية')"><span>🚑</span><strong>الإسعافات الأولية</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('تمريض الأطفال')"><span>👶</span><strong>تمريض الأطفال</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openExamMaterialWorkspace('تأسيس اللغة الإنجليزية')"><span>🇬🇧</span><strong>تأسيس اللغة الإنجليزية</strong><small>إعداد امتحان للمادة</small></button>
             </div>
           </div>
           <div class="search-bar no-print">
@@ -2427,6 +2434,42 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-session')">إلغاء</button>
       <button class="btn btn-gold" onclick="saveSession()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EXAM SUBJECT WORKSPACE -->
+<div class="modal-overlay" id="modal-exam-material-workspace">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <h3 id="exam-material-workspace-title">📚 مكتبة ملفات المادة</h3>
+      <button class="modal-close" onclick="closeModal('modal-exam-material-workspace')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:16px;color:#1e3a8a;">
+        <strong>الخطوة 1 — ارفع ملفات المنهج PDF</strong>
+        <div style="font-size:12px;margin-top:5px;">تقدر ترفع أكتر من ملف لنفس المادة. الملفات هتفضل في مكتبة المادة علشان تختار منها عند إعداد كل امتحان.</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+        <input type="file" id="exam-material-pdf-input" accept="application/pdf,.pdf" multiple style="display:none" onchange="uploadExamMaterialPdfs(this.files)">
+        <button class="btn btn-gold" onclick="document.getElementById('exam-material-pdf-input').click()">📤 رفع ملف PDF أو أكثر</button>
+        <button class="btn btn-outline" onclick="loadExamMaterialFiles()">↻ تحديث الملفات</button>
+        <span id="exam-material-upload-status" style="font-size:12px;color:var(--muted);"></span>
+      </div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px;margin-bottom:14px;color:#92400e;">
+        <strong>الخطوة 2 — اختار مصادر الامتحان</strong>
+        <div style="font-size:12px;margin-top:5px;">علّم على ملف واحد أو عدة ملفات تريد أن يعتمد عليها الامتحان.</div>
+      </div>
+      <div id="exam-material-files-list" style="display:flex;flex-direction:column;gap:8px;">
+        <div class="empty-state" style="padding:18px"><div class="emoji">📄</div><h4>جاري تحميل ملفات المادة...</h4></div>
+      </div>
+      <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:16px;">
+        <button class="btn btn-gold" style="width:100%;padding:13px;" onclick="startAiExamGeneration()">🤖 توليد الامتحان من ملفات PDF المحددة</button>
+        <p style="font-size:11px;color:var(--muted);margin-top:8px;">بعد التوليد ستظهر الأسئلة للمراجعة والتعديل قبل اعتماد الامتحان ونشره للطلاب.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-exam-material-workspace')">إغلاق</button>
     </div>
   </div>
 </div>
@@ -10960,6 +11003,85 @@ function renderExamsTable() {
       </td>
     </tr>`;
   }).join('');
+}
+
+
+// مكتبة ملفات المناهج لكل مادة — الملفات تحفظ في Supabase Storage داخل مجلد المادة.
+let activeExamMaterialName = '';
+let activeExamMaterialFolder = '';
+
+function examMaterialSafeFolder(name) {
+  return String(name || 'مادة').normalize('NFKC').replace(/[^\u0600-\u06FF\w-]+/g, '-').replace(/^-+|-+$/g, '').slice(0,90) || 'مادة';
+}
+function examMaterialFormatSize(bytes) {
+  if (!Number.isFinite(Number(bytes))) return '';
+  const n = Number(bytes);
+  return n < 1024*1024 ? (n/1024).toFixed(0)+' KB' : (n/1024/1024).toFixed(2)+' MB';
+}
+function openExamMaterialWorkspace(materialName) {
+  activeExamMaterialName = materialName;
+  activeExamMaterialFolder = examMaterialSafeFolder(materialName);
+  document.getElementById('exam-material-workspace-title').textContent = '📚 مكتبة المادة: ' + materialName;
+  document.getElementById('exam-material-upload-status').textContent = '';
+  document.getElementById('exam-material-pdf-input').value = '';
+  document.getElementById('modal-exam-material-workspace').classList.add('open');
+  loadExamMaterialFiles();
+}
+async function uploadExamMaterialPdfs(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  const status = document.getElementById('exam-material-upload-status');
+  const list = document.getElementById('exam-material-files-list');
+  const bad = files.filter(f => !/\.pdf$/i.test(f.name) && f.type !== 'application/pdf');
+  if (bad.length) { showToast('ارفع ملفات PDF فقط', 'error'); return; }
+  if (files.some(f => f.size > 30*1024*1024)) { showToast('حجم الملف الواحد لا يتجاوز 30 ميجابايت', 'error'); return; }
+  status.textContent = 'جاري رفع '+files.length+' ملف...';
+  const bucket = sb.storage.from('exam-materials');
+  let succeeded = 0;
+  for (const file of files) {
+    const cleanName = file.name.replace(/[^\u0600-\u06FF\w.() -]+/g,'_').replace(/\s+/g,'_').slice(-150);
+    const path = activeExamMaterialFolder + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '_' + cleanName;
+    const { error } = await bucket.upload(path, file, { contentType:'application/pdf', upsert:false });
+    if (error) {
+      showToast('تعذر رفع '+file.name+': '+error.message, 'error');
+    } else succeeded++;
+  }
+  status.textContent = 'تم رفع '+succeeded+' من '+files.length+' ملف';
+  document.getElementById('exam-material-pdf-input').value = '';
+  await loadExamMaterialFiles();
+}
+async function loadExamMaterialFiles() {
+  const container = document.getElementById('exam-material-files-list');
+  if (!container || !activeExamMaterialFolder) return;
+  container.innerHTML = '<div class="empty-state" style="padding:18px"><div class="emoji">⏳</div><h4>جاري تحميل الملفات...</h4></div>';
+  const { data, error } = await sb.storage.from('exam-materials').list(activeExamMaterialFolder, { limit:100, sortBy:{column:'name',order:'desc'} });
+  if (error) {
+    container.innerHTML = '<div style="padding:14px;border:1px solid #fecaca;border-radius:10px;color:#991b1b;background:#fef2f2;font-size:12px;"><strong>تعذر الوصول إلى مكتبة ملفات المناهج.</strong><div style="margin-top:5px;">قد تحتاج إلى إنشاء Storage bucket باسم <code>exam-materials</code> وضبط صلاحياته في Supabase. تفاصيل الخطأ: '+escapeHtml(error.message)+'</div></div>';
+    return;
+  }
+  const files = (data || []).filter(f => f.name && f.id !== null && f.name !== '.emptyFolderPlaceholder');
+  if (!files.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:20px"><div class="emoji">📄</div><h4>لا توجد ملفات PDF لهذه المادة بعد</h4><p>اضغط «رفع ملف PDF أو أكثر» للبدء.</p></div>';
+    return;
+  }
+  container.innerHTML = files.map(f => {
+    const path = activeExamMaterialFolder+'/'+f.name;
+    const size = f.metadata?.size ? examMaterialFormatSize(f.metadata.size) : 'PDF';
+    return '<label class="exam-material-file"><input class="exam-material-file-cb" type="checkbox" value="'+escapeHtml(path)+'"><span style="font-size:27px;">📕</span><span style="min-width:0;flex:1"><span class="file-name">'+escapeHtml(f.name.replace(/^\d+_[a-z0-9]+_/i,''))+'</span><span class="file-meta">'+escapeHtml(size)+' · PDF</span></span><span class="file-actions"><button type="button" class="btn btn-danger btn-sm" onclick="event.preventDefault();event.stopPropagation();deleteExamMaterialFile(\''+escapeHtml(path).replace(/'/g,'\\\'')+'\')">🗑</button></span></label>';
+  }).join('');
+}
+async function deleteExamMaterialFile(path) {
+  if (!confirm('حذف ملف المنهج من مكتبة المادة؟')) return;
+  const { error } = await sb.storage.from('exam-materials').remove([path]);
+  if (error) { showToast('تعذر حذف الملف: '+error.message,'error'); return; }
+  showToast('تم حذف الملف');
+  await loadExamMaterialFiles();
+}
+async function startAiExamGeneration() {
+  const selectedFiles = [...document.querySelectorAll('#exam-material-files-list .exam-material-file-cb:checked')].map(el=>el.value);
+  if (!selectedFiles.length) { showToast('اختار ملف PDF واحدًا على الأقل لتوليد الامتحان','error'); return; }
+  // الواجهة جاهزة؛ المرحلة التالية تنشئ وتوصل Edge Function آمنة لتوليد الأسئلة دون كشف مفتاح الذكاء الاصطناعي.
+  showToast('تم اختيار '+selectedFiles.length+' ملف. نحتاج الآن إلى تفعيل خدمة الذكاء الاصطناعي الآمنة قبل التوليد.', 'error');
 }
 
 function openCreateExamForMaterial(materialName) {
