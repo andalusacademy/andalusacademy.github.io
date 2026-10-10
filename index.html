@@ -706,7 +706,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
       <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
       <div class="field-error" id="err-pass">كلمة المرور مطلوبة</div>
     </div>
-    <button class="login-btn" id="login-btn" onclick="doLogin()">دخول</button>
+    <button class="login-btn" id="login-btn" onclick="window.doLogin()">دخول</button>
     <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--muted)">
       مشكلة في الدخول؟ تواصل مع المدير
     </div>
@@ -3282,7 +3282,7 @@ function loginWithTimeout(promise, ms, label) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-async function doLogin() {
+window.doLogin = async function doLogin() {
   clearFieldErrors();
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
