@@ -11218,9 +11218,9 @@ function openGeneratedExamSettings() {
     showToast('لا توجد أسئلة جاهزة لإنشاء الامتحان', 'error');
     return;
   }
-  generatedExamPending = true;
   closeModal('modal-ai-exam-review');
   openCreateExam();
+  generatedExamPending = true;
   const normalize = value => String(value || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\\sـ]+/g, ' ').trim().toLowerCase();
   const wanted = normalize(exam.subject || activeExamMaterialName);
   const match = allSubjects.find(subject => normalize(subject.name) === wanted)
