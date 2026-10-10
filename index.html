@@ -11086,6 +11086,13 @@ async function deleteExamMaterialFile(path) {
   await loadExamMaterialFiles();
 }
 async function startAiExamGeneration() {
+  const countInput = prompt('عاوز تولّد كام سؤال للامتحان؟', '20');
+  if (countInput === null) return;
+  const requestedCount = parseInt(countInput, 10);
+  if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 100) {
+    showToast('اكتب عددًا صحيحًا من 1 إلى 100 سؤال', 'error');
+    return;
+  }
   const selectedFiles = [...document.querySelectorAll('#exam-material-files-list .exam-material-file-cb:checked')].map(el => el.value);
   if (!selectedFiles.length) { showToast('اختار ملف PDF واحدًا على الأقل لتوليد الامتحان', 'error'); return; }
   if (selectedFiles.length > 5) { showToast('اختار 5 ملفات PDF كحد أقصى في المرة الواحدة', 'error'); return; }
@@ -11112,7 +11119,7 @@ async function startAiExamGeneration() {
       body: JSON.stringify({
         paths: selectedFiles,
         subject: activeExamMaterialName || 'المادة التدريبية',
-        count: 20,
+        count: requestedCount,
         difficulty: 'متوسط'
       })
     });
@@ -11142,7 +11149,7 @@ function showGeneratedExamReview(exam) {
     modal = document.createElement('div');
     modal.id = 'modal-ai-exam-review';
     modal.className = 'modal-overlay';
-    modal.innerHTML = '<div class="modal" style="max-width:900px;max-height:90vh;overflow:auto"><div class="modal-header"><h3 id="ai-exam-review-title">مراجعة الامتحان المُولّد</h3><button class="modal-close" onclick="closeModal(\'modal-ai-exam-review\')">×</button></div><div class="modal-body"><div id="ai-exam-review-content"></div></div><div class="modal-footer" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="copyGeneratedExamJson()">📋 نسخ الأسئلة بصيغة JSON</button><button class="btn btn-gold" onclick="closeModal(\'modal-ai-exam-review\')">تمت المراجعة</button></div></div>';
+    modal.innerHTML = '<div class="modal" style="max-width:900px;max-height:90vh;overflow:auto"><div class="modal-header"><h3 id="ai-exam-review-title">مراجعة الامتحان المُولّد</h3><button class="modal-close" onclick="closeModal(\'modal-ai-exam-review\')">×</button></div><div class="modal-body"><div id="ai-exam-review-content"></div></div><div class="modal-footer" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="copyGeneratedExamJson()">📋 نسخ الأسئلة بصيغة JSON</button><button class="btn btn-gold" onclick="openGeneratedExamSettings()">تمت المراجعة وإنشاء الامتحان ←</button></div></div>';
     document.body.appendChild(modal);
   }
 
@@ -11203,7 +11210,39 @@ function openCreateExamForMaterial(materialName) {
   }
 }
 
+let generatedExamPending = false;
+
+function openGeneratedExamSettings() {
+  const exam = window._andalusGeneratedExam;
+  if (!exam || !Array.isArray(exam.questions) || !exam.questions.length) {
+    showToast('لا توجد أسئلة جاهزة لإنشاء الامتحان', 'error');
+    return;
+  }
+  generatedExamPending = true;
+  closeModal('modal-ai-exam-review');
+  openCreateExam();
+  const normalize = value => String(value || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\\sـ]+/g, ' ').trim().toLowerCase();
+  const wanted = normalize(exam.subject || activeExamMaterialName);
+  const match = allSubjects.find(subject => normalize(subject.name) === wanted)
+    || allSubjects.find(subject => normalize(subject.name).includes(wanted) || wanted.includes(normalize(subject.name)));
+  if (!match) {
+    generatedExamPending = false;
+    showToast('المادة غير مسجلة في قائمة المواد. أضف المادة أولًا ثم أعد إنشاء الامتحان.', 'error');
+    return;
+  }
+  document.getElementById('exam-subject').value = match.id;
+  document.getElementById('exam-title').value = exam.title || ('امتحان ' + (exam.subject || activeExamMaterialName || match.name));
+  const pointsTotal = exam.questions.reduce((sum, q) => sum + (Number(q.points) > 0 ? Number(q.points) : 1), 0);
+  document.getElementById('exam-total-score').value = pointsTotal || exam.questions.length;
+  const publishButton = document.querySelector('#modal-exam button[onclick="saveExam()"]');
+  if (publishButton) publishButton.textContent = '🚀 نشر الامتحان وحفظ الأسئلة';
+  showToast('حدد الفرع والبرنامج والمدة وموعد الامتحان، ثم اضغط نشر الامتحان.');
+}
+
 function openCreateExam() {
+  generatedExamPending = false;
+  const publishButton = document.querySelector('#modal-exam button[onclick="saveExam()"]');
+  if (publishButton) publishButton.textContent = '💾 حفظ ومتابعة لإضافة الأسئلة';
   editingExamId = null;
   document.getElementById('modal-exam-title').textContent = 'إنشاء امتحان جديد';
   document.getElementById('exam-title').value = '';
@@ -11289,6 +11328,57 @@ async function saveExam() {
     } else {
       showToast('❌ خطأ في إنشاء الامتحان: ' + error.message, 'error');
     }
+    return;
+  }
+
+  if (generatedExamPending) {
+    const generated = window._andalusGeneratedExam;
+    const normalizeAnswer = value => String(value ?? '').trim().toLowerCase();
+    const generatedRows = generated.questions.map((q, index) => {
+      const options = Array.isArray(q.options) ? q.options.map(v => String(v ?? '').trim()) : [];
+      const typeRaw = normalizeAnswer(q.type || q.question_type || '');
+      const isTrueFalse = typeRaw === 'true_false' || typeRaw === 'truefalse' || typeRaw.includes('صح') || typeRaw.includes('true');
+      const answerRaw = String(q.answer ?? q.correct_answer ?? '').trim();
+      let correct = '';
+      let optionA = null, optionB = null, optionC = null, optionD = null;
+      if (isTrueFalse) {
+        const a = normalizeAnswer(answerRaw);
+        correct = (a === 'true' || a === 'صح' || a === 'صحيح' || a === '1') ? 'true' : 'false';
+      } else {
+        [optionA, optionB, optionC, optionD] = [options[0] || null, options[1] || null, options[2] || null, options[3] || null];
+        const a = normalizeAnswer(answerRaw);
+        const letters = { a:'a', b:'b', c:'c', d:'d', 'أ':'a', 'ب':'b', 'ج':'c', 'د':'d' };
+        const answerIndex = options.findIndex(o => normalizeAnswer(o) === normalizeAnswer(answerRaw));
+        correct = letters[a] || (answerIndex >= 0 ? ['a','b','c','d'][answerIndex] : '');
+      }
+      return {
+        exam_id: data.id,
+        question_text: String(q.question || q.question_text || '').trim(),
+        question_type: isTrueFalse ? 'truefalse' : 'mcq',
+        option_a: optionA, option_b: optionB, option_c: optionC, option_d: optionD,
+        correct_answer: correct,
+        points: Number(q.points) > 0 ? Number(q.points) : 1,
+        order_num: index
+      };
+    });
+    const invalidIndex = generatedRows.findIndex(q => !q.question_text || !q.correct_answer || (q.question_type === 'mcq' && (!q.option_a || !q.option_b)));
+    if (invalidIndex >= 0) {
+      await sb.from('exams').delete().eq('id', data.id);
+      showToast('تعذر نشر الامتحان: راجع السؤال رقم ' + (invalidIndex + 1) + ' لأن نصه أو إجابته أو اختياراته غير مكتملة.', 'error');
+      return;
+    }
+    const { error: questionsError } = await sb.from('exam_questions').insert(generatedRows);
+    if (questionsError) {
+      await sb.from('exams').delete().eq('id', data.id);
+      showToast('تم إلغاء إنشاء الامتحان لأن حفظ الأسئلة فشل: ' + questionsError.message, 'error');
+      return;
+    }
+    generatedExamPending = false;
+    await logActivity('add', 'أنشأ ونشر امتحانًا مولّدًا بالذكاء الاصطناعي: ' + title);
+    closeModal('modal-exam');
+    closeModal('modal-ai-exam-review');
+    showToast('✅ تم نشر الامتحان وحفظ ' + generatedRows.length + ' سؤالًا. ستجده الآن في قائمة الامتحانات الإلكترونية.');
+    await loadExams();
     return;
   }
 
