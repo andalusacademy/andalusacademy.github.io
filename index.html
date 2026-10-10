@@ -12,7 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
@@ -706,7 +706,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
       <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
       <div class="field-error" id="err-pass">كلمة المرور مطلوبة</div>
     </div>
-    <button class="login-btn" id="login-btn" onclick="doLogin()">دخول</button>
+    <button class="login-btn" id="login-btn" onclick="window.doLogin()">دخول</button>
     <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--muted)">
       مشكلة في الدخول؟ تواصل مع المدير
     </div>
@@ -3296,7 +3296,7 @@ function withLoginTimeout(promise, ms, label) {
   ]).finally(() => clearTimeout(timer));
 }
 
-async function doLogin() {
+window.doLogin = async function doLogin() {
   const emailInput = document.getElementById('login-email');
   const passwordInput = document.getElementById('login-password');
   const errBox = document.getElementById('login-error');
@@ -3379,7 +3379,7 @@ async function doLogin() {
     btn.textContent = 'دخول';
     btn.dataset.loginBusy = '0';
   }
-}
+};
 
 const CACHED_PROFILE_KEY = 'andalus_cached_profile_v1';
 
@@ -3789,7 +3789,7 @@ async function renderParentPortalDashboard() {
   const payMap = {};
   payments.forEach(p => { payMap[p.payment_type] = p; });
   const schedule = getPaymentSchedule(student);
-  let totalDue = 0, totalPaid = 0;
+  let totalPaid = 0;
   const scheduleRows = schedule.map(item => {
     const rec = payMap[item.type] || {};
     const amount = Number(rec.amount ?? item.amount) || 0;
