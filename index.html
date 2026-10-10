@@ -80,6 +80,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);-webk
 .nav-card.c11{background:linear-gradient(135deg,#6366f1,#4f46e5);}
 .nav-card.c12{background:linear-gradient(135deg,#db2777,#be185d);}
 
+
+.exam-subject-tile{appearance:none;border:1px solid var(--border);border-radius:14px;background:linear-gradient(145deg,#fff,#f8fafc);padding:20px 14px;min-height:145px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--navy);transition:transform .18s,box-shadow .18s,border-color .18s;}
+.exam-subject-tile:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:var(--gold);}
+.exam-subject-tile span{font-size:31px;line-height:1.2;}
+.exam-subject-tile strong{font-size:13px;font-weight:900;line-height:1.6;}
+.exam-subject-tile small{font-size:11px;color:var(--muted);font-weight:700;}
+@media(max-width:600px){#exam-subject-cards{grid-template-columns:repeat(2,minmax(0,1fr))!important;padding:12px!important;gap:9px!important}.exam-subject-tile{padding:14px 8px;min-height:132px}.exam-subject-tile strong{font-size:11px}}
+
 .main{flex:1;display:flex;flex-direction:column;min-width:0;}
 .topbar{background:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);position:sticky;top:64px;z-index:50;gap:12px;}
 .topbar h1{font-size:19px;font-weight:900;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -1112,6 +1120,25 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 
         <!-- EXAMS (الامتحانات الإلكترونية) -->
         <div id="page-exams" class="page">
+          <div class="card" style="margin-bottom:18px;border-top:4px solid var(--gold);">
+            <div class="card-header">
+              <div><h3>📚 مكتبة مواد الامتحانات الإلكترونية</h3><p style="font-size:12px;color:var(--muted);margin-top:4px;">اختر المادة لإعداد امتحان خاص بها. سيتم ربط رفع ملفات PDF وتوليد الأسئلة بالذكاء الاصطناعي في المرحلة التالية.</p></div>
+              <span class="badge badge-navy">11 مادة</span>
+            </div>
+            <div id="exam-subject-cards" style="padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;">
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('أساسيات الرعاية الصحية')"><span>🩺</span><strong>أساسيات الرعاية الصحية</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('مكافحة العدوى')"><span>🦠</span><strong>مكافحة العدوى</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('تمريض الباطنة والطوارئ')"><span>🏥</span><strong>تمريض الباطنة والطوارئ</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('أساسيات التمريض النظري والمصطلحات الطبية')"><span>📚</span><strong>أساسيات التمريض النظري والمصطلحات الطبية</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('العناية المركزة')"><span>❤️‍🩹</span><strong>العناية المركزة</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('التغذية العلاجية')"><span>🥗</span><strong>التغذية العلاجية</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('النساء والتوليد')"><span>🤰</span><strong>النساء والتوليد</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('الفسيولوجي')"><span>🫀</span><strong>الفسيولوجي</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('الإسعافات الأولية')"><span>🚑</span><strong>الإسعافات الأولية</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('تمريض الأطفال')"><span>👶</span><strong>تمريض الأطفال</strong><small>إعداد امتحان للمادة</small></button>
+              <button class="exam-subject-tile" onclick="openCreateExamForMaterial('تأسيس اللغة الإنجليزية')"><span>🇬🇧</span><strong>تأسيس اللغة الإنجليزية</strong><small>إعداد امتحان للمادة</small></button>
+            </div>
+          </div>
           <div class="search-bar no-print">
             <button class="btn btn-gold" onclick="openCreateExam()">➕ إنشاء امتحان جديد</button>
             <button class="btn btn-info" onclick="copyStudentExamLink()">🔗 نسخ رابط بوابة الامتحانات فقط</button>
@@ -10933,6 +10960,22 @@ function renderExamsTable() {
       </td>
     </tr>`;
   }).join('');
+}
+
+function openCreateExamForMaterial(materialName) {
+  openCreateExam();
+  const select = document.getElementById('exam-subject');
+  const normalize = value => String(value || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\sـ]+/g, ' ').trim().toLowerCase();
+  const wanted = normalize(materialName);
+  const match = allSubjects.find(subject => normalize(subject.name) === wanted)
+    || allSubjects.find(subject => normalize(subject.name).includes(wanted) || wanted.includes(normalize(subject.name)));
+  if (match) {
+    select.value = match.id;
+    document.getElementById('exam-title').value = 'امتحان ' + materialName;
+    showToast('تم اختيار مادة: ' + materialName);
+  } else {
+    showToast('المادة موجودة في الواجهة، لكنها غير مسجلة بعد في قائمة المواد بقاعدة البيانات. اختر مادة مسجلة أو أضف المادة أولاً.', 'error');
+  }
 }
 
 function openCreateExam() {
