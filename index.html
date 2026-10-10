@@ -8953,10 +8953,8 @@ function getPaymentSchedule(student) {
     schedule.push({ type: 'مقدم', label: 'المقدم', amount: 0, due: reg });
     for (let i = 1; i <= 10; i++) schedule.push({ type: 'قسط_' + i, label: 'القسط ' + ordinals[i - 1], amount: 0, due: fmtDate(addMonths(reg, i)) });
     schedule.push({ type: 'قسط_11', label: 'القسط ' + ordinals[10] + ' (الأخير)', amount: 0, due: fmtDate(addMonths(reg, 11)) });
-  } else {
-    const prog = allPrograms.find(p => p.id === student.program_id);
-    schedule.push({ type: 'رسوم_كاملة', label: 'رسوم الكورس', amount: prog?.fees ? parseFloat(prog.fees) : 0, due: reg });
   }
+  // لا ننشئ بند "رسوم الكورس" الثابت؛ إجمالي الرسوم يُقرأ من إجمالي المستحق المسجل للطالب.
   return schedule;
 }
 
@@ -9241,7 +9239,9 @@ function renderStudentFinance(s, container) {
   const fixedTypes = new Set(FIXED_EXTRA_ITEMS.map(i => i.type));
   const extraItems = Object.values(payments).filter(p =>
     !scheduleTypes.has(p.payment_type) &&
-    !fixedTypes.has(p.payment_type) && p.payment_type !== '_notes'
+    !fixedTypes.has(p.payment_type) &&
+    p.payment_type !== '_notes' &&
+    p.payment_type !== 'رسوم_كاملة'
   );
 
   let totalPaid = 0;
@@ -9326,7 +9326,10 @@ function renderStudentFinance(s, container) {
           <button class="btn btn-success btn-sm" id="regbtn_${type.replace(/[^a-zA-Z0-9]/g, '_')}" style="font-size:12px" onclick="registerPayment('${s.id}','${type}','paydate_${type.replace(/[^a-zA-Z0-9]/g, '_')}')" disabled>💵 تسجيل الدفع</button>
         </div>`;
 
-    const notesCell = `<input type="text" class="pay-date-input" style="width:120px" value="${escapeHtml(rec.label || '')}" placeholder="ملاحظة..." onchange="updatePayLabel('${s.id}','${type}',this.value)">`;
+    const notesCell = `<div style="display:flex;flex-direction:column;gap:5px;min-width:130px">
+      <input type="text" class="pay-date-input" style="width:130px" value="${escapeHtml(rec.notes || '')}" placeholder="ملاحظة..." onchange="updatePayNote('${s.id}','${type}',this.value)">
+      ${isExtra ? `<label style="font-size:11px;display:flex;align-items:center;gap:4px"><span>الاستحقاق:</span><input type="date" class="pay-date-input" style="width:125px" value="${escapeHtml(rec.due_date || '')}" onchange="updateDueDate('${s.id}','${type}',this.value)"></label>` : ''}
+    </div>`;
 
     const deleteBtn = isExtra ? `<button class="btn btn-danger btn-sm del-action" style="font-size:11px" onclick="deleteExtraItem('${s.id}','${type}')">🗑</button>` : '';
 
@@ -9501,31 +9504,8 @@ const engRec = payments['كورس_انجليزى'] || {};
 
     <div class="card" style="margin-bottom:12px">
       <div style="padding:12px 18px;background:#f8fafc;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <strong style="font-size:14px">بنود / خصومات إضافية</strong>
-        <button class="btn btn-gold btn-sm" onclick="openPayItem('${s.id}')">+ إضافة بند / خصم</button>
-      </div>
-      <div style="overflow-x:auto">
-        <table class="grades-table">
-          <thead>
-            <tr>
-              <th style="text-align:right;min-width:130px">البند</th>
-              <th style="min-width:80px">القيمة</th>
-              <th style="min-width:90px">النوع</th>
-              <th style="min-width:190px">الدفع</th>
-              <th style="min-width:80px">—</th>
-              <th style="min-width:150px;text-align:right">ملاحظة</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${extraItems.length ? extraItems.map(rec => extraRowHtml(rec)).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;">لا توجد بنود إضافية بعد</td></tr>'}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px">
-      <div style="padding:12px 18px;background:#f8fafc;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <strong style="font-size:14px">بنود المصروفات</strong>
+        <button class="btn btn-gold btn-sm" onclick="openPayItem('${s.id}')">+ إضافة بند مصروفات</button>
       </div>
       <div style="overflow-x:auto">
         <table class="grades-table">
@@ -9542,7 +9522,7 @@ const engRec = payments['كورس_انجليزى'] || {};
           <tbody>
             ${schedule.find(i => i.type === 'مقدم') ? rowHtml('مقدم', 'المقدم', schedule.find(i => i.type === 'مقدم').amount, undefined, false, false, true) : ''}
             ${schedule.filter(i => i.type.startsWith('قسط_')).map(item => rowHtml(item.type, item.label, item.amount, undefined, false, false, true)).join('')}
-            ${schedule.find(i => i.type === 'رسوم_كاملة') ? rowHtml('رسوم_كاملة', 'رسوم الكورس', schedule.find(i => i.type === 'رسوم_كاملة').amount, undefined, false) : ''}
+            ${extraItems.map(rec => rowHtml(rec.payment_type, rec.label || rec.payment_type, rec.amount || 0, rec.applicable === false ? false : undefined, false, true, true)).join('')}
             ${notesRow}
           </tbody>
         </table>
