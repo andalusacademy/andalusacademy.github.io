@@ -11086,10 +11086,105 @@ async function deleteExamMaterialFile(path) {
   await loadExamMaterialFiles();
 }
 async function startAiExamGeneration() {
-  const selectedFiles = [...document.querySelectorAll('#exam-material-files-list .exam-material-file-cb:checked')].map(el=>el.value);
-  if (!selectedFiles.length) { showToast('اختار ملف PDF واحدًا على الأقل لتوليد الامتحان','error'); return; }
-  // الواجهة جاهزة؛ المرحلة التالية تنشئ وتوصل Edge Function آمنة لتوليد الأسئلة دون كشف مفتاح الذكاء الاصطناعي.
-  showToast('تم اختيار '+selectedFiles.length+' ملف. نحتاج الآن إلى تفعيل خدمة الذكاء الاصطناعي الآمنة قبل التوليد.', 'error');
+  const selectedFiles = [...document.querySelectorAll('#exam-material-files-list .exam-material-file-cb:checked')].map(el => el.value);
+  if (!selectedFiles.length) { showToast('اختار ملف PDF واحدًا على الأقل لتوليد الامتحان', 'error'); return; }
+  if (selectedFiles.length > 5) { showToast('اختار 5 ملفات PDF كحد أقصى في المرة الواحدة', 'error'); return; }
+
+  const button = document.querySelector('#modal-exam-material-workspace button[onclick="startAiExamGeneration()"]');
+  const originalText = button ? button.textContent : '';
+  if (button) { button.disabled = true; button.textContent = '⏳ جاري تحليل الملفات وتوليد الأسئلة...'; }
+
+  try {
+    const { data: sessionData, error: sessionError } = await sb.auth.getSession();
+    const session = sessionData?.session;
+    if (sessionError || !session?.access_token) {
+      showToast('انتهت جلسة الإدارة. سجّل الدخول مرة أخرى ثم أعد المحاولة.', 'error');
+      return;
+    }
+
+    const response = await fetch(SUPABASE_URL + '/functions/v1/generate-exam', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + session.access_token,
+        'apikey': SUPABASE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        paths: selectedFiles,
+        subject: activeExamMaterialName || 'المادة التدريبية',
+        count: 20,
+        difficulty: 'متوسط'
+      })
+    });
+
+    let result;
+    try { result = await response.json(); }
+    catch (_) { throw new Error('الخدمة أرجعت استجابة غير مفهومة. راجع Logs في Supabase.'); }
+
+    if (!response.ok || !result.success || !result.exam) {
+      const details = result?.details ? ' — ' + result.details : '';
+      throw new Error((result?.error || 'فشل توليد الامتحان') + details);
+    }
+
+    showGeneratedExamReview(result.exam);
+    showToast('تم توليد ' + (result.generatedCount || result.exam.questions.length) + ' سؤالًا للمراجعة');
+  } catch (error) {
+    console.error('Exam generation failed:', error);
+    showToast(error?.message || 'تعذر الاتصال بخدمة توليد الامتحانات', 'error');
+  } finally {
+    if (button) { button.disabled = false; button.textContent = originalText || '🤖 توليد الامتحان من ملفات PDF المحددة'; }
+  }
+}
+
+function showGeneratedExamReview(exam) {
+  let modal = document.getElementById('modal-ai-exam-review');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-ai-exam-review';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = '<div class="modal" style="max-width:900px;max-height:90vh;overflow:auto"><div class="modal-header"><h3 id="ai-exam-review-title">مراجعة الامتحان المُولّد</h3><button class="modal-close" onclick="closeModal(\'modal-ai-exam-review\')">×</button></div><div class="modal-body"><div id="ai-exam-review-content"></div></div><div class="modal-footer" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="copyGeneratedExamJson()">📋 نسخ الأسئلة بصيغة JSON</button><button class="btn btn-gold" onclick="closeModal(\'modal-ai-exam-review\')">تمت المراجعة</button></div></div>';
+    document.body.appendChild(modal);
+  }
+
+  const questions = Array.isArray(exam.questions) ? exam.questions : [];
+  document.getElementById('ai-exam-review-title').textContent = exam.title || ('مراجعة امتحان ' + (exam.subject || activeExamMaterialName || 'المادة'));
+  const content = document.getElementById('ai-exam-review-content');
+  content.innerHTML = '<div style="background:#eff6ff;padding:12px;border-radius:10px;margin-bottom:14px"><strong>' + escapeHtml(exam.subject || activeExamMaterialName || 'المادة') + '</strong><div style="font-size:12px;margin-top:5px">عدد الأسئلة: ' + questions.length + ' — راجع الأسئلة والإجابات قبل اعتمادها.</div></div>' +
+    questions.map((q, i) => {
+      const options = Array.isArray(q.options) ? q.options : [];
+      return '<article style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">' +
+        '<div style="font-weight:800;margin-bottom:8px">سؤال ' + (i + 1) + ' · ' + escapeHtml(q.type === 'true_false' ? 'صح أو خطأ' : 'اختيار من متعدد') + '</div>' +
+        '<div style="white-space:pre-wrap;margin-bottom:10px">' + escapeHtml(q.question || '') + '</div>' +
+        (options.length ? '<ul style="margin:0 0 10px;padding-right:22px">' + options.map(o => '<li style="margin:4px 0">' + escapeHtml(o) + '</li>').join('') + '</ul>' : '') +
+        '<div style="color:#166534;font-weight:700">الإجابة: ' + escapeHtml(q.answer || 'غير محددة') + '</div>' +
+        (q.explanation ? '<div style="font-size:12px;color:var(--muted);margin-top:6px">التفسير: ' + escapeHtml(q.explanation) + '</div>' : '') +
+        '</article>';
+    }).join('');
+
+  window._andalusGeneratedExam = exam;
+  modal.classList.add('open');
+}
+
+function copyGeneratedExamJson() {
+  const exam = window._andalusGeneratedExam;
+  if (!exam) { showToast('لا توجد أسئلة لنسخها', 'error'); return; }
+  const text = JSON.stringify(exam, null, 2);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => showToast('تم نسخ الأسئلة بصيغة JSON'),
+      () => showToast('تعذر النسخ تلقائيًا؛ حاول من متصفح آمن', 'error')
+    );
+  } else {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); showToast('تم نسخ الأسئلة بصيغة JSON'); }
+    catch (_) { showToast('تعذر نسخ الأسئلة', 'error'); }
+    area.remove();
+  }
 }
 
 function openCreateExamForMaterial(materialName) {
