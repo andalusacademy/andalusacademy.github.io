@@ -5673,20 +5673,20 @@ function getFilteredStudents() {
     const professional = /احتراف|professional/.test(systemMeta);
     const basic = /أساس|اساس|basic/.test(systemMeta);
 
-    // رقم الدفعة يُقرأ من حقول الدفعة فقط، وليس رقم القيد الذي قد يحتوي على 8 أو 10.
-    const batchMeta = [s.batch, s.batch_name, s.cohort, s.group_name, s.notes].filter(Boolean).join(' ').toLowerCase();
-    const hasExplicitBatch = /دفعة\s*\d+|batch\s*\d+/i.test(batchMeta);
-    const batch8Explicit = /دفعة\s*8(?!\d)|batch\s*8(?!\d)/i.test(batchMeta);
-    const batch10 = /دفعة\s*10(?!\d)|batch\s*10(?!\d)/i.test(batchMeta);
+    // تحديد الدفعة من الفرع وبادئة رقم القيد حسب تقسيم المركز.
+    // رقم القيد محفوظ في s.id.
+    const reg = String(s.id ?? s.enrollment_number ?? s.registration_number ?? '').replace(/\D/g, '');
+    const studentBranch = normalizeStudentsBranch(s.branch);
+    let batch = null;
+    if (studentBranch === 'كفر الدوار' && reg.startsWith('50')) batch = 8;
+    else if (studentBranch === 'كفر الدوار' && reg.startsWith('52')) batch = 10;
+    else if (studentBranch === 'فرع اسكندرية' && reg.startsWith('51')) batch = 8;
 
-    // السجلات القديمة التي أُضيفت قبل اعتماد تقسيم الدفعات تُعامل كدفعة 8،
-    // إلا إذا كانت محددة صراحةً كدفعة 10.
-    const batch8 = batch8Explicit || (!hasExplicitBatch && !batch10);
     const mc = category === 'all' ||
-      (category === 'professional8' && professional && batch8) ||
-      (category === 'basic8' && basic && batch8) ||
-      (category === 'professional10' && professional && batch10) ||
-      (category === 'basic10' && basic && batch10);
+      (category === 'professional8' && batch === 8 && professional) ||
+      (category === 'basic8' && batch === 8 && basic) ||
+      (category === 'professional10' && batch === 10 && professional) ||
+      (category === 'basic10' && batch === 10 && basic);
     return mq && mb && mp && mc;
   });
 }
