@@ -4500,8 +4500,12 @@ async function saveExamAnswer(questionId, value) {
   document.querySelectorAll(`input[name="q_${questionId}"]`).forEach(inp => {
     inp.closest('.exam-option-label').classList.toggle('selected', inp.checked);
   });
-  // حفظ تلقائي فورى فى قاعدة البيانات (يحمي من ضياع الإجابات لو حصل ريفرش)
-  await sb.from('exam_attempts').update({ answers }).eq('id', examCurrentAttempt.id);
+  // حفظ تلقائي فوري في قاعدة البيانات مع إظهار الخطأ بدل فقد الإجابة بصمت.
+  const { error } = await sb.from('exam_attempts').update({ answers }).eq('id', examCurrentAttempt.id);
+  if (error) {
+    console.error('تعذر حفظ إجابة الامتحان:', error);
+    showToast('تعذر حفظ الإجابة على قاعدة البيانات: ' + error.message, 'error');
+  }
 }
 
 function startExamTimer() {
@@ -4598,13 +4602,20 @@ async function submitExam(autoSubmitted, cheatingDetected) {
     examLastAnswers = answers;
   }
 
-  await sb.from('exam_attempts').update({
+  const { error: submitSaveError } = await sb.from('exam_attempts').update({
     answers, score: finalScore, max_score: maxScore,
     submitted_at: new Date().toISOString(), status: 'submitted',
     flagged_cheating: !!cheatingDetected, time_taken_seconds: timeTakenSeconds
   }).eq('id', examCurrentAttempt.id);
 
-  // ✅ تسجيل الدرجة تلقائيًا فى تاب "الدرجات" الرسمي، مع تمييزها بـ "(إلكتروني)" وملاحظة الغش لو وُجد
+  if (submitSaveError) {
+    console.error('تعذر حفظ تسليم الامتحان:', submitSaveError);
+    showToast('تعذر حفظ تسليم الامتحان على قاعدة البيانات: ' + submitSaveError.message + ' — حاول إعادة الاتصال ثم استكمال المحاولة.', 'error');
+    examSubmitLock = false;
+    return;
+  }
+
+  // لا نحدّث سجل الدرجات الرسمي إلا بعد تأكيد حفظ محاولة الامتحان بنجاح.
   await syncExamScoreToGrades(examCurrentExam, examStudent.id, finalScore, cheatingDetected ? 'غشاش' : null);
 
   if (cheatingDetected) {
