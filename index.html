@@ -793,6 +793,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
         <div id="page-dashboard" class="page active">
           <div class="nav-cards-grid no-print" id="nav-cards-grid">
             <div class="nav-card c4" onclick="showPage('students')"><span class="nav-card-icon">👨‍🎓</span><span>الطلاب</span></div>
+            <div class="nav-card c12 admin-only" onclick="showPage('achievements');loadAchievementsAdmin()"><span class="nav-card-icon">🏅</span><span>إنجازات وترتيب المتدربين</span></div>
             <div class="nav-card c3" onclick="showPage('programs')"><span class="nav-card-icon">📚</span><span>البرامج والكورسات</span></div>
             <div class="nav-card c2" onclick="showPage('attendance')"><span class="nav-card-icon">✅</span><span>الحضور والغياب</span></div>
             <div class="nav-card c1" onclick="showPage('leads')"><span class="nav-card-icon">📞</span><span>الحجوزات والاستفسارات</span></div>
@@ -987,6 +988,32 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div class="card-header"><h3>قائمة الطلاب</h3><span id="student-count" style="font-size:12px;color:var(--muted)">0 طالب</span></div>
             <table><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-students" onchange="toggleSelectAllStudents(this)"></th><th>صورة</th><th>رقم القيد</th><th>الاسم</th><th>السن</th><th>المؤهل</th><th>البرنامج</th><th>النظام</th><th>الفرع</th><th>ولي الأمر</th><th>إجراءات</th></tr></thead>
             <tbody id="students-table"></tbody></table>
+          </div>
+        </div>
+
+        <!-- ACHIEVEMENTS AND RANKING -->
+        <div id="page-achievements" class="page">
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>🏅 تسجيل إنجاز لمتدرب</h3><span style="font-size:12px;color:var(--muted)">متاح للمدير فقط</span></div>
+            <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+              <div class="form-group"><label>المتدرب</label><select id="ach-student" class="search-input" style="width:100%;max-width:none;"><option value="">— اختر المتدرب —</option></select></div>
+              <div class="form-group"><label>نوع الإنجاز</label><select id="ach-type" class="search-input" style="width:100%;max-width:none;"><option value="academic">تفوق دراسي</option><option value="attendance">حضور والتزام</option><option value="course">إتمام دورة</option><option value="activity">نشاط ومشاركة</option><option value="general">إنجاز عام</option></select></div>
+              <div class="form-group"><label>عنوان الإنجاز</label><input id="ach-title" class="search-input" style="width:100%;max-width:none;" placeholder="مثال: المتدرب المثالي"></div>
+              <div class="form-group"><label>تاريخ الإنجاز</label><input id="ach-date" type="date" class="search-input" style="width:100%;max-width:none;"></div>
+              <div class="form-group"><label>نقاط الإنجاز (0–100)</label><input id="ach-points" type="number" min="0" max="100" value="0" class="search-input" style="width:100%;max-width:none;"></div>
+              <div class="form-group"><label>نقاط الأنشطة (0–100)</label><input id="ach-activity-points" type="number" min="0" max="100" value="0" class="search-input" style="width:100%;max-width:none;"></div>
+              <div class="form-group" style="grid-column:1/-1;"><label>وصف مختصر</label><textarea id="ach-description" class="search-input" style="width:100%;max-width:none;min-height:70px;" placeholder="تفاصيل الإنجاز أو سبب التكريم"></textarea></div>
+            </div>
+            <div style="padding:0 16px 16px;"><button class="btn btn-gold" onclick="saveStudentAchievement()">💾 حفظ الإنجاز</button></div>
+          </div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>🏆 ترتيب المتدربين</h3><button class="btn btn-gold btn-sm" onclick="loadAchievementsAdmin()">تحديث الترتيب</button></div>
+            <div style="padding:12px 16px;font-size:12px;line-height:1.9;color:var(--muted);">المعايير: الامتحانات 50%، الحضور 25%، نقاط الإنجازات 15%، الأنشطة والمشاركة 10%. تُحسب النتيجة من البيانات المسجلة، وتُعرض فقط للمتدربين الذين لديهم بيانات دراسية أو حضور أو نقاط.</div>
+            <div style="overflow-x:auto;"><table><thead><tr><th>الترتيب</th><th>المتدرب</th><th>الفرع</th><th>الامتحانات (50%)</th><th>الحضور (25%)</th><th>الإنجازات (15%)</th><th>الأنشطة (10%)</th><th>المجموع</th></tr></thead><tbody id="ach-ranking-table"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px;">اضغط تحديث لحساب الترتيب</td></tr></tbody></table></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>📋 الإنجازات المسجلة</h3><span id="ach-count" style="font-size:12px;color:var(--muted)">0 إنجاز</span></div>
+            <div style="overflow-x:auto;"><table><thead><tr><th>المتدرب</th><th>نوع الإنجاز</th><th>العنوان</th><th>التاريخ</th><th>النقاط</th><th>نقاط الأنشطة</th><th>الوصف</th><th>إجراء</th></tr></thead><tbody id="ach-records-table"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px;">جاري التحميل...</td></tr></tbody></table></div>
           </div>
         </div>
 
@@ -14656,5 +14683,6 @@ async function renderTraineeRanking(){
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTraineeRanking()});
 
 </script>
+<script src="student-achievements.js"></script>
 </body>
 </html>
