@@ -774,6 +774,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
         <div id="page-dashboard" class="page active">
           <div class="nav-cards-grid no-print" id="nav-cards-grid">
             <div class="nav-card c4" onclick="showPage('students')"><span class="nav-card-icon">👨‍🎓</span><span>الطلاب</span></div>
+            <div class="nav-card c12 admin-only" style="display:none;" onclick="showPage('achievements');loadAchievementsAdmin()"><span class="nav-card-icon">🏅</span><span>إنجازات وترتيب المتدربين</span></div>
             <div class="nav-card c3" onclick="showPage('programs')"><span class="nav-card-icon">📚</span><span>البرامج والكورسات</span></div>
             <div class="nav-card c2" onclick="showPage('attendance')"><span class="nav-card-icon">✅</span><span>الحضور والغياب</span></div>
             <div class="nav-card c1" onclick="showPage('leads')"><span class="nav-card-icon">📞</span><span>الحجوزات والاستفسارات</span></div>
