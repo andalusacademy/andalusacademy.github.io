@@ -14580,10 +14580,12 @@ function renderSmartAlertCenter(){
   if(!filtered.length){list.innerHTML='<div class="smart-alert-empty">✅ لا توجد تنبيهات مطابقة للفلاتر الحالية.</div>';return}
   list.innerHTML=filtered.map(n=>{
     const level=smartAlertPriority(n);
-    return '<article class="smart-alert-card '+level+'"><div class="smart-alert-icon">'+escapeHtml(n.icon||'🔔')+'</div><div><div class="smart-alert-title">'+escapeHtml(n.title||smartAlertTypeLabel(n.type))+' <span class="smart-alert-priority">'+smartAlertPriorityLabel(level)+'</span></div><div class="smart-alert-body">'+escapeHtml(n.body||'')+'</div><div class="smart-alert-body">التصنيف: '+smartAlertTypeLabel(n.type)+'</div></div><div class="smart-alert-actions"><button onclick="smartAlertAction(allNotifications.find(x=>x.key===\''+String(n.key).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')||{})">فتح التفاصيل ↗</button><button onclick="dismissSmartAlert(\''+String(n.key).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')">✓ تم الاطلاع</button></div></article>';
+    const encodedKey=encodeURIComponent(String(n.key||'')).replace(/'/g,'%27');
+    return '<article class="smart-alert-card '+level+'"><div class="smart-alert-icon">'+escapeHtml(n.icon||'🔔')+'</div><div><div class="smart-alert-title">'+escapeHtml(n.title||smartAlertTypeLabel(n.type))+' <span class="smart-alert-priority">'+smartAlertPriorityLabel(level)+'</span></div><div class="smart-alert-body">'+escapeHtml(n.body||'')+'</div><div class="smart-alert-body">التصنيف: '+smartAlertTypeLabel(n.type)+'</div></div><div class="smart-alert-actions"><button onclick="smartAlertActionByKey(\''+encodedKey+'\')">فتح التفاصيل ↗</button><button onclick="dismissSmartAlertByKey(\''+encodedKey+'\')">✓ تم الاطلاع</button></div></article>';
   }).join('');
 }
-function dismissSmartAlert(key){dismissOneNotification(key);renderSmartAlertCenter()}
+function smartAlertActionByKey(encodedKey){const key=decodeURIComponent(encodedKey);const n=allNotifications.find(x=>x.key===key);if(n)smartAlertAction(n)}
+function dismissSmartAlertByKey(encodedKey){dismissOneNotification(decodeURIComponent(encodedKey));renderSmartAlertCenter()}
 async function refreshSmartAlertCenter(){
   const list=document.getElementById('smart-alert-list');
   if(list)list.innerHTML='<div class="smart-alert-empty">⏳ جاري تحديث التنبيهات من البيانات المتاحة...</div>';
