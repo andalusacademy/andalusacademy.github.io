@@ -49,20 +49,30 @@ using (exists (
 
 grant select, insert, update, delete on public.student_achievements to authenticated;
 
-create or replace function public.student_portal_get_achievements(p_student_id text)
+create or replace function public.student_portal_get_achievements(p_student_id text, p_phone text)
 returns jsonb
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  phone_digits text := regexp_replace(coalesce(p_phone, ''), '[^0-9]', '', 'g');
+  s public.students%rowtype;
 begin
-  if p_student_id is null or btrim(p_student_id) = '' then
+  if coalesce(btrim(p_student_id), '') = '' or phone_digits = '' then
     return '[]'::jsonb;
   end if;
 
-  if not exists (select 1 from public.students s where s.id = p_student_id) then
-    return '[]'::jsonb;
-  end if;
+  select * into s
+  from public.students st
+  where st.id = p_student_id
+    and (
+      regexp_replace(coalesce(st.phone, ''), '[^0-9]', '', 'g') = phone_digits
+      or regexp_replace(coalesce(st.guardian_phone, ''), '[^0-9]', '', 'g') = phone_digits
+    )
+  limit 1;
+
+  if not found then return '[]'::jsonb; end if;
 
   return coalesce((
     select jsonb_agg(jsonb_build_object(
@@ -75,11 +85,11 @@ begin
       'activity_points', a.activity_points
     ) order by a.achievement_date desc, a.created_at desc)
     from public.student_achievements a
-    where a.student_id = p_student_id
+    where a.student_id = s.id
   ), '[]'::jsonb);
 end;
 $$;
 
-revoke all on function public.student_portal_get_achievements(text) from public;
-grant execute on function public.student_portal_get_achievements(text) to anon, authenticated;
+revoke all on function public.student_portal_get_achievements(text, text) from public;
+grant execute on function public.student_portal_get_achievements(text, text) to anon, authenticated;
 notify pgrst, 'reload schema';
