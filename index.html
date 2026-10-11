@@ -2853,6 +2853,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
 });
+window.sb = sb; // Shared with competition security module
 
 let currentUser = null;          // user_profiles row
 let currentAuth = null;          // supabase auth user
