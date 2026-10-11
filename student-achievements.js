@@ -7,17 +7,29 @@ function formatAchievementDate(value) {
   try { return new Date(value + 'T00:00:00').toLocaleDateString('ar-EG'); } catch (_) { return value; }
 }
 
-async function loadStudentPortalAchievements() {
+async function loadStudentPortalAchievements(phone) {
   const box = document.getElementById('student-portal-achievements');
   if (!box || !unifiedPortalStudent) return;
+  if (!phone) {
+    box.innerHTML = '<div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff;">' +
+      '<div style="font-weight:900;color:var(--navy);margin-bottom:8px;">🏅 إنجازاتي</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">لخصوصية بياناتك، أدخل رقم هاتفك المسجل لدى المركز لعرض الإنجازات.</div>' +
+      '<input id="student-achievements-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="رقم الهاتف المسجل" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;">' +
+      '<button class="btn btn-gold" style="width:100%;margin-top:9px;padding:10px;" onclick="loadStudentPortalAchievements(document.getElementById(\'student-achievements-phone\')?.value?.trim())">عرض إنجازاتي</button>' +
+      '<div id="student-achievements-error" style="display:none;color:#b91c1c;font-size:12px;margin-top:8px;"></div></div>';
+    return;
+  }
   try {
-    const { data, error } = await sb.rpc('student_portal_get_achievements', { p_student_id: unifiedPortalStudent.id });
+    box.innerHTML = '<div style="text-align:center;padding:12px;color:var(--muted);">جاري تحميل إنجازاتك...</div>';
+    const { data, error } = await sb.rpc('student_portal_get_achievements', {
+      p_student_id: unifiedPortalStudent.id, p_phone: phone
+    });
     if (error) throw error;
     const rows = Array.isArray(data) ? data : [];
     box.innerHTML = '<div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff;"><div style="font-weight:900;color:var(--navy);margin-bottom:10px;">🏅 إنجازاتي</div>' +
       (rows.length ? '<div style="display:grid;gap:9px;">' + rows.map(a => '<div style="border:1px solid #fde68a;background:#fffbeb;border-radius:10px;padding:11px;"><div style="font-weight:800;">🏅 ' + escapeHtml(a.title || 'إنجاز') + '</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">' + escapeHtml(a.description || '') + '</div><div style="font-size:11px;color:#92400e;margin-top:5px;">' + escapeHtml(ACH_TYPE_LABELS[a.achievement_type] || 'إنجاز عام') + ' · ' + formatAchievementDate(a.achievement_date) + '</div></div>').join('') + '</div>' : '<div style="text-align:center;color:var(--muted);padding:10px;">لا توجد إنجازات مسجلة حتى الآن.</div>') + '</div>';
   } catch (e) {
-    box.innerHTML = '<div style="padding:12px;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:12px;">تعذر تحميل الإنجازات حاليًا. تأكد من تطبيق تحديث قاعدة البيانات.</div>';
+    box.innerHTML = '<div style="padding:12px;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:12px;">تعذر تحميل الإنجازات حاليًا. تأكد من صحة رقم الهاتف وتحديث قاعدة البيانات.</div>';
     console.warn('Student achievements load failed', e);
   }
 }
