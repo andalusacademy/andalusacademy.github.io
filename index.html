@@ -761,7 +761,10 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           <div class="notif-panel" id="notif-panel">
             <div class="notif-panel-header">
               <h4>🔔 الإشعارات</h4>
-              <button class="btn btn-outline btn-sm" onclick="markAllRead()">تم القراءة ✓</button>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <button class="btn btn-outline btn-sm" onclick="openSmartAlertCenter()">🧠 المركز الذكي</button>
+                <button class="btn btn-outline btn-sm" onclick="markAllRead()">تم القراءة ✓</button>
+              </div>
             </div>
             <div id="notif-list"><div style="padding:20px;text-align:center;color:var(--muted)">لا توجد إشعارات</div></div>
           </div>
@@ -14475,5 +14478,120 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 <script>function openAndalusAI(){document.getElementById('andalus-ai-overlay').classList.add('open')}function closeAndalusAI(){document.getElementById('andalus-ai-overlay').classList.remove('open')}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAndalusAI()})</script>
 <!-- /ANDALUS_AI_LAUNCHER -->
 
+
+<style id="smart-alert-center-styles">
+#smart-alert-overlay{display:none;position:fixed;inset:0;z-index:10020;background:rgba(10,20,38,.64);padding:18px;overflow:auto;align-items:center;justify-content:center}
+#smart-alert-overlay.open{display:flex}
+.smart-alert-shell{width:min(1120px,100%);max-height:94vh;overflow:auto;background:#f8fafc;border-radius:22px;box-shadow:0 24px 90px #0005;color:#172033}
+.smart-alert-head{position:sticky;top:0;z-index:2;background:linear-gradient(135deg,#152238,#294879);color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-radius:22px 22px 0 0}
+.smart-alert-head h2{margin:0;font-size:22px}.smart-alert-head p{margin:4px 0 0;font-size:12px;color:#dbe5f5}
+.smart-alert-close{border:1px solid #ffffff50;background:#ffffff12;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;font:inherit}
+.smart-alert-content{padding:20px}
+.smart-alert-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.smart-alert-stat{background:#fff;border:1px solid #e2e8f0;border-radius:15px;padding:14px;box-shadow:0 3px 12px #15223808}
+.smart-alert-stat span{display:block;color:#64748b;font-size:12px;font-weight:700}.smart-alert-stat strong{display:block;font-size:25px;margin-top:4px;color:#152238}
+.smart-alert-filters{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;margin-bottom:14px}
+.smart-alert-filters input,.smart-alert-filters select{width:100%;min-width:0;padding:11px 12px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;font:inherit;font-size:13px}
+.smart-alert-btn{border:0;border-radius:11px;padding:10px 13px;background:#c9a24c;color:#152238;font:inherit;font-weight:800;cursor:pointer;white-space:nowrap}
+.smart-alert-list{display:grid;gap:10px}
+.smart-alert-card{background:#fff;border:1px solid #e2e8f0;border-right:5px solid #94a3b8;border-radius:14px;padding:15px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start}
+.smart-alert-card.high{border-right-color:#dc2626}.smart-alert-card.medium{border-right-color:#d97706}.smart-alert-card.low{border-right-color:#2563eb}
+.smart-alert-icon{width:42px;height:42px;border-radius:12px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:21px}
+.smart-alert-title{font-weight:900;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.smart-alert-body{font-size:13px;color:#475569;margin-top:5px;line-height:1.8;overflow-wrap:anywhere}
+.smart-alert-priority{font-size:10px;border-radius:20px;padding:3px 8px;background:#fee2e2;color:#991b1b;font-weight:800}
+.smart-alert-card.medium .smart-alert-priority{background:#fef3c7;color:#92400e}
+.smart-alert-card.low .smart-alert-priority{background:#dbeafe;color:#1d4ed8}
+.smart-alert-actions{display:flex;flex-direction:column;gap:6px}
+.smart-alert-actions button{font:inherit;font-size:11px;font-weight:800;padding:7px 9px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;white-space:nowrap}
+.smart-alert-empty{background:#fff;border:1px dashed #cbd5e1;border-radius:15px;padding:35px 15px;text-align:center;color:#64748b}
+.smart-alert-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px;color:#64748b;font-size:11px}
+@media(max-width:720px){#smart-alert-overlay{padding:7px}.smart-alert-head{padding:16px}.smart-alert-head h2{font-size:18px}.smart-alert-content{padding:12px}.smart-alert-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.smart-alert-filters{grid-template-columns:1fr 1fr}.smart-alert-filters input{grid-column:1/-1}.smart-alert-card{grid-template-columns:auto 1fr}.smart-alert-actions{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}.smart-alert-stat strong{font-size:22px}}
+</style>
+
+<div id="smart-alert-overlay" onclick="if(event.target===this)closeSmartAlertCenter()">
+  <section class="smart-alert-shell" role="dialog" aria-modal="true" aria-labelledby="smart-alert-heading">
+    <header class="smart-alert-head">
+      <div><h2 id="smart-alert-heading">🧠 مركز التنبيهات الذكي</h2><p>تجميع التنبيهات حسب الأهمية مع وصول سريع للإجراء المناسب</p></div>
+      <button class="smart-alert-close" onclick="closeSmartAlertCenter()">✕ إغلاق</button>
+    </header>
+    <div class="smart-alert-content">
+      <div class="smart-alert-stats">
+        <div class="smart-alert-stat"><span>إجمالي التنبيهات الحالية</span><strong id="smart-alert-total">0</strong></div>
+        <div class="smart-alert-stat"><span>تحتاج تدخلًا عاجلًا</span><strong id="smart-alert-high">0</strong></div>
+        <div class="smart-alert-stat"><span>تنبيهات متوسطة</span><strong id="smart-alert-medium">0</strong></div>
+        <div class="smart-alert-stat"><span>أقساط قريبة</span><strong id="smart-alert-upcoming">0</strong></div>
+      </div>
+      <div class="smart-alert-filters">
+        <input id="smart-alert-search" type="search" placeholder="🔎 ابحث باسم متدرب أو نوع التنبيه..." oninput="renderSmartAlertCenter()">
+        <select id="smart-alert-category" onchange="renderSmartAlertCenter()">
+          <option value="">كل الأنواع</option><option value="late">تأخر سداد</option><option value="upcoming">أقساط قريبة</option><option value="attend">غياب مرتفع</option><option value="task">مهام مستحقة</option><option value="lead">متابعات متأخرة</option>
+        </select>
+        <select id="smart-alert-priority" onchange="renderSmartAlertCenter()">
+          <option value="">كل الأولويات</option><option value="high">عاجل</option><option value="medium">متوسط</option><option value="low">متابعة</option>
+        </select>
+        <button class="smart-alert-btn" onclick="refreshSmartAlertCenter()">↻ تحديث</button>
+      </div>
+      <div id="smart-alert-list" class="smart-alert-list"></div>
+      <div class="smart-alert-foot"><span>التنبيهات مبنية على البيانات المحمّلة في النظام؛ راجع التفاصيل قبل اتخاذ إجراء.</span><button class="smart-alert-btn" onclick="markAllSmartAlertsRead()">✓ تعليم الكل كمقروء</button></div>
+    </div>
+  </section>
+</div>
+
+<script id="smart-alert-center-script">
+function openSmartAlertCenter(){
+  document.getElementById('notif-panel')?.classList.remove('open');
+  document.getElementById('smart-alert-overlay')?.classList.add('open');
+  renderSmartAlertCenter();
+  refreshSmartAlertCenter();
+}
+function closeSmartAlertCenter(){document.getElementById('smart-alert-overlay')?.classList.remove('open')}
+function smartAlertPriority(n){
+  if(n.type==='late'||n.type==='attend'||n.type==='task'||n.type==='lead') return 'high';
+  if(n.type==='upcoming') return 'medium';
+  return 'low';
+}
+function smartAlertPriorityLabel(level){return level==='high'?'عاجل':level==='medium'?'متوسط':'متابعة'}
+function smartAlertTypeLabel(type){return ({late:'تأخر سداد',upcoming:'قسط قريب',attend:'غياب مرتفع',task:'مهمة مستحقة',lead:'متابعة متأخرة'})[type]||'تنبيه'}
+function smartAlertAction(n){
+  if(n.type==='task') {showPage('tasks');closeSmartAlertCenter();return}
+  if(n.type==='lead') {showPage('leads');closeSmartAlertCenter();setTimeout(()=>openFollowupModal(String(n.leadId||'')),150);return}
+  if(n.studentId){closeSmartAlertCenter();openProfileFromNotif(String(n.studentId));return}
+  showToast('لا يوجد إجراء مباشر لهذا التنبيه');
+}
+function renderSmartAlertCenter(){
+  const list=document.getElementById('smart-alert-list'); if(!list)return;
+  const current=Array.isArray(allNotifications)?allNotifications:[];
+  const high=current.filter(n=>smartAlertPriority(n)==='high').length;
+  const medium=current.filter(n=>smartAlertPriority(n)==='medium').length;
+  document.getElementById('smart-alert-total').textContent=current.length;
+  document.getElementById('smart-alert-high').textContent=high;
+  document.getElementById('smart-alert-medium').textContent=medium;
+  document.getElementById('smart-alert-upcoming').textContent=current.filter(n=>n.type==='upcoming').length;
+  const q=(document.getElementById('smart-alert-search')?.value||'').trim().toLocaleLowerCase();
+  const category=document.getElementById('smart-alert-category')?.value||'';
+  const priority=document.getElementById('smart-alert-priority')?.value||'';
+  const filtered=current.filter(n=>{
+    const hay=[n.title,n.body,smartAlertTypeLabel(n.type)].join(' ').toLocaleLowerCase();
+    return (!q||hay.includes(q))&&(!category||n.type===category)&&(!priority||smartAlertPriority(n)===priority);
+  }).sort((a,b)=>{
+    const rank={high:0,medium:1,low:2};return rank[smartAlertPriority(a)]-rank[smartAlertPriority(b)];
+  });
+  if(!filtered.length){list.innerHTML='<div class="smart-alert-empty">✅ لا توجد تنبيهات مطابقة للفلاتر الحالية.</div>';return}
+  list.innerHTML=filtered.map(n=>{
+    const level=smartAlertPriority(n);
+    return '<article class="smart-alert-card '+level+'"><div class="smart-alert-icon">'+escapeHtml(n.icon||'🔔')+'</div><div><div class="smart-alert-title">'+escapeHtml(n.title||smartAlertTypeLabel(n.type))+' <span class="smart-alert-priority">'+smartAlertPriorityLabel(level)+'</span></div><div class="smart-alert-body">'+escapeHtml(n.body||'')+'</div><div class="smart-alert-body">التصنيف: '+smartAlertTypeLabel(n.type)+'</div></div><div class="smart-alert-actions"><button onclick="smartAlertAction(allNotifications.find(x=>x.key===\''+String(n.key).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')||{})">فتح التفاصيل ↗</button><button onclick="dismissSmartAlert(\''+String(n.key).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')">✓ تم الاطلاع</button></div></article>';
+  }).join('');
+}
+function dismissSmartAlert(key){dismissOneNotification(key);renderSmartAlertCenter()}
+async function refreshSmartAlertCenter(){
+  const list=document.getElementById('smart-alert-list');
+  if(list)list.innerHTML='<div class="smart-alert-empty">⏳ جاري تحديث التنبيهات من البيانات المتاحة...</div>';
+  try{await buildNotifications();}catch(e){if(list)list.innerHTML='<div class="smart-alert-empty">تعذر تحديث التنبيهات. جرّب مرة أخرى.</div>';return}
+  renderSmartAlertCenter();
+}
+function markAllSmartAlertsRead(){markAllRead();renderSmartAlertCenter();showToast('تم تعليم التنبيهات الحالية كمقروءة')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSmartAlertCenter()});
+</script>
 </body>
 </html>
