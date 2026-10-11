@@ -482,6 +482,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
   <div id="exam-select-screen" class="exam-portal-card-wrap" style="display:none;">
     <div class="login-card" style="max-width:480px;">
       <div class="login-logo"><h1 id="exam-student-welcome">أهلاً</h1><div class="gold-line"></div></div>
+      <div id="exam-achievements-content" style="margin:12px 0;"></div>
       <div id="exam-available-list"></div>
       <button class="btn btn-outline" style="width:100%;margin-top:14px;" onclick="examStudentLogout()">🚪 تسجيل خروج</button>
     </div>
@@ -915,6 +916,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 
         <!-- STUDENTS -->
         <div id="page-students" class="page">
+          <div style="display:flex;justify-content:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:14px;"><button class="btn btn-gold" onclick="openTraineeRanking()">🏆 ترتيب المتدربين</button></div>
           <div id="students-branch-home" style="margin-bottom:18px;">
             <div style="font-size:15px;font-weight:900;color:var(--navy);margin-bottom:12px;">📍 اختار الفرع</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
@@ -3909,6 +3911,17 @@ async function renderParentPortalDashboard() {
         ? '<span class="badge" style="background:#fef3c7;color:#92400e;">استئذان</span>'
         : '<span class="badge">غير مسجل</span>';
 
+  const achievementItems = [];
+  const gradedSubjects = subjectRows.filter(r => r.g1 != null || r.g2 != null);
+  const passedSubjects = gradedSubjects.filter(r => (r.g2 != null ? r.g2 >= r.pass2 : r.g1 >= r.pass1));
+  if (passedSubjects.length) achievementItems.push({icon:'✅',title:'اجتياز المواد',detail:'اجتاز ' + passedSubjects.length + ' من ' + gradedSubjects.length + ' مادة مسجلة'});
+  if (subjectRows.some(r => (r.g2 != null && r.max2 > 0 && r.g2 >= r.max2) || (r.g2 == null && r.g1 != null && r.max1 > 0 && r.g1 >= r.max1))) achievementItems.push({icon:'🥇',title:'الدرجة النهائية',detail:'حقق الدرجة النهائية في مادة واحدة على الأقل'});
+  if (attendancePct !== null && attendancePct >= 95) achievementItems.push({icon:'🌟',title:'الانتظام المتميز',detail:'نسبة حضورك ' + attendancePct + '%'});
+  if (gradedSubjects.length && passedSubjects.length === gradedSubjects.length) achievementItems.push({icon:'🏅',title:'سجل دراسي ناجح',detail:'اجتاز جميع المواد التي لها درجات مسجلة'});
+  const achievementsHtml = achievementItems.length
+    ? achievementItems.map(a => '<div style="display:flex;gap:10px;align-items:center;padding:12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;"><div style="font-size:25px;">'+a.icon+'</div><div><div style="font-weight:900;color:var(--navy);">'+escapeHtml(a.title)+'</div><div style="font-size:12px;color:var(--muted);">'+escapeHtml(a.detail)+'</div></div></div>').join('')
+    : '<div style="color:var(--muted);padding:12px;">ستظهر إنجازاتك تلقائيًا عند تسجيل درجات أو حضور كافٍ.</div>';
+
   const studentFields = [
     ['الاسم', student.name],
     ['رقم القيد', student.id],
@@ -3976,6 +3989,11 @@ async function renderParentPortalDashboard() {
       <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
         ${studentFields.map(([label,value]) => `<div style="background:#f8fafc;border:1px solid var(--border);border-radius:9px;padding:10px 12px;"><div style="font-size:10px;color:var(--muted);margin-bottom:4px;">${label}</div><div style="font-size:13px;font-weight:800;color:var(--navy);word-break:break-word;">${escapeHtml(String(value ?? '—'))}</div></div>`).join('')}
       </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header"><h3>🏅 إنجازات المتدرب</h3></div>
+      <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">${achievementsHtml}</div>
     </div>
 
     <div class="card" style="margin-bottom:14px;">
@@ -4315,6 +4333,7 @@ async function examStudentLogin() {
   examStudent = student;
   document.getElementById('exam-student-welcome').textContent = 'أهلاً، ' + student.name;
   await loadAvailableExamsForStudent();
+  await renderStudentAchievements();
   showExamScreen('exam-select-screen');
 }
 
@@ -14594,6 +14613,48 @@ async function refreshSmartAlertCenter(){
 }
 function markAllSmartAlertsRead(){markAllRead();renderSmartAlertCenter();showToast('تم تعليم التنبيهات الحالية كمقروءة')}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSmartAlertCenter()});
+
+/* إنجازات الطالب وترتيب المتدربين: يعتمد على الدرجات والحضور المسجلين */
+async function renderStudentAchievements(){
+ const box=document.getElementById('exam-achievements-content');if(!box||!examStudent)return;
+ box.innerHTML='<div style="padding:12px;color:var(--muted);">جاري تحميل إنجازاتك...</div>';
+ try{
+  const [gRes,aRes,sRes]=await Promise.all([sb.from('grades').select('*').eq('student_id',examStudent.id),sb.from('attendance').select('status').eq('student_id',examStudent.id),sb.from('subjects').select('id,name,max_grade_1,max_grade_2,pass_grade_1,pass_grade_2,min_pass')]);
+  const grades=gRes.data||[],attendance=aRes.data||[],subjects=sRes.data||[],gmap={};grades.forEach(g=>gmap[g.subject_id]=g);
+  const graded=subjects.map(sub=>{const g=gmap[sub.id]||{},r2=g.grade_2!=null,max=Number(r2?(sub.max_grade_2??sub.max_grade_1??100):(sub.max_grade_1??100)),pass=Number(r2?(sub.pass_grade_2??sub.min_pass??25):(sub.pass_grade_1??sub.min_pass??25)),score=r2?Number(g.grade_2):g.grade_1!=null?Number(g.grade_1):null;return {score,max,pass};}).filter(x=>x.score!==null);
+  const counted=attendance.filter(a=>a.status==='حاضر'||a.status==='غائب'),pct=counted.length?Math.round(counted.filter(a=>a.status==='حاضر').length/counted.length*100):null,passed=graded.filter(g=>g.score>=g.pass),items=[];
+  if(passed.length)items.push(['✅','اجتياز المواد',passed.length+' من '+graded.length+' مادة مسجلة']);
+  if(graded.some(g=>g.max>0&&g.score>=g.max))items.push(['🥇','الدرجة النهائية','حصلت على الدرجة النهائية في مادة']);
+  if(pct!==null&&pct>=95)items.push(['🌟','الانتظام المتميز','نسبة الحضور '+pct+'%']);
+  if(graded.length&&passed.length===graded.length)items.push(['🏅','سجل دراسي ناجح','اجتاز جميع المواد ذات الدرجات المسجلة']);
+  box.innerHTML='<div style="border:1px solid #dbeafe;border-radius:12px;padding:12px;background:#f8fbff;"><div style="font-weight:900;color:var(--navy);margin-bottom:9px;">🏅 إنجازاتي</div>'+(items.length?'<div style="display:grid;gap:8px;">'+items.map(a=>'<div style="display:flex;gap:9px;align-items:center;background:white;border-radius:9px;padding:10px;"><span style="font-size:22px;">'+a[0]+'</span><div><b>'+escapeHtml(a[1])+'</b><div style="font-size:12px;color:var(--muted);">'+escapeHtml(a[2])+'</div></div></div>').join('')+'</div>':'<div style="font-size:12px;color:var(--muted);">ستظهر إنجازاتك تلقائيًا بعد تسجيل الدرجات أو الحضور.</div>')+'</div>';
+ }catch(e){console.warn('Achievements load failed',e);box.innerHTML='<div style="padding:10px;color:var(--muted);">تعذر تحميل الإنجازات الآن.</div>';}
+}
+function openTraineeRanking(){
+ if(!currentUser||currentUser.role!=='admin'){showToast('ترتيب المتدربين متاح للمدير فقط','error');return;}
+ let modal=document.getElementById('trainee-ranking-modal');
+ if(!modal){modal=document.createElement('div');modal.id='trainee-ranking-modal';modal.style.cssText='position:fixed;inset:0;z-index:10040;background:rgba(7,18,38,.78);display:flex;align-items:center;justify-content:center;padding:12px;';
+ modal.innerHTML='<div style="background:#fff;border-radius:16px;width:min(100%,1000px);max-height:90vh;overflow:auto;padding:18px;"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><h2 style="margin:0;color:var(--navy);">🏆 ترتيب المتدربين</h2><button class="btn btn-outline" onclick="closeTraineeRanking()">إغلاق ✕</button></div><p style="font-size:12px;color:var(--muted);line-height:1.8;">المجموع = 70% متوسط الأداء الدراسي كنسبة مئوية + 30% نسبة الحضور. يُدرج المتدرب عند وجود درجات وحضور مسجلين؛ وعند التعادل يتقدم الأعلى دراسيًا. لا تُستخدم المدفوعات في الترتيب.</p><div id="trainee-ranking-content" style="padding-top:10px;">جاري حساب الترتيب...</div></div>';
+ modal.addEventListener('click',e=>{if(e.target===modal)closeTraineeRanking()});document.body.appendChild(modal);}
+ modal.style.display='flex';renderTraineeRanking();
+}
+function closeTraineeRanking(){const m=document.getElementById('trainee-ranking-modal');if(m)m.style.display='none';}
+async function renderTraineeRanking(){
+ const box=document.getElementById('trainee-ranking-content');if(!box)return;box.innerHTML='<div style="padding:20px;text-align:center;">جاري تحميل الدرجات والحضور...</div>';
+ try{
+  const [sRes,gRes,aRes,subRes]=await Promise.all([sb.from('students').select('id,name,branch,program,system_name').is('deleted_at',null),sb.from('grades').select('student_id,subject_id,grade_1,grade_2'),sb.from('attendance').select('student_id,status'),sb.from('subjects').select('id,name,max_grade_1,max_grade_2,pass_grade_1,pass_grade_2,min_pass')]);
+  const errors=[sRes.error,gRes.error,aRes.error,subRes.error].filter(Boolean);if(errors.length)throw errors[0];
+  const students=sRes.data||[],grades=gRes.data||[],att=aRes.data||[],subjects=subRes.data||[],byStudent={};students.forEach(st=>byStudent[st.id]={student:st,gradeSum:0,gradeMax:0,present:0,counted:0});
+  const subjectMap={};subjects.forEach(sub=>subjectMap[sub.id]=sub);
+  grades.forEach(g=>{const r=byStudent[g.student_id],sub=subjectMap[g.subject_id];if(!r||!sub)return;const r2=g.grade_2!=null,raw=r2?g.grade_2:g.grade_1;if(raw==null)return;const score=Number(raw),max=Number(r2?(sub.max_grade_2??sub.max_grade_1??100):(sub.max_grade_1??100));if(!Number.isFinite(score)||max<=0)return;r.gradeSum+=Math.max(0,Math.min(score,max));r.gradeMax+=max;});
+  att.forEach(a=>{const r=byStudent[a.student_id];if(!r)return;if(a.status==='حاضر'||a.status==='غائب'){r.counted++;if(a.status==='حاضر')r.present++;}});
+  const ranked=Object.values(byStudent).map(r=>{r.studyPct=r.gradeMax?100*r.gradeSum/r.gradeMax:null;r.attPct=r.counted?100*r.present/r.counted:null;r.total=(r.studyPct!==null&&r.attPct!==null)?(.7*r.studyPct+.3*r.attPct):null;return r;}).filter(r=>r.total!==null).sort((a,b)=>b.total-a.total||b.studyPct-a.studyPct||String(a.student.name||'').localeCompare(String(b.student.name||''),'ar'));
+  if(!ranked.length){box.innerHTML='<div style="padding:18px;text-align:center;color:var(--muted);">لا توجد بيانات كافية حتى الآن. يلزم تسجيل درجة واحدة على الأقل وسجل حضور (حاضر/غائب) لكل متدرب.</div>';return;}
+  box.innerHTML='<div style="overflow:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th>الترتيب</th><th>اسم المتدرب</th><th>الفرع</th><th>البرنامج</th><th>الأداء الدراسي (70%)</th><th>الحضور (30%)</th><th>المجموع</th></tr></thead><tbody>'+ranked.map((r,i)=>'<tr><td style="font-weight:900;">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1)+'</td><td>'+escapeHtml(r.student.name||'—')+'</td><td>'+escapeHtml(r.student.branch||'—')+'</td><td>'+escapeHtml(r.student.program||r.student.system_name||'—')+'</td><td>'+r.studyPct.toFixed(1)+'%</td><td>'+r.attPct.toFixed(1)+'%</td><td style="font-weight:900;color:var(--navy);">'+r.total.toFixed(1)+'%</td></tr>').join('')+'</tbody></table></div><div style="font-size:11px;color:var(--muted);margin-top:10px;">عدد المتدربين المؤهلين للترتيب: '+ranked.length+' — لا تدخل البيانات المالية في التقييم.</div>';
+ }catch(e){console.error('Ranking error',e);box.innerHTML='<div style="padding:16px;color:#b91c1c;">تعذر تحميل الترتيب من قاعدة البيانات: '+escapeHtml(e.message||'خطأ غير معروف')+'. تأكد من صلاحيات قراءة الدرجات والحضور.</div>';}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTraineeRanking()});
+
 </script>
 </body>
 </html>
