@@ -4330,7 +4330,10 @@ async function loadAvailableExamsForStudent() {
     .lte('available_from', now)
     .gte('available_until', now);
 
-  const matching = (exams || []).filter(e => examMatchesStudent(e, examStudent));
+  const matching = [];
+  for (const exam of (exams || [])) {
+    if (await isStudentEligibleForExam(exam, examStudent)) matching.push(exam);
+  }
 
   const listEl = document.getElementById('exam-available-list');
   if (!matching.length) {
@@ -4365,14 +4368,42 @@ async function loadAvailableExamsForStudent() {
 let allSubjectsCacheForPortal = null;
 async function ensurePortalSubjects() {
   if (allSubjectsCacheForPortal) return;
-  const { data } = await sb.from('subjects').select('id,name');
+  const { data, error } = await sb.from('subjects').select('id,name,max_grade_1,max_grade_2,pass_grade_1,pass_grade_2,min_pass');
+  if (error) console.error('تعذر تحميل إعدادات المواد للامتحانات:', error);
   allSubjectsCacheForPortal = data || [];
+}
+
+async function isStudentEligibleForExam(exam, student, options = {}) {
+  if (!exam || !student) return false;
+  if (String(exam.branch || '') !== String(student.branch || '')) return false;
+  if (!examMatchesStudent(exam, student)) return false;
+  if (!options.allowPastWindow) {
+    const now = Date.now();
+    const from = exam.available_from ? new Date(exam.available_from).getTime() : 0;
+    const until = exam.available_until ? new Date(exam.available_until).getTime() : 0;
+    if (!Number.isFinite(from) || !Number.isFinite(until) || now < from || now >= until) return false;
+  }
+  if (Number(exam.round) === 2 && !exam.is_placement_test) {
+    const [{ data: subject }, { data: grade, error: gradeError }] = await Promise.all([
+      sb.from('subjects').select('id,pass_grade_1,min_pass').eq('id', exam.subject_id).maybeSingle(),
+      sb.from('grades').select('grade_1').eq('student_id', student.id).eq('subject_id', exam.subject_id).maybeSingle()
+    ]);
+    if (gradeError || !grade || grade.grade_1 == null) return false;
+    const passMark = Number(subject?.pass_grade_1 ?? subject?.min_pass ?? 25);
+    if (Number(grade.grade_1) >= passMark) return false;
+  }
+  return true;
 }
 
 async function startExam(examId) {
   await ensurePortalSubjects();
   const { data: exam } = await sb.from('exams').select('*').eq('id', examId).maybeSingle();
   if (!exam) { showToast('الامتحان غير موجود', 'error'); return; }
+  if (!(await isStudentEligibleForExam(exam, examStudent))) {
+    showToast('هذا الامتحان غير متاح لك حاليًا أو أنك ناجح في هذه المادة بالدور الأول.', 'error');
+    await loadAvailableExamsForStudent();
+    return;
+  }
 
   const { data: questions } = await sb.from('exam_questions')
     .select('id,question_text,question_type,option_a,option_b,option_c,option_d,points,order_num')
@@ -4406,6 +4437,10 @@ async function resumeExam(examId) {
   const { data: exam } = await sb.from('exams').select('*').eq('id', examId).maybeSingle();
   const { data: attempt } = await sb.from('exam_attempts').select('*').eq('exam_id', examId).eq('student_id', examStudent.id).maybeSingle();
   if (!exam || !attempt) return;
+  if (!(await isStudentEligibleForExam(exam, examStudent, { allowPastWindow: true }))) {
+    showToast('لا يمكنك استكمال هذا الامتحان وفق بيانات الفرع أو البرنامج أو شروط الدور الثاني.', 'error');
+    return;
+  }
   if (attempt.status === 'submitted') {
     if (attempt.flagged_cheating) showToast('🚫 تم إلغاء هذا الامتحان مسبقًا بسبب اكتشاف محاولة غش — النتيجة: راسب', 'error');
     else showToast('لقد سلّمت هذا الامتحان من قبل', 'error');
@@ -4472,8 +4507,10 @@ async function saveExamAnswer(questionId, value) {
 function startExamTimer() {
   if (examTimerInterval) clearInterval(examTimerInterval);
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
-  const durationMs = examCurrentExam.duration_minutes * 60 * 1000;
-  const endsAt = startedAt + durationMs;
+  const durationMs = Math.max(0, Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000;
+  const durationEnd = startedAt + durationMs;
+  const scheduledEnd = examCurrentExam.available_until ? new Date(examCurrentExam.available_until).getTime() : durationEnd;
+  const endsAt = Math.min(durationEnd, Number.isFinite(scheduledEnd) ? scheduledEnd : durationEnd);
 
   function tick() {
     const remaining = endsAt - Date.now();
@@ -4535,7 +4572,11 @@ async function submitExam(autoSubmitted, cheatingDetected) {
 
   const answers = examCurrentAttempt.answers || {};
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
-  const timeTakenSeconds = Math.round((Date.now() - startedAt) / 1000);
+  const durationEnd = startedAt + Math.max(0, Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000;
+  const scheduledEnd = examCurrentExam.available_until ? new Date(examCurrentExam.available_until).getTime() : durationEnd;
+  const hardEnd = Math.min(durationEnd, Number.isFinite(scheduledEnd) ? scheduledEnd : durationEnd);
+  const effectiveAutoSubmit = !!autoSubmitted || Date.now() >= hardEnd;
+  const timeTakenSeconds = Math.max(0, Math.round((Math.min(Date.now(), hardEnd) - startedAt) / 1000));
 
   let score = 0, finalScore = 0, maxScore = examCurrentExam.total_score || 100;
 
@@ -4573,7 +4614,7 @@ async function submitExam(autoSubmitted, cheatingDetected) {
   } else {
     const pct = maxScore > 0 ? Math.round(finalScore / maxScore * 100) : 0;
     document.getElementById('exam-result-emoji').textContent = pct >= 50 ? '🎉' : '📝';
-    document.getElementById('exam-result-title').textContent = autoSubmitted ? 'انتهى وقت الامتحان وتم التسليم تلقائيًا' : 'تم تسليم الامتحان بنجاح';
+    document.getElementById('exam-result-title').textContent = effectiveAutoSubmit ? 'انتهى وقت الامتحان وتم التسليم تلقائيًا' : 'تم تسليم الامتحان بنجاح';
     document.getElementById('exam-result-score').textContent = `${finalScore} / ${maxScore} (${pct}%)`;
   }
 
@@ -4605,19 +4646,47 @@ async function submitExam(autoSubmitted, cheatingDetected) {
 
 // مزامنة درجة الامتحان الإلكتروني مع جدول grades الرسمي (دور 1 أو دور 2 حسب نوع الامتحان)
 async function syncExamScoreToGrades(exam, studentId, score, note) {
-  // ✅ اختبار تحديد المستوى لا يُسجَّل فى الدرجات الرسمية — هو فقط لتحديد المستوى وقت القبول
+  // اختبار تحديد المستوى لا يُسجَّل فى الدرجات الرسمية.
   if (exam.is_placement_test) return;
-  const gradeField = exam.round === 2 ? 'grade_2' : 'grade_1';
-  const { data: existing } = await sb.from('grades').select('*').eq('student_id', studentId).eq('subject_id', exam.subject_id).maybeSingle();
+  const gradeField = Number(exam.round) === 2 ? 'grade_2' : 'grade_1';
+  const { data: existing, error: gradeReadError } = await sb.from('grades').select('*')
+    .eq('student_id', studentId).eq('subject_id', exam.subject_id).maybeSingle();
+  if (gradeReadError) {
+    console.error('تعذر قراءة سجل الدرجات قبل المزامنة:', gradeReadError);
+    showToast('تم تسليم الامتحان لكن تعذرت مزامنة الدرجة مع سجل الدرجات: ' + gradeReadError.message, 'error');
+    return;
+  }
+
+  // الدور الثاني لا يُسجل إلا للمتدرب الراسب فعلًا في الدور الأول.
+  if (gradeField === 'grade_2') {
+    if (!existing || existing.grade_1 == null) {
+      showToast('تم تسليم الامتحان، لكن لا توجد درجة دور أول لهذه المادة لتحديد أهلية الدور الثاني.', 'error');
+      return;
+    }
+    const { data: subject, error: subjectError } = await sb.from('subjects').select('pass_grade_1,min_pass')
+      .eq('id', exam.subject_id).maybeSingle();
+    if (subjectError) {
+      showToast('تم تسليم الامتحان لكن تعذر التحقق من درجة النجاح للدور الأول.', 'error');
+      return;
+    }
+    const passMark = Number(subject?.pass_grade_1 ?? subject?.min_pass ?? 25);
+    if (Number(existing.grade_1) >= passMark) {
+      showToast('تم تسليم الامتحان، لكن لم تُحدّث الدرجات لأن المتدرب ناجح في الدور الأول.', 'error');
+      return;
+    }
+  }
+
   const updates = {
     student_id: studentId, subject_id: exam.subject_id,
     [gradeField]: score, [gradeField + '_source']: 'electronic',
     [gradeField + '_note']: note || null
   };
-  if (existing) {
-    await sb.from('grades').update(updates).eq('id', existing.id);
-  } else {
-    await sb.from('grades').insert(updates);
+  const result = existing
+    ? await sb.from('grades').update(updates).eq('id', existing.id)
+    : await sb.from('grades').insert(updates);
+  if (result.error) {
+    console.error('تعذر حفظ الدرجة الإلكترونية:', result.error);
+    showToast('تم تسليم الامتحان لكن تعذر حفظ الدرجة في سجل الدرجات: ' + result.error.message, 'error');
   }
 }
 
@@ -10788,14 +10857,16 @@ function sessionMatchesStudent(session, student) {
 
 // ✅ نفس منطق sessionMatchesStudent لكن للامتحانات (تدعم امتحان لأكتر من برنامج فى نفس الوقت — v4.9)
 function examMatchesStudent(exam, student) {
+  if (!exam || !student) return false;
   if (exam.program_combos && Array.isArray(exam.program_combos) && exam.program_combos.length) {
     return exam.program_combos.some(c => {
       const [pid, sys] = String(c).split('|');
-      return student.program_id === pid && (!sys || student.system_name === sys);
+      return String(student.program_id ?? '') === String(pid ?? '') &&
+        (!sys || String(student.system_name ?? '') === String(sys));
     });
   }
-  return (!exam.program_id || student.program_id === exam.program_id) &&
-         (!exam.system_name || student.system_name === exam.system_name);
+  return (!exam.program_id || String(student.program_id ?? '') === String(exam.program_id)) &&
+         (!exam.system_name || String(student.system_name ?? '') === String(exam.system_name));
 }
 let allTasks = [];
 
