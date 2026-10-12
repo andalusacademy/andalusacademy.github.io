@@ -3572,6 +3572,13 @@ async function doLogout() {
     return;
   }
 
+  // ✅ بوابة المسابقة الأسبوعية المستقلة — دخول برقم القيد مع صورة تدقيق بموافقة الطالب
+  if (new URLSearchParams(window.location.search).get('weekly-quiz') === '1') {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('weekly-quiz-screen').style.display = 'block';
+    showWeeklyQuizEntryLogin();
+    return;
+  }
   await loadSystemName();
   try { await loadWhatsappNewsLink(); } catch (e) { WHATSAPP_NEWS_LINK = ''; }
   // ✅ بوابة الطالب للامتحانات الإلكترونية — مسار مستقل تمامًا
@@ -3587,13 +3594,6 @@ async function doLogout() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('student-card-screen').style.display = 'block';
     loadStudentCard(cardStudentId);
-    return;
-  }
-  // ✅ بوابة المسابقة الأسبوعية المستقلة — دخول برقم القيد مع صورة تدقيق بموافقة الطالب
-  if (new URLSearchParams(window.location.search).get('weekly-quiz') === '1') {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('weekly-quiz-screen').style.display = 'block';
-    showWeeklyQuizEntryLogin();
     return;
   }
   // ✅ المشاركة فى مسابقة — مسار عام مستقل، رابط لكل مسابقة
