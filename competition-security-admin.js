@@ -1,6 +1,5 @@
 /* Admin-only competition security audit panel */
 (()=> {
-const API='https://uvwarprsghwvrfmdaaqv.supabase.co/functions/v1/competition-security';
 const $=id=>document.getElementById(id);
 let installed=false;
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -19,16 +18,14 @@ async function load(){
  const content=$('and-sec-content');content.textContent='جاري تحميل السجل الأمني...';
  try{
   const c=typeof sb!=='undefined'?sb:window.sb;if(!c)throw Error('تعذر الاتصال بالنظام');
-  const {data,error}=await c.auth.getSession();if(error||!data.session)throw Error('سجّل الدخول بحساب المدير أولًا');
-  const key=typeof SUPABASE_KEY!=='undefined'?SUPABASE_KEY:'';
-  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','apikey':key,'Authorization':'Bearer '+data.session.access_token},body:JSON.stringify({action:'admin_logs'})});
-  const d=await r.json();if(!r.ok||!d.ok)throw Error(d.message||'لا تملك صلاحية عرض السجل');
-  const logs=d.logs||[],filter=$('and-sec-filter').value;
-  const counts={success:0,failure:0,blocked:0,pending:0};logs.forEach(x=>{if(counts[x.outcome]!==undefined)counts[x.outcome]++});
-  $('and-sec-summary').innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">'+[['الإجمالي',logs.length],['نجاح',counts.success],['فشل',counts.failure],['محظور',counts.blocked],['قيد التحقق',counts.pending]].map(x=>'<div style="padding:10px 14px;background:#f1f5f9;border-radius:9px"><b>'+x[0]+'</b><div style="font-size:20px;font-weight:900">'+x[1]+'</div></div>').join('')+'</div>';
-  const rows=logs.filter(x=>filter==='all'||x.outcome===filter);
+  const {data:logs,error}=await c.rpc('competition_security_admin_logs',{p_limit:200});
+  if(error)throw error;
+  const rowsAll=logs||[],filter=$('and-sec-filter').value;
+  const counts={success:0,failure:0,blocked:0,pending:0};rowsAll.forEach(x=>{if(counts[x.outcome]!==undefined)counts[x.outcome]++});
+  $('and-sec-summary').innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">'+[['الإجمالي',rowsAll.length],['نجاح',counts.success],['فشل',counts.failure],['محظور',counts.blocked],['قيد التحقق',counts.pending]].map(x=>'<div style="padding:10px 14px;background:#f1f5f9;border-radius:9px"><b>'+x[0]+'</b><div style="font-size:20px;font-weight:900">'+x[1]+'</div></div>').join('')+'</div>';
+  const rows=rowsAll.filter(x=>filter==='all'||x.outcome===filter);
   content.innerHTML=rows.length?'<div style="overflow:auto"><table><thead><tr><th>الوقت</th><th>رقم القيد</th><th>نوع المسابقة</th><th>الحدث</th><th>النتيجة</th><th>السبب</th><th>IP</th><th>الجهاز</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.created_at?new Date(x.created_at).toLocaleString('ar-EG'):'')+'</td><td>'+esc(x.enrollment_number||'—')+'</td><td>'+esc(x.competition_type==='weekly_quiz'?'الأسبوعية':'عامة')+'</td><td>'+esc(x.event_type)+'</td><td>'+esc(x.outcome)+'</td><td>'+esc(x.reason||'—')+'</td><td>'+esc(x.ip_address||'—')+'</td><td>'+esc(x.device_label||x.user_agent||'—')+'</td></tr>').join('')+'</tbody></table></div>':'لا توجد محاولات مطابقة للفلتر.';
- }catch(e){content.textContent=e.message||'تعذر تحميل السجل'}
+ }catch(e){content.textContent='تعذر تحميل السجل: '+(e.message||'خطأ غير معروف')}
 }
 setInterval(setup,1200);
 })();
