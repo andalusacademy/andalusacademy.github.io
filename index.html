@@ -474,7 +474,12 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
         <label>كلمة المرور (رقم القيد وقت الامتحان)</label>
         <input type="password" id="exam-login-pass" placeholder="رقم القيد بتاعك">
       </div>
-      <button class="btn btn-gold" style="width:100%;padding:13px;" onclick="examStudentLogin()">دخول الامتحان</button>
+      <div class="form-group">
+        <label>رقم الهاتف المسجل لدى المركز</label>
+        <input type="tel" id="exam-login-phone" inputmode="tel" autocomplete="tel" placeholder="01xxxxxxxxx">
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin:-2px 0 10px;line-height:1.7;">الدخول يتطلب التحقق من الوجه. إذا كانت هذه أول مرة، ستتمكن من تسجيل بصمة الوجه بعد التحقق من رقم الهاتف.</div>
+      <button class="btn btn-gold" style="width:100%;padding:13px;" onclick="examStudentLogin()">تحقق من الوجه ثم دخول الامتحان</button>
     </div>
   </div>
 
@@ -3843,6 +3848,10 @@ async function parentPortalLogin() {
 
   ppPortalData = data;
   ppStudent = data.student;
+  try {
+    const rankingResult = await sb.rpc('student_portal_get_ranking', { p_student_id: id, p_phone: phone });
+    if (!rankingResult.error && rankingResult.data && rankingResult.data.verified) ppPortalData.ranking = rankingResult.data;
+  } catch (rankingErr) { console.warn('Parent portal ranking unavailable', rankingErr); }
   if (data.program_fees != null) {
     allPrograms = [{ id: ppStudent.program_id, fees: data.program_fees }];
   }
@@ -4010,6 +4019,7 @@ async function renderParentPortalDashboard() {
       <div class="sc-stat"><div class="v">${money(totalDue)}</div><div class="l">إجمالي المستحق</div></div>
       <div class="sc-stat"><div class="v" style="color:#22c55e">${money(totalPaid)}</div><div class="l">إجمالي المدفوع</div></div>
       <div class="sc-stat"><div class="v" style="color:#ef4444">${money(remaining)}</div><div class="l">المتبقي</div></div>
+      <div class="sc-stat"><div class="v">${portal.ranking?.rank ?? "—"}</div><div class="l">الترتيب العام</div><div style="font-size:10px;color:var(--muted)">من ${portal.ranking?.ranked_count ?? "—"} متدرب</div></div>
     </div>
 
     <div class="card" style="margin-bottom:14px;">
@@ -4343,11 +4353,25 @@ function startPulseRotation() {
 async function examStudentLogin() {
   const id = document.getElementById('exam-login-id').value.trim();
   const pass = document.getElementById('exam-login-pass').value.trim();
+  const phone = document.getElementById('exam-login-phone')?.value.trim() || '';
   const errEl = document.getElementById('exam-login-error');
   errEl.style.display = 'none';
 
   if (!id || !pass) { errEl.textContent = 'أدخل رقم القيد وكلمة المرور'; errEl.style.display = 'block'; return; }
   if (id !== pass) { errEl.textContent = 'بيانات الدخول غير صحيحة'; errEl.style.display = 'block'; return; }
+
+  if (examFaceVerifiedStudentId !== id) {
+    if (!phone) { errEl.textContent = 'أدخل رقم الهاتف المسجل للتحقق من الوجه'; errEl.style.display = 'block'; return; }
+    const { data: faceStudent, error: faceStudentError } = await sb.from('students').select('id,name,branch,program_id,system_name').eq('id', id).maybeSingle();
+    if (faceStudentError || !faceStudent) { errEl.textContent = 'رقم القيد غير موجود'; errEl.style.display = 'block'; return; }
+    const { data: faceStatus, error: faceStatusError } = await sb.rpc('student_face_status', { p_student_id: id, p_phone: phone });
+    if (faceStatusError) { errEl.textContent = 'تعذر الاتصال بخدمة التحقق من الوجه'; errEl.style.display = 'block'; return; }
+    if (!faceStatus?.verified) { errEl.textContent = 'رقم الهاتف غير مطابق للهاتف المسجل لدى المركز'; errEl.style.display = 'block'; return; }
+    unifiedPortalStudent = faceStudent;
+    unifiedPortalPhone = phone;
+    renderStudentFaceGate(!faceStatus.enrolled, 'exam_portal', null);
+    return;
+  }
 
   const { data: student, error } = await sb.from('students').select('*').eq('id', id).maybeSingle();
   if (error) {
@@ -4361,12 +4385,11 @@ async function examStudentLogin() {
   examStudent = student;
   document.getElementById('exam-student-welcome').textContent = 'أهلاً، ' + student.name;
   await loadAvailableExamsForStudent();
-  await renderStudentAchievements();
   showExamScreen('exam-select-screen');
 }
 
 function examStudentLogout() {
-  examStudent = null; examCurrentExam = null; examCurrentAttempt = null;
+  examStudent = null; examCurrentExam = null; examCurrentAttempt = null; examFaceVerifiedStudentId = null;
   if (examTimerInterval) clearInterval(examTimerInterval);
   document.getElementById('exam-login-id').value = '';
   document.getElementById('exam-login-pass').value = '';
@@ -12388,26 +12411,206 @@ async function deleteAlumni(id) {
    ============================================================ */
 let unifiedPortalStudent = null;
 
+let unifiedPortalPhone = '';
+let studentFaceStream = null;
+let studentFaceModelsReady = false;
+let studentFaceModelsPromise = null;
+let studentFaceContextType = 'student_portal';
+let studentFaceContextId = null;
+let weeklyQuizFaceToken = null;
+let examFaceVerifiedStudentId = null;
+
 function showStudentPortalLoginStep() {
+  stopStudentFaceCamera();
   document.getElementById('student-portal-content').innerHTML = `
-    <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">اكتب رقم قيدك عشان تدخل بوابتك</p>
-    <div class="form-group"><label>رقم القيد</label><input type="text" id="student-portal-id-input" placeholder="AND-2026-001" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;"></div>
-    <div id="student-portal-login-err" style="color:#dc2626;font-size:12px;margin-top:6px;display:none;"></div>
-    <button class="btn btn-gold" style="width:100%;padding:13px;margin-top:12px;" onclick="enterStudentPortal()">دخول</button>
+    <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أدخل رقم القيد ورقم الهاتف المسجل، ثم تحقق من الوجه للدخول الآمن</p>
+    <div class="form-group"><label>رقم القيد</label><input type="text" id="student-portal-id-input" autocomplete="username" placeholder="رقم القيد" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
+    <div class="form-group"><label>رقم الهاتف المسجل لدى المركز</label><input type="tel" inputmode="tel" autocomplete="tel" id="student-portal-phone-input" placeholder="01xxxxxxxxx" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
+    <div id="student-portal-login-err" role="alert" style="color:#dc2626;font-size:12px;margin-top:6px;display:none;"></div>
+    <button class="btn btn-gold" style="width:100%;padding:13px;margin-top:12px;" onclick="enterStudentPortal()">متابعة والتحقق من الوجه</button>
   `;
+  document.getElementById('student-portal-phone-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') enterStudentPortal(); });
   document.getElementById('student-portal-id-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') enterStudentPortal(); });
 }
 
 async function enterStudentPortal() {
   const idInput = document.getElementById('student-portal-id-input');
+  const phoneInput = document.getElementById('student-portal-phone-input');
   const errEl = document.getElementById('student-portal-login-err');
-  const studentId = idInput.value.trim();
-  if (!studentId) { errEl.textContent = 'اكتب رقم القيد'; errEl.style.display = 'block'; return; }
-  errEl.style.display = 'none';
-  const { data: student, error } = await sb.from('students').select('id,name,branch,program_id,system_name').eq('id', studentId).maybeSingle();
-  if (error || !student) { errEl.textContent = 'رقم القيد غير موجود'; errEl.style.display = 'block'; return; }
-  unifiedPortalStudent = student;
+  const studentId = idInput?.value.trim();
+  const phone = phoneInput?.value.trim();
+  if (!studentId || !phone) { if(errEl){errEl.textContent='اكتب رقم القيد ورقم الهاتف المسجل';errEl.style.display='block';} return; }
+  if(errEl) { errEl.style.display='none'; }
+  try {
+    const { data: student, error } = await sb.from('students').select('id,name,branch,program_id,system_name').eq('id', studentId).maybeSingle();
+    if (error || !student) throw new Error('رقم القيد غير موجود أو تعذر تحميل بيانات الطالب');
+    const { data: faceStatus, error: statusError } = await sb.rpc('student_face_status', {
+      p_student_id: studentId, p_phone: phone
+    });
+    if (statusError) throw statusError;
+    if (!faceStatus?.verified) throw new Error('رقم الهاتف غير مطابق للهاتف المسجل لدى المركز');
+    unifiedPortalStudent = student;
+    unifiedPortalPhone = phone;
+    renderStudentFaceGate(!faceStatus.enrolled);
+  } catch (e) {
+    if(errEl) { errEl.textContent = e.message || 'تعذر التحقق من البيانات'; errEl.style.display='block'; }
+    else showToast(e.message || 'تعذر التحقق من البيانات','error');
+  }
+}
+
+function renderStudentFaceGate(enrolling, contextType = 'student_portal', contextId = null) {
+  stopStudentFaceCamera();
+  studentFaceContextType = contextType;
+  studentFaceContextId = contextId;
+  if (contextType === 'exam_portal' && !document.getElementById('student-face-gate-overlay')) {
+    document.body.insertAdjacentHTML('beforeend', '<div id="student-face-gate-overlay" style="position:fixed;inset:0;z-index:999999;background:rgba(15,23,42,.82);overflow:auto;padding:18px;display:flex;align-items:center;justify-content:center;"><div id="student-face-gate-content" style="width:100%;max-width:560px;"></div></div>');
+  }
+  const box = contextType === 'exam_portal'
+    ? document.getElementById('student-face-gate-content')
+    : document.getElementById('student-portal-content');
+  if (!box) return;
+  box.innerHTML = `
+    <div style="border:1px solid var(--border);border-radius:14px;padding:16px;background:#fff;max-width:560px;margin:auto;">
+      <div style="font-size:20px;font-weight:900;text-align:center;color:var(--navy);">${enrolling ? '📸 تسجيل الوجه لأول مرة' : '🔐 التحقق من هوية الطالب'}</div>
+      <p style="font-size:13px;line-height:1.8;color:var(--muted);text-align:center;">${enrolling ? 'سنحفظ بصمة رقمية للوجه فقط، وليس صورة الوجه. يلزم موافقتك قبل التسجيل.' : 'انظر إلى الكاميرا في إضاءة جيدة، وتأكد أن وجهك ظاهر بالكامل.'}</p>
+      <video id="student-face-video" autoplay muted playsinline style="display:none;width:100%;max-height:330px;object-fit:cover;border-radius:12px;background:#0f172a;"></video>
+      <div id="student-face-status" aria-live="polite" style="padding:10px;text-align:center;font-size:12px;color:var(--muted);">اضغط تشغيل الكاميرا للمتابعة.</div>
+      ${enrolling ? '<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.7;margin:10px 0;"><input id="student-face-consent" type="checkbox" style="margin-top:4px;"> أوافق على تسجيل بصمة رقمية لوجهي للتحقق من هويتي عند الدخول، وأفهم أنني أستطيع طلب حذفها من إدارة المركز.</label>' : ''}
+      <button class="btn btn-gold" id="student-face-start" style="width:100%;padding:12px;" onclick="startStudentFaceCamera()">تشغيل الكاميرا</button>
+      <button class="btn btn-gold" id="student-face-capture" style="display:none;width:100%;padding:12px;margin-top:8px;" onclick="${enrolling ? 'registerStudentFace()' : 'verifyStudentFaceAndEnter()'}">${enrolling ? 'حفظ بصمة الوجه والدخول' : 'تحقق من الوجه والدخول'}</button>
+      <button class="btn btn-secondary" style="width:100%;padding:10px;margin-top:8px;" onclick="showStudentPortalLoginStep()">رجوع</button>
+    </div>`;
+}
+
+function setStudentFaceStatus(message, isError = false) {
+  const el = document.getElementById('student-face-status');
+  if (el) { el.textContent = message; el.style.color = isError ? '#b91c1c' : 'var(--muted)'; }
+}
+
+async function ensureStudentFaceModels() {
+  if (studentFaceModelsReady) return;
+  if (studentFaceModelsPromise) return studentFaceModelsPromise;
+  studentFaceModelsPromise = (async () => {
+    if (!window.faceapi) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('تعذر تحميل مكتبة التحقق من الوجه؛ تأكد من اتصال الإنترنت.'));
+        document.head.appendChild(script);
+      });
+    }
+    const modelUrl = 'https://justadudewhohacks.github.io/face-api.js/models';
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl),
+      faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl),
+      faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl)
+    ]);
+    studentFaceModelsReady = true;
+  })();
+  try { await studentFaceModelsPromise; }
+  catch (e) { studentFaceModelsPromise = null; throw e; }
+}
+
+async function startStudentFaceCamera() {
+  try {
+    setStudentFaceStatus('جاري تحميل نماذج الوجه...');
+    await ensureStudentFaceModels();
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('الكاميرا غير متاحة. افتح الرابط عبر HTTPS واستخدم متصفحًا حديثًا.');
+    studentFaceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+    const video = document.getElementById('student-face-video');
+    video.srcObject = studentFaceStream;
+    video.style.display = 'block';
+    await video.play();
+    const startBtn = document.getElementById('student-face-start');
+    const captureBtn = document.getElementById('student-face-capture');
+    if (startBtn) startBtn.style.display = 'none';
+    if (captureBtn) captureBtn.style.display = 'block';
+    setStudentFaceStatus('ضع وجهك داخل الإطار، وانظر إلى الكاميرا مباشرة.');
+  } catch (e) {
+    setStudentFaceStatus(e.message || 'تعذر تشغيل الكاميرا.', true);
+  }
+}
+
+async function captureStudentFaceDescriptor() {
+  const video = document.getElementById('student-face-video');
+  if (!video || !studentFaceStream || video.readyState < 2) throw new Error('شغّل الكاميرا وانتظر ظهور الصورة أولًا.');
+  const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+    .withFaceLandmarks().withFaceDescriptor();
+  if (!detection) throw new Error('لم نتعرف على وجه واضح. حسّن الإضاءة واجعل وجهك أمام الكاميرا.');
+  return Array.from(detection.descriptor);
+}
+
+async function registerStudentFace() {
+  const consent = document.getElementById('student-face-consent');
+  if (!consent?.checked) { setStudentFaceStatus('يجب الموافقة على تسجيل بصمة الوجه أولًا.', true); return; }
+  const btn = document.getElementById('student-face-capture');
+  if (btn) btn.disabled = true;
+  try {
+    setStudentFaceStatus('جاري التقاط بصمة الوجه وحفظها بأمان...');
+    const descriptor = await captureStudentFaceDescriptor();
+    const { data, error } = await sb.rpc('student_face_enroll', {
+      p_student_id: unifiedPortalStudent.id, p_phone: unifiedPortalPhone,
+      p_descriptor: descriptor, p_consent: true
+    });
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.reason === 'phone_mismatch' ? 'رقم الهاتف غير مطابق.' : 'تعذر تسجيل بصمة الوجه.');
+    setStudentFaceStatus('تم التسجيل. جاري تأكيد الهوية...');
+    await finishStudentFaceVerification(descriptor, studentFaceContextType, studentFaceContextId);
+  } catch (e) {
+    setStudentFaceStatus(e.message || 'تعذر تسجيل بصمة الوجه.', true);
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function verifyStudentFaceAndEnter() {
+  const btn = document.getElementById('student-face-capture');
+  if (btn) btn.disabled = true;
+  try {
+    setStudentFaceStatus('جاري التحقق من الوجه...');
+    const descriptor = await captureStudentFaceDescriptor();
+    await finishStudentFaceVerification(descriptor, studentFaceContextType, studentFaceContextId);
+  } catch (e) {
+    setStudentFaceStatus(e.message || 'تعذر التحقق من الوجه.', true);
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function finishStudentFaceVerification(descriptor, contextType, contextId) {
+  const { data, error } = await sb.rpc('student_face_verify', {
+    p_student_id: unifiedPortalStudent.id, p_phone: unifiedPortalPhone,
+    p_live_descriptor: descriptor, p_competition_type: contextType, p_competition_id: contextId
+  });
+  if (error) throw error;
+  if (!data?.verified) {
+    const messages = { face_mismatch: 'الوجه لا يطابق البصمة المسجلة. حاول مرة أخرى.', face_not_enrolled: 'لا توجد بصمة وجه مسجلة لهذا الطالب.', phone_mismatch: 'رقم الهاتف غير مطابق.' };
+    throw new Error(messages[data?.reason] || 'تعذر التحقق من الهوية.');
+  }
+  stopStudentFaceCamera();
+  if (contextType === 'exam_portal') {
+    examFaceVerifiedStudentId = unifiedPortalStudent.id;
+    document.getElementById('student-face-gate-overlay')?.remove();
+    await examStudentLogin();
+    return;
+  }
+  if (contextType === 'weekly_quiz') {
+    weeklyQuizFaceToken = data.token || null;
+    weeklyQuizStudent = unifiedPortalStudent;
+    document.getElementById('student-portal-screen').style.display = 'none';
+    document.getElementById('weekly-quiz-screen').style.display = 'block';
+    await loadWeeklyQuizSection();
+    return;
+  }
   renderStudentPortalMenu();
+}
+
+function stopStudentFaceCamera() {
+  if (studentFaceStream) {
+    studentFaceStream.getTracks().forEach(track => track.stop());
+    studentFaceStream = null;
+  }
+  const video = document.getElementById('student-face-video');
+  if (video) { video.pause(); video.srcObject = null; }
 }
 
 function renderStudentPortalMenu() {
@@ -12445,11 +12648,21 @@ function getWeekStartDate(d) {
   return date.toISOString().split('T')[0];
 }
 
-function goToPortalWeeklyQuiz() {
-  document.getElementById('student-portal-screen').style.display = 'none';
-  document.getElementById('weekly-quiz-screen').style.display = 'block';
-  weeklyQuizStudent = unifiedPortalStudent;
-  loadWeeklyQuizSection();
+async function goToPortalWeeklyQuiz() {
+  if (!unifiedPortalStudent || !unifiedPortalPhone) {
+    showToast('أعد تسجيل الدخول والتحقق من الهوية أولًا', 'error');
+    return;
+  }
+  const { data: status, error } = await sb.rpc('student_face_status', {
+    p_student_id: unifiedPortalStudent.id, p_phone: unifiedPortalPhone
+  });
+  if (error || !status?.verified) {
+    showToast('تعذر تأكيد بيانات الطالب. أعد تسجيل الدخول.', 'error');
+    return;
+  }
+  document.getElementById('student-portal-screen').style.display = 'block';
+  document.getElementById('weekly-quiz-screen').style.display = 'none';
+  renderStudentFaceGate(!status.enrolled, 'weekly_quiz', null);
 }
 
 async function ensureTodayQuizActivated() {
@@ -12581,7 +12794,8 @@ async function answerWeeklyQuizQuestion(selectedKey) {
 
   await sb.from('quiz_answers').upsert({
     quiz_date: weeklyQuizCurrentDate, student_id: weeklyQuizStudent.id, question_id: q.id,
-    selected_option: selectedKey, is_correct: isCorrect, points_earned: pointsEarned
+    selected_option: selectedKey, is_correct: isCorrect, points_earned: pointsEarned,
+    face_verification_token: weeklyQuizFaceToken
   }, { onConflict: 'quiz_date,student_id,question_id' });
 
   if (pointsEarned > 0) {
