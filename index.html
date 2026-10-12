@@ -11894,6 +11894,9 @@ let unifiedPortalPhone = '';
 let studentFaceStream = null;
 let studentFaceModelsReady = false;
 let studentFaceModelsPromise = null;
+let studentFaceContextType = 'student_portal';
+let studentFaceContextId = null;
+let weeklyQuizFaceToken = null;
 
 function showStudentPortalLoginStep() {
   stopStudentFaceCamera();
@@ -11933,8 +11936,10 @@ async function enterStudentPortal() {
   }
 }
 
-function renderStudentFaceGate(enrolling) {
+function renderStudentFaceGate(enrolling, contextType = 'student_portal', contextId = null) {
   stopStudentFaceCamera();
+  studentFaceContextType = contextType;
+  studentFaceContextId = contextId;
   const box = document.getElementById('student-portal-content');
   if (!box) return;
   box.innerHTML = `
@@ -12024,7 +12029,7 @@ async function registerStudentFace() {
     if (error) throw error;
     if (!data?.ok) throw new Error(data?.reason === 'phone_mismatch' ? 'رقم الهاتف غير مطابق.' : 'تعذر تسجيل بصمة الوجه.');
     setStudentFaceStatus('تم التسجيل. جاري تأكيد الهوية...');
-    await finishStudentFaceVerification(descriptor, 'student_portal', null);
+    await finishStudentFaceVerification(descriptor, studentFaceContextType, studentFaceContextId);
   } catch (e) {
     setStudentFaceStatus(e.message || 'تعذر تسجيل بصمة الوجه.', true);
     if (btn) btn.disabled = false;
@@ -12055,6 +12060,14 @@ async function finishStudentFaceVerification(descriptor, contextType, contextId)
     throw new Error(messages[data?.reason] || 'تعذر التحقق من الهوية.');
   }
   stopStudentFaceCamera();
+  if (contextType === 'weekly_quiz') {
+    weeklyQuizFaceToken = data.token || null;
+    weeklyQuizStudent = unifiedPortalStudent;
+    document.getElementById('student-portal-screen').style.display = 'none';
+    document.getElementById('weekly-quiz-screen').style.display = 'block';
+    await loadWeeklyQuizSection();
+    return;
+  }
   renderStudentPortalMenu();
 }
 
@@ -12104,11 +12117,21 @@ function getWeekStartDate(d) {
   return date.toISOString().split('T')[0];
 }
 
-function goToPortalWeeklyQuiz() {
-  document.getElementById('student-portal-screen').style.display = 'none';
-  document.getElementById('weekly-quiz-screen').style.display = 'block';
-  weeklyQuizStudent = unifiedPortalStudent;
-  loadWeeklyQuizSection();
+async function goToPortalWeeklyQuiz() {
+  if (!unifiedPortalStudent || !unifiedPortalPhone) {
+    showToast('أعد تسجيل الدخول والتحقق من الهوية أولًا', 'error');
+    return;
+  }
+  const { data: status, error } = await sb.rpc('student_face_status', {
+    p_student_id: unifiedPortalStudent.id, p_phone: unifiedPortalPhone
+  });
+  if (error || !status?.verified) {
+    showToast('تعذر تأكيد بيانات الطالب. أعد تسجيل الدخول.', 'error');
+    return;
+  }
+  document.getElementById('student-portal-screen').style.display = 'block';
+  document.getElementById('weekly-quiz-screen').style.display = 'none';
+  renderStudentFaceGate(!status.enrolled, 'weekly_quiz', null);
 }
 
 async function ensureTodayQuizActivated() {
@@ -12240,7 +12263,8 @@ async function answerWeeklyQuizQuestion(selectedKey) {
 
   await sb.from('quiz_answers').upsert({
     quiz_date: weeklyQuizCurrentDate, student_id: weeklyQuizStudent.id, question_id: q.id,
-    selected_option: selectedKey, is_correct: isCorrect, points_earned: pointsEarned
+    selected_option: selectedKey, is_correct: isCorrect, points_earned: pointsEarned,
+    face_verification_token: weeklyQuizFaceToken
   }, { onConflict: 'quiz_date,student_id,question_id' });
 
   if (pointsEarned > 0) {
