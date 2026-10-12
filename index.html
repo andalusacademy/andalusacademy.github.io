@@ -12554,7 +12554,7 @@ async function registerStudentFace() {
       p_descriptor: descriptor, p_consent: true
     });
     if (error) throw error;
-    if (!data?.ok) throw new Error(data?.reason === 'phone_mismatch' ? 'رقم الهاتف غير مطابق.' : 'تعذر تسجيل بصمة الوجه.');
+    if (!data?.ok) throw new Error(data?.reason === 'phone_mismatch' ? 'رقم الهاتف غير مطابق.' : data?.reason === 'already_enrolled' ? 'بصمة الوجه مسجلة بالفعل. لإعادة التسجيل، تواصل مع إدارة المركز.' : 'تعذر تسجيل بصمة الوجه.');
     setStudentFaceStatus('تم التسجيل. جاري تأكيد الهوية...');
     await finishStudentFaceVerification(descriptor, studentFaceContextType, studentFaceContextId);
   } catch (e) {
