@@ -26,7 +26,21 @@ async function loadStudentPortalAchievements(phone) {
     });
     if (error) throw error;
     const rows = Array.isArray(data) ? data : [];
-    box.innerHTML = '<div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff;"><div style="font-weight:900;color:var(--navy);margin-bottom:10px;">🏅 إنجازاتي</div>' +
+    const { data: ranking, error: rankingError } = await sb.rpc('student_portal_get_ranking', {
+      p_student_id: unifiedPortalStudent.id, p_phone: phone
+    });
+    if (rankingError) throw rankingError;
+    if (!ranking || !ranking.verified) {
+      box.innerHTML = '<div style="padding:12px;border:1px solid #fecaca;border-radius:10px;color:#b91c1c;font-size:12px;">رقم الهاتف غير مطابق للبيانات المسجلة.</div>';
+      return;
+    }
+    const rankingCard = '<div style="border:1px solid #fde68a;background:linear-gradient(135deg,#fffbeb,#fff);border-radius:12px;padding:14px;margin-bottom:10px;">' +
+      '<div style="font-weight:900;color:#92400e;margin-bottom:8px;">🏆 ترتيبي بين المتدربين</div>' +
+      '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">' +
+      '<div style="font-size:26px;font-weight:900;color:#92400e;">' + escapeHtml(String(ranking.rank ?? '—')) + '<span style="font-size:12px;font-weight:600;"> / ' + escapeHtml(String(ranking.ranked_count ?? '—')) + '</span></div>' +
+      '<div style="font-size:12px;color:#78350f;">النتيجة الإجمالية: <strong>' + escapeHtml(String(ranking.total ?? '—')) + (ranking.total == null ? '' : '%') + '</strong><br>الدرجات: ' + (ranking.exam == null ? '—' : escapeHtml(String(ranking.exam)) + '%') + ' · الحضور: ' + (ranking.attendance == null ? '—' : escapeHtml(String(ranking.attendance)) + '%') + '</div>' +
+      '</div></div>';
+    box.innerHTML = rankingCard + '<div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff;"><div style="font-weight:900;color:var(--navy);margin-bottom:10px;">🏅 إنجازاتي</div>' +
       (rows.length ? '<div style="display:grid;gap:9px;">' + rows.map(a => '<div style="border:1px solid #fde68a;background:#fffbeb;border-radius:10px;padding:11px;"><div style="font-weight:800;">🏅 ' + escapeHtml(a.title || 'إنجاز') + '</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">' + escapeHtml(a.description || '') + '</div><div style="font-size:11px;color:#92400e;margin-top:5px;">' + escapeHtml(ACH_TYPE_LABELS[a.achievement_type] || 'إنجاز عام') + ' · ' + formatAchievementDate(a.achievement_date) + '</div></div>').join('') + '</div>' : '<div style="text-align:center;color:var(--muted);padding:10px;">لا توجد إنجازات مسجلة حتى الآن.</div>') + '</div>';
   } catch (e) {
     box.innerHTML = '<div style="padding:12px;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:12px;">تعذر تحميل الإنجازات حاليًا. تأكد من صحة رقم الهاتف وتحديث قاعدة البيانات.</div>';
