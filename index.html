@@ -12067,7 +12067,7 @@ async function verifyStudentFaceAndEnter() {
   try {
     setStudentFaceStatus('جاري التحقق من الوجه...');
     const descriptor = await captureStudentFaceDescriptor();
-    await finishStudentFaceVerification(descriptor, 'student_portal', null);
+    await finishStudentFaceVerification(descriptor, studentFaceContextType, studentFaceContextId);
   } catch (e) {
     setStudentFaceStatus(e.message || 'تعذر التحقق من الوجه.', true);
     if (btn) btn.disabled = false;
