@@ -1652,7 +1652,10 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           <div class="card" style="margin-bottom:16px;">
             <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
               <h3>🧾 سجل نشاطات المسابقة الأسبوعية</h3>
-              <button class="btn btn-outline btn-sm" onclick="loadWeeklyQuizAuditAdmin()">🔄 تحديث السجل</button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-outline btn-sm" onclick="copyWeeklyQuizEntryLink()">🔗 نسخ رابط دخول الطلاب</button>
+                <button class="btn btn-outline btn-sm" onclick="loadWeeklyQuizAuditAdmin()">🔄 تحديث السجل</button>
+              </div>
             </div>
             <div style="padding:10px 14px;color:var(--muted);font-size:12px;">يعرض رقم القيد والاسم والوقت والمتصفح والجهاز وصورة التدقيق التي وافق الطالب على حفظها. الصور خاصة ولا تظهر إلا للإدارة المخوّلة.</div>
             <div style="overflow-x:auto;">
@@ -12806,6 +12809,13 @@ async function submitWeeklyQuizEntry() {
     if (status) { status.textContent = e.message || 'تعذر الدخول للمسابقة.'; status.style.color = '#b91c1c'; }
     if (button) button.disabled = false;
   }
+}
+
+function copyWeeklyQuizEntryLink() {
+  const url = window.location.origin + window.location.pathname + '?weekly-quiz=1';
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('تم نسخ رابط الدخول المباشر للمسابقة الأسبوعية');
+  }).catch(() => showToast('رابط الدخول: ' + url, 'info'));
 }
 
 async function loadWeeklyQuizAuditAdmin() {
