@@ -3755,6 +3755,10 @@ async function parentPortalLogin() {
 
   ppPortalData = data;
   ppStudent = data.student;
+  try {
+    const rankingResult = await sb.rpc('student_portal_get_ranking', { p_student_id: id, p_phone: phone });
+    if (!rankingResult.error && rankingResult.data && rankingResult.data.verified) ppPortalData.ranking = rankingResult.data;
+  } catch (rankingErr) { console.warn('Parent portal ranking unavailable', rankingErr); }
   if (data.program_fees != null) {
     allPrograms = [{ id: ppStudent.program_id, fees: data.program_fees }];
   }
@@ -3911,6 +3915,7 @@ async function renderParentPortalDashboard() {
       <div class="sc-stat"><div class="v">${money(parentPortalTotalDue)}</div><div class="l">إجمالي المستحق</div></div>
       <div class="sc-stat"><div class="v" style="color:#22c55e">${money(totalPaid)}</div><div class="l">إجمالي المدفوع</div></div>
       <div class="sc-stat"><div class="v" style="color:#ef4444">${money(remaining)}</div><div class="l">المتبقي</div></div>
+      <div class="sc-stat"><div class="v">${portal.ranking?.rank ?? "—"}</div><div class="l">الترتيب العام</div><div style="font-size:10px;color:var(--muted)">من ${portal.ranking?.ranked_count ?? "—"} متدرب</div></div>
     </div>
 
     <div class="card" style="margin-bottom:14px;">
