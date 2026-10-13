@@ -13171,7 +13171,8 @@ async function loadWeeklyQuizAdmin() {
   await loadWeeklyQuizLeaderboardAdmin(weeks[0]);
   await loadWeeklyQuizAuditAdmin();
 
-  const { data: bank } = await sb.from('quiz_bank_questions').select('*').order('created_at', { ascending: false });
+  const { data: bank, error: bankError } = await sb.rpc('admin_get_weekly_quiz_bank');
+  if (bankError) { showToast('تعذر تحميل بنك الأسئلة: ' + bankError.message, 'error'); return; }
   document.getElementById('wq-bank-count').textContent = bank?.length || 0;
   const bankTable = document.getElementById('wq-bank-table');
   const optKey = { a: 'option_a', b: 'option_b', c: 'option_c', d: 'option_d' };
@@ -13244,11 +13245,20 @@ async function importWeeklyQuizExcel(input) {
       const c = String(row['اختيار ج'] || '').trim(), d = String(row['اختيار د'] || '').trim();
       const correct = String(row['الإجابة الصحيحة (a/b/c/d)'] || '').trim().toLowerCase();
       if (!question || !a || !b || !['a','b','c','d'].includes(correct)) { skipped++; continue; }
-      const { error } = await sb.from('quiz_bank_questions').insert({
-        question, option_a: a, option_b: b, option_c: c || null, option_d: d || null,
-        correct_option: correct, category: String(row['التصنيف (منهج/عام)'] || '').trim() || null,
-        points: parseInt(row['النقاط']) || 10
+      const { data: addResult, error } = await sb.rpc('admin_add_weekly_quiz_question', {
+        p_question: question,
+        p_option_a: a,
+        p_option_b: b,
+        p_option_c: c || null,
+        p_option_d: d || null,
+        p_correct_option: correct,
+        p_category: String(row['التصنيف (منهج/عام)'] || '').trim() || null,
+        p_points: parseInt(row['النقاط']) || 10
       });
+      if (!error && addResult && addResult.ok !== true) {
+        skipped++;
+        continue;
+      }
       if (error) { skipped++; continue; }
       added++;
     }
