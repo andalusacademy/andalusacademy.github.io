@@ -4132,14 +4132,14 @@ async function trainerKioskLogin() {
   errEl.style.display = 'none';
   if (!code) { errEl.textContent = 'أدخل كود الدخول'; errEl.style.display = 'block'; return; }
 
-  const { data, error } = await sb.from('schedule_sessions').select('*').eq('trainer_code', code);
-  if (error || !data || !data.length) {
+  const { data: result, error } = await sb.rpc('trainer_kiosk_get_sessions', { p_code: code });
+  if (error || !result?.ok || !Array.isArray(result.sessions) || !result.sessions.length) {
     errEl.textContent = 'كود الدخول غير صحيح أو لا توجد محاضرات مرتبطة به';
     errEl.style.display = 'block';
     return;
   }
-  tkSessions = data;
-  document.getElementById('tk-trainer-name').textContent = '👤 ' + (data[0].trainer || 'المدرّس');
+  tkSessions = result.sessions;
+  document.getElementById('tk-trainer-name').textContent = '👤 ' + (tkSessions[0].trainer || 'المدرّس');
   renderTkSessionsList();
   showTkScreen('tk-sessions-screen');
 }
@@ -4179,18 +4179,19 @@ async function openTkAttendance(sessionId) {
   tkCurrentSession = session;
   document.getElementById('tk-current-session-title').textContent = session.subject_name || session.program_name || 'محاضرة';
 
-  const { data: students } = await sb.from('students').select('id,name,branch,program_id,system_name').eq('branch', session.branch);
-  let excludedIds = new Set();
-  try {
-    const { data: exclData } = await sb.from('attendance_session_exclusions').select('student_id').eq('session_id', sessionId);
-    if (exclData) excludedIds = new Set(exclData.map(e => e.student_id));
-  } catch (e) { /* الجدول لسه مش موجود — تجاهل بهدوء */ }
-  tkStudentsList = (students || []).filter(s => sessionMatchesStudent(session, s) && !excludedIds.has(s.id));
-
-  const todayStr = new Date().toISOString().split('T')[0];
-  const { data: att } = await sb.from('attendance').select('*').eq('date', todayStr).eq('session_id', sessionId);
-  tkExisting = {}; (att || []).forEach(a => tkExisting[a.student_id] = a.status);
-
+  const code = document.getElementById('tk-login-code').value.trim();
+  const { data: result, error } = await sb.rpc('trainer_kiosk_get_attendance', {
+    p_code: code, p_session_id: sessionId
+  });
+  if (error || !result?.ok) {
+    alert('تعذر تحميل كشف الحضور. تحقق من كود الدخول واتصال الإنترنت.');
+    return;
+  }
+  const students = result.students || [];
+  const excludedIds = new Set(result.excluded_ids || []);
+  tkStudentsList = students.filter(st => sessionMatchesStudent(session, st) && !excludedIds.has(st.id));
+  tkExisting = {};
+  (result.attendance || []).forEach(a => tkExisting[a.student_id] = a.status);
   renderTkAttendanceList();
   showTkScreen('tk-attendance-screen');
 }
@@ -4228,13 +4229,19 @@ function renderTkAttendanceList() {
 
 async function tkMarkAttendance(studentId, status) {
   if (!tkCurrentSession) return;
-  const todayStr = new Date().toISOString().split('T')[0];
-  const record = { student_id: studentId, session_id: tkCurrentSession.id, date: todayStr, status };
-  let { error } = await sb.from('attendance').upsert(record, { onConflict: 'student_id,session_id,date' });
-  if (error && error.message && error.message.includes('recorded_by')) {
-    ({ error } = await sb.from('attendance').upsert({ ...record, recorded_by: null }, { onConflict: 'student_id,session_id,date' }));
+  const code = document.getElementById('tk-login-code').value.trim();
+  const todayStr = toLocalDateStr(new Date());
+  const { data: result, error } = await sb.rpc('trainer_kiosk_mark_attendance', {
+    p_code: code,
+    p_session_id: tkCurrentSession.id,
+    p_student_id: studentId,
+    p_status: status,
+    p_date: todayStr
+  });
+  if (error || !result?.ok) {
+    alert('تعذر حفظ الحضور: ' + (result?.reason || error?.message || 'خطأ غير معروف'));
+    return;
   }
-  if (error) { alert('خطأ فى الحفظ: ' + error.message); return; }
   tkExisting[studentId] = status;
   renderTkAttendanceList();
 }
