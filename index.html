@@ -12986,7 +12986,7 @@ async function ensureTodayQuizActivated() {
   const { data: existing } = await sb.from('quiz_daily_sessions').select('id').eq('quiz_date', todayStr).maybeSingle();
   if (existing) return;
 
-  const { data: settings } = await sb.from('quiz_settings').select('*').eq('id', 1).maybeSingle();
+  const { data: settings } = await sb.from('quiz_settings').select('id,daily_time,questions_per_day,updated_at').eq('id', 1).maybeSingle();
   const dailyTime = settings?.daily_time || '19:00';
   const [h, m] = dailyTime.split(':').map(Number);
   const now = new Date();
@@ -12998,7 +12998,7 @@ async function ensureTodayQuizActivated() {
 
 async function activateTodayQuizNow() {
   const todayStr = new Date().toISOString().split('T')[0];
-  const { data: settings } = await sb.from('quiz_settings').select('*').eq('id', 1).maybeSingle();
+  const { data: settings } = await sb.from('quiz_settings').select('id,daily_time,questions_per_day,updated_at').eq('id', 1).maybeSingle();
   const count = settings?.questions_per_day || 5;
 
   const { data: bank } = await sb.from('quiz_bank_questions').select('id').eq('active', true);
@@ -13166,7 +13166,7 @@ async function answerWeeklyQuizQuestion(selectedKey) {
    المسابقة الأسبوعية — إدارة (v6.2)
    ============================================================ */
 async function loadWeeklyQuizAdmin() {
-  const { data: settings } = await sb.from('quiz_settings').select('*').eq('id', 1).maybeSingle();
+  const { data: settings } = await sb.from('quiz_settings').select('id,daily_time,questions_per_day,updated_at').eq('id', 1).maybeSingle();
   document.getElementById('wq-daily-time').value = (settings?.daily_time || '19:00').slice(0, 5);
   document.getElementById('wq-questions-count').value = settings?.questions_per_day || 5;
 
@@ -13199,8 +13199,8 @@ async function loadWeeklyQuizAdmin() {
 async function saveQuizSettings() {
   const daily_time = document.getElementById('wq-daily-time').value || '19:00';
   const questions_per_day = parseInt(document.getElementById('wq-questions-count').value) || 5;
-  const { error } = await sb.from('quiz_settings').update({ daily_time, questions_per_day, updated_at: new Date().toISOString() }).eq('id', 1);
-  if (error) { showToast('خطأ: ' + error.message, 'error'); return; }
+  const { data: updateResult, error } = await sb.rpc('admin_update_weekly_quiz_settings', { p_daily_time: daily_time, p_questions_per_day: questions_per_day });
+  if (error || !updateResult?.ok) { showToast('خطأ: ' + (error?.message || updateResult?.reason || 'تعذر حفظ الإعدادات'), 'error'); return; }
   await logActivity('edit', `تعديل إعدادات المسابقة الأسبوعية: الميعاد ${daily_time}، ${questions_per_day} سؤال/يوم`);
   showToast('✅ تم حفظ الإعدادات — هتتطبق من التفعيل الجاي');
 }
