@@ -4418,7 +4418,7 @@ async function examStudentLogin() {
 }
 
 function examStudentLogout() {
-  examStudent = null; examCurrentExam = null; examCurrentAttempt = null; examFaceVerifiedStudentId = null;
+  examStudent = null; examCurrentExam = null; examCurrentAttempt = null; examFaceVerifiedStudentId = null; examFaceVerificationToken = null; examStudentPhone = '';
   if (examTimerInterval) clearInterval(examTimerInterval);
   document.getElementById('exam-login-id').value = '';
   document.getElementById('exam-login-pass').value = '';
