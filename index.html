@@ -12930,15 +12930,15 @@ async function submitWeeklyQuizEntry() {
     canvas.width = width; canvas.height = height;
     canvas.getContext('2d').drawImage(video, 0, 0, width, height);
     const blob = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('تعذر تجهيز صورة الوجه.')), 'image/jpeg', 0.72));
-    const photoPath = 'audit/' + String(student.id).replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + crypto.randomUUID() + '.jpg';
+    const photoPath = 'audit/' + String(student.id).replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + weeklyQuizFaceToken + '/' + crypto.randomUUID() + '.jpg';
     const { error: uploadError } = await sb.storage.from('weekly-quiz-face-audit').upload(photoPath, blob, { contentType: 'image/jpeg', upsert: false });
     if (uploadError) throw new Error('تعذر حفظ صورة التدقيق: ' + uploadError.message);
     const ua = navigator.userAgent || '';
     const browser = weeklyQuizBrowserName(ua);
     const device = [navigator.platform || 'جهاز غير محدد', /Mobi|Android|iPhone|iPad/i.test(ua) ? 'محمول' : 'كمبيوتر'].join(' · ');
     const { data: logged, error: logError } = await sb.rpc('weekly_quiz_log_entry', {
-      p_student_id: student.id, p_photo_path: photoPath, p_user_agent: ua,
-      p_browser_name: browser, p_device_label: device, p_photo_consent: true
+      p_student_id: student.id, p_photo_path: photoPath, p_face_token: weeklyQuizFaceToken,
+      p_user_agent: ua, p_browser_name: browser, p_device_label: device, p_photo_consent: true
     });
     if (logError) throw new Error('تم رفع الصورة لكن تعذر تسجيل النشاط: ' + logError.message);
     if (!logged?.ok) throw new Error(logged?.reason === 'registration_not_found' ? 'رقم القيد غير موجود.' : 'تعذر تسجيل نشاط الدخول (' + (logged?.reason || 'خطأ غير معروف') + ').');
