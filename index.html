@@ -14987,9 +14987,9 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 
 
 <!-- ANDALUS_AI_LAUNCHER -->
-<button id="andalus-ai-launcher" type="button" onclick="openAndalusAI()">🧠 Andalus AI</button>
+<button id="andalus-ai-launcher" class="admin-only" type="button" onclick="openAndalusAI()">🧠 Andalus AI</button>
 <div id="andalus-ai-overlay" onclick="if(event.target===this)closeAndalusAI()"><iframe id="andalus-ai-frame" src="andalus-ai.html" title="Andalus AI"></iframe></div>
-<script>function openAndalusAI(){document.getElementById('andalus-ai-overlay').classList.add('open')}function closeAndalusAI(){document.getElementById('andalus-ai-overlay').classList.remove('open')}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAndalusAI()})</script>
+<script>function openAndalusAI(){if(!currentUser||currentUser.role!=='admin'){showToast('Andalus AI متاح للمدير فقط لحماية بيانات المركز','error');return}document.getElementById('andalus-ai-overlay').classList.add('open')}function closeAndalusAI(){document.getElementById('andalus-ai-overlay').classList.remove('open')}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAndalusAI()})</script>
 <!-- /ANDALUS_AI_LAUNCHER -->
 
 
