@@ -1,0 +1,16 @@
+REVOKE ALL PRIVILEGES ON TABLE public.activity_log FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.cash_register_logs FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.daily_revenue FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.expenses FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.leads FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.lead_followups FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.marketing_campaigns FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.reservations FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.session_log FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.student_disciplinary_actions FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.student_evaluations FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.student_files FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.tasks FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.user_profiles FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.users FROM anon, PUBLIC;
+REVOKE ALL PRIVILEGES ON TABLE public.system_settings FROM anon, PUBLIC;
