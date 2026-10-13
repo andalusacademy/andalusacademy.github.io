@@ -4664,6 +4664,7 @@ async function submitExam(autoSubmitted, cheatingDetected) {
     console.error('تعذر حفظ تسليم الامتحان:', submitError || submitResult?.reason);
     showToast('تعذر حفظ تسليم الامتحان: تحقق من اتصال الإنترنت وصلاحية التحقق بالوجه.', 'error');
     examSubmitLock = false;
+    startExamTimer();
     return;
   }
   finalScore = Number(submitResult.score) || 0;
