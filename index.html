@@ -3977,9 +3977,11 @@ async function renderParentPortalDashboard() {
   if (subjectRows.some(r => (r.g2 != null && r.max2 > 0 && r.g2 >= r.max2) || (r.g2 == null && r.g1 != null && r.max1 > 0 && r.g1 >= r.max1))) achievementItems.push({icon:'🥇',title:'الدرجة النهائية',detail:'حقق الدرجة النهائية في مادة واحدة على الأقل'});
   if (attendancePct !== null && attendancePct >= 95) achievementItems.push({icon:'🌟',title:'الانتظام المتميز',detail:'نسبة حضورك ' + attendancePct + '%'});
   if (gradedSubjects.length && passedSubjects.length === gradedSubjects.length) achievementItems.push({icon:'🏅',title:'سجل دراسي ناجح',detail:'اجتاز جميع المواد التي لها درجات مسجلة'});
-  const achievementsHtml = achievementItems.length
-    ? achievementItems.map(a => '<div style="display:flex;gap:10px;align-items:center;padding:12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;"><div style="font-size:25px;">'+a.icon+'</div><div><div style="font-weight:900;color:var(--navy);">'+escapeHtml(a.title)+'</div><div style="font-size:12px;color:var(--muted);">'+escapeHtml(a.detail)+'</div></div></div>').join('')
-    : '<div style="color:var(--muted);padding:12px;">ستظهر إنجازاتك تلقائيًا عند تسجيل درجات أو حضور كافٍ.</div>';
+  const savedAchievements = Array.isArray(portal.achievements) ? portal.achievements : [];
+  const computedAchievementsHtml = achievementItems.map(a => '<div style="display:flex;gap:10px;align-items:center;padding:12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;"><div style="font-size:25px;">'+a.icon+'</div><div><div style="font-weight:900;color:var(--navy);">'+escapeHtml(a.title)+'</div><div style="font-size:12px;color:var(--muted);">'+escapeHtml(a.detail)+'</div></div></div>').join('');
+  const savedAchievementsHtml = savedAchievements.map(a => '<div style="display:flex;gap:10px;align-items:center;padding:12px;border:1px solid #fde68a;border-radius:12px;background:#fffbeb;"><div style="font-size:25px;">🏅</div><div><div style="font-weight:900;color:var(--navy);">'+escapeHtml(a.title || 'إنجاز مسجل')+'</div><div style="font-size:12px;color:var(--muted);">'+escapeHtml(a.description || '')+'</div><div style="font-size:10px;color:#92400e;margin-top:4px;">'+escapeHtml(a.achievement_date ? fmt(a.achievement_date) : 'تاريخ غير محدد')+' · '+escapeHtml(a.achievement_type || 'إنجاز عام')+'</div></div></div>').join('');
+  const achievementsHtml = [computedAchievementsHtml, savedAchievementsHtml].filter(Boolean).join('')
+    || '<div style="color:var(--muted);padding:12px;">ستظهر إنجازاتك عند تسجيل درجات أو حضور كافٍ أو إضافة إنجاز من الإدارة.</div>';
 
   const studentFields = [
     ['الاسم', student.name],
@@ -5932,6 +5934,7 @@ function getFilteredStudents() {
   const prog = document.getElementById('filter-program')?.value || '';
   const category = window.studentsCategory || 'all';
   return allStudents.filter(s => {
+    if (['dismissed','final_dismissed'].includes(String(s.student_status || 'active'))) return false;
     const mq = !q || String(s.name || '').toLowerCase().includes(q) || String(s.id || '').toLowerCase().includes(q);
     const mb = !branch || normalizeStudentsBranch(s.branch) === normalizeStudentsBranch(branch);
     const mp = !prog || (s.program_id + '|' + (s.system_name || '')) === prog || (s.program_id + '|') === prog;
@@ -11597,6 +11600,7 @@ function getExamGradeRows() {
   const programFilter = document.getElementById('eg-filter-program')?.value || '';
   const gradesMap = new Map((allGradesOverviewData || []).map(g => [`${g.student_id}::${g.subject_id}`, g]));
   const students = (allStudents || []).filter(s => {
+    if (['dismissed','final_dismissed'].includes(String(s.student_status || 'active'))) return false;
     if (branchFilter && s.branch !== branchFilter) return false;
     if (programFilter && examStudentCourseLabel(s) !== programFilter) return false;
     return true;
@@ -11721,14 +11725,26 @@ async function saveExamGradesOverview() {
   const inputs = document.querySelectorAll('.exam-grade-grid-input');
   if (!inputs.length) { showToast('لا توجد درجات لإدخالها', 'info'); return; }
   const records = [];
+  let invalidCount = 0;
   inputs.forEach(inp => {
     const value = inp.value.trim();
     const round = Number(inp.dataset.round);
+    const max = Number(inp.max);
+    if (value !== '' && (!Number.isFinite(Number(value)) || Number(value) < 0 || (Number.isFinite(max) && Number(value) > max))) {
+      inp.classList.add('invalid');
+      invalidCount++;
+      return;
+    }
+    inp.classList.remove('invalid');
     const rec = { student_id: inp.dataset.student, subject_id: inp.dataset.subject, updated_at: new Date().toISOString() };
     rec[round === 1 ? 'grade_1' : 'grade_2'] = value === '' ? null : Number(value);
     rec[round === 1 ? 'grade_1_source' : 'grade_2_source'] = value === '' ? null : 'paper';
     records.push(rec);
   });
+  if (invalidCount) {
+    showToast('راجع الدرجات المحددة بالأحمر: الدرجة لا يمكن أن تقل عن صفر أو تتجاوز الدرجة العظمى.', 'error');
+    return;
+  }
   let failed = 0;
   for (const rec of records) {
     const { error } = await sb.from('grades').upsert(rec, { onConflict: 'student_id,subject_id' });
@@ -15065,7 +15081,7 @@ function closeTraineeRanking(){const m=document.getElementById('trainee-ranking-
 async function renderTraineeRanking(){
  const box=document.getElementById('trainee-ranking-content');if(!box)return;box.innerHTML='<div style="padding:20px;text-align:center;">جاري تحميل الدرجات والحضور...</div>';
  try{
-  const [sRes,gRes,aRes,subRes]=await Promise.all([sb.from('students').select('id,name,branch,program,system_name').is('deleted_at',null),sb.from('grades').select('student_id,subject_id,grade_1,grade_2'),sb.from('attendance').select('student_id,status'),sb.from('subjects').select('id,name,max_grade_1,max_grade_2,pass_grade_1,pass_grade_2,min_pass')]);
+  const [sRes,gRes,aRes,subRes]=await Promise.all([sb.from('students').select('id,name,branch,program,system_name').is('deleted_at',null).eq('student_status','active'),sb.from('grades').select('student_id,subject_id,grade_1,grade_2'),sb.from('attendance').select('student_id,status'),sb.from('subjects').select('id,name,max_grade_1,max_grade_2,pass_grade_1,pass_grade_2,min_pass')]);
   const errors=[sRes.error,gRes.error,aRes.error,subRes.error].filter(Boolean);if(errors.length)throw errors[0];
   const students=sRes.data||[],grades=gRes.data||[],att=aRes.data||[],subjects=subRes.data||[],byStudent={};students.forEach(st=>byStudent[st.id]={student:st,gradeSum:0,gradeMax:0,present:0,counted:0});
   const subjectMap={};subjects.forEach(sub=>subjectMap[sub.id]=sub);
