@@ -82,13 +82,9 @@ BEGIN
   WHERE st.id = btrim(p_student_id)
     AND st.deleted_at IS NULL
     AND (
-      (p_requester_type = 'student' AND public.normalize_eg_phone(st.phone) = normalized_phone)
-      OR
-      (p_requester_type = 'parent' AND (
-        public.normalize_eg_phone(st.guardian_phone) = normalized_phone
-        OR public.normalize_eg_phone(st.parent_phone) = normalized_phone
-        OR public.normalize_eg_phone(st.phone) = normalized_phone
-      ))
+      public.normalize_eg_phone(st.phone) = normalized_phone
+      OR public.normalize_eg_phone(st.guardian_phone) = normalized_phone
+      OR public.normalize_eg_phone(st.parent_phone) = normalized_phone
     )
   LIMIT 1;
 
