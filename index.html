@@ -11272,8 +11272,8 @@ async function startAiExamGeneration() {
   const countInput = prompt('عاوز تولّد كام سؤال للامتحان؟', '20');
   if (countInput === null) return;
   const requestedCount = parseInt(countInput, 10);
-  if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 100) {
-    showToast('اكتب عددًا صحيحًا من 1 إلى 100 سؤال', 'error');
+  if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 50) {
+    showToast('اكتب عددًا صحيحًا من 1 إلى 50 سؤال', 'error');
     return;
   }
   const selectedFiles = [...document.querySelectorAll('#exam-material-files-list .exam-material-file-cb:checked')].map(el => el.value);
@@ -11404,7 +11404,7 @@ function openGeneratedExamSettings() {
   closeModal('modal-ai-exam-review');
   openCreateExam();
   generatedExamPending = true;
-  const normalize = value => String(value || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\\sـ]+/g, ' ').trim().toLowerCase();
+  const normalize = value => String(value || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\sـ]+/g, ' ').trim().toLowerCase();
   const wanted = normalize(exam.subject || activeExamMaterialName);
   const match = allSubjects.find(subject => normalize(subject.name) === wanted)
     || allSubjects.find(subject => normalize(subject.name).includes(wanted) || wanted.includes(normalize(subject.name)));
@@ -12684,7 +12684,11 @@ function renderStudentPortalMenu() {
       <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;" onclick="goToPortalExams()">📝 الامتحانات الإلكترونية</button>
       <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;background:linear-gradient(135deg,#b45309,#78350f);" onclick="goToPortalWeeklyQuiz()">🏆 المسابقة الأسبوعية</button>
     </div>
+    <div id="student-portal-achievements" style="margin-top:14px;"></div>
   `;
+  if (typeof loadStudentPortalAchievements === 'function') {
+    loadStudentPortalAchievements(unifiedPortalPhone || '');
+  }
 }
 
 function goToPortalExams() {
