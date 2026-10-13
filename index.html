@@ -4872,7 +4872,7 @@ function updateTime() {
    ============================================================ */
 
 // الصفحات الإدارية المحمية دائمًا للمدير فقط، بصرف النظر عن أي تخصيص
-const ADMIN_ONLY_PAGES = new Set(['subjects', 'breakeven', 'court', 'dream', 'employees', 'logs']);
+const ADMIN_ONLY_PAGES = new Set(['subjects', 'breakeven', 'court', 'dream', 'employees', 'logs', 'achievements', 'requests']);
 
 function showPage(page) {
   // ✅ فحص أمني: منع الموظف من فتح صفحة إدارية أو غير مسموح له بها، حتى لو استُدعيت الدالة مباشرة
@@ -4900,7 +4900,7 @@ function showPage(page) {
     attendance: 'الحضور والغياب', leads: 'الحجوزات والاستفسارات', payments: 'المدفوعات',
     expenses: 'المصروفات',
     reports: 'التقارير',
-    subjects: 'المواد الدراسية', employees: 'الموظفين', logs: 'سجل النشاط', profile: 'بروفايل الطالب', exams: 'الامتحانات الإلكترونية', 'exam-grades': 'درجات الامتحانات', breakeven: 'نقطة التعادل', court: 'محكمة الأداء', dream: 'النظام يحلم', campaigns: 'الحملات التسويقية'
+    subjects: 'المواد الدراسية', employees: 'الموظفين', logs: 'سجل النشاط', profile: 'بروفايل الطالب', exams: 'الامتحانات الإلكترونية', 'exam-grades': 'درجات الامتحانات', breakeven: 'نقطة التعادل', court: 'محكمة الأداء', dream: 'النظام يحلم', campaigns: 'الحملات التسويقية', achievements: 'إنجازات وترتيب المتدربين', requests: 'الشكاوى والطلبات'
   };
   document.getElementById('page-title').textContent = titles[page] || '';
   if (page === 'leads') { loadLeads(); loadCampaigns(); }
