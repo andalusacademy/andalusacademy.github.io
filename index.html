@@ -3736,7 +3736,8 @@ function initExamPortal() {
    ============================================================ */
 async function loadStudentCard(studentId) {
   const box = document.getElementById('student-card-content');
-  const { data: student, error } = await sb.from('students').select('id,name,branch,program,system_name,photo_url,date').eq('id', studentId).maybeSingle();
+  const { data: cardResult, error } = await sb.rpc('get_public_student_card', { p_student_id: studentId });
+  const student = cardResult?.student;
 
   if (error || !student) {
     box.innerHTML = `<div style="text-align:center;padding:60px 20px;">
@@ -3747,33 +3748,11 @@ async function loadStudentCard(studentId) {
     return;
   }
 
-  // نسبة الحضور الإجمالية
-  const { data: attendance } = await sb.from('attendance').select('status').eq('student_id', studentId);
-  let attendancePct = null;
-  if (attendance && attendance.length) {
-    const present = attendance.filter(a => a.status === 'حاضر').length;
-    attendancePct = Math.round(present / attendance.length * 100);
-  }
-
-  // متوسط الدرجات (لو موجودة)
-  const { data: grades } = await sb.from('grades').select('*');
-  if (!allSubjectsCacheForPortal2) {
-    const { data: subj } = await sb.from('subjects').select('id,name,max_grade_1,max_grade_2');
-    allSubjectsCacheForPortal2 = subj || [];
-  }
-  const myGrades = (grades || []).filter(g => g.student_id === studentId);
-  let totalScore = 0, totalMax = 0;
-  myGrades.forEach(g => {
-    const subj = allSubjectsCacheForPortal2.find(s => s.id === g.subject_id);
-    if (!subj) return;
-    if (g.grade_1 != null) { totalScore += parseFloat(g.grade_1); totalMax += subj.max_grade_1 || 0; }
-    if (g.grade_2 != null) { totalScore += parseFloat(g.grade_2); totalMax += subj.max_grade_2 || 0; }
-  });
-  const gradePct = totalMax > 0 ? Math.round(totalScore / totalMax * 100) : null;
+  const attendancePct = cardResult?.attendance_pct ?? null;
+  const gradePct = cardResult?.grade_pct ?? null;
+  const sessions = cardResult?.sessions || [];
 
   // أقرب محاضرة قادمة (من جدول المحاضرات المطابق لبرنامج/فرع/نظام الطالب)
-  const { data: sessions } = await sb.from('schedule_sessions').select('*')
-    .eq('branch', student.branch);
   const matchingSessions = (sessions || []).filter(s => sessionMatchesStudent(s, student));
   const daysOrder = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
   const todayIdx = new Date().getDay(); // 0 = الأحد فى جافاسكريبت
@@ -3806,25 +3785,6 @@ async function loadStudentCard(studentId) {
     }
   }
 
-  // أقرب قسط مستحق غير مدفوع
-  const { data: payments } = await sb.from('payments').select('*').eq('student_id', studentId);
-  const payMap = {}; (payments || []).forEach(p => payMap[p.payment_type] = p);
-  const schedule = (typeof getPaymentSchedule === 'function') ? getPaymentSchedule(student) : [];
-  const unpaidUpcoming = schedule
-    .map(item => ({ ...item, rec: payMap[item.type] || {} }))
-    .filter(item => !item.rec.paid)
-    .sort((a, b) => new Date(a.rec.due_date || a.due) - new Date(b.rec.due_date || b.due));
-  let nextPaymentHtml = '';
-  if (unpaidUpcoming.length) {
-    const next = unpaidUpcoming[0];
-    const dueDate = next.rec.due_date || next.due;
-    const dueLabel = dueDate ? new Date(dueDate).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) : '—';
-    nextPaymentHtml = `<div class="sc-next-box" style="background:#fffbeb;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">💰 القسط القادم</div>
-      <div style="font-weight:800;font-size:13px;color:var(--navy);">${escapeHtml(next.label)} — مستحق ${escapeHtml(dueLabel)}</div>
-    </div>`;
-  }
-
   // حالة الشهادة (موجودة فعلًا فى النظام؟ نتحقق ببساطة من وجود قالب شهادة مرتبط)
   const regDate = student.date ? new Date(student.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 
@@ -3852,7 +3812,6 @@ async function loadStudentCard(studentId) {
         <div class="sc-stat"><div class="v" style="font-size:13px;">${escapeHtml(regDate)}</div><div class="l">تاريخ التسجيل</div></div>
       </div>
       ${nextSessionHtml}
-      ${nextPaymentHtml}
       <p style="font-size:11px;color:var(--muted);margin-top:14px;">هذه البطاقة تعرض ملخصًا عامًا فقط، ولا تشمل أي بيانات مالية أو شخصية حساسة</p>
     </div>
   `;
@@ -4425,7 +4384,7 @@ async function examStudentLogin() {
 
   if (examFaceVerifiedStudentId !== id) {
     if (!phone) { errEl.textContent = 'أدخل رقم الهاتف المسجل للتحقق من الوجه'; errEl.style.display = 'block'; return; }
-    const { data: faceStudent, error: faceStudentError } = await sb.from('students').select('id,name,branch,program_id,system_name').eq('id', id).maybeSingle();
+    const { data: faceStudent, error: faceStudentError } = await sb.rpc('public_student_lookup', { p_student_id: id, p_phone: phone });
     if (faceStudentError || !faceStudent) { errEl.textContent = 'رقم القيد غير موجود'; errEl.style.display = 'block'; return; }
     const { data: faceStatus, error: faceStatusError } = await sb.rpc('student_face_status', { p_student_id: id, p_phone: phone });
     if (faceStatusError) { errEl.textContent = 'تعذر الاتصال بخدمة التحقق من الوجه'; errEl.style.display = 'block'; return; }
@@ -4436,7 +4395,7 @@ async function examStudentLogin() {
     return;
   }
 
-  const { data: student, error } = await sb.from('students').select('*').eq('id', id).maybeSingle();
+  const { data: student, error } = await sb.rpc('public_student_lookup', { p_student_id: id, p_phone: phone });
   if (error) {
     console.error('Exam login error:', error);
     errEl.textContent = 'خطأ فى الاتصال: ' + error.message;
@@ -12589,7 +12548,7 @@ async function enterStudentPortal() {
   if (!studentId || !phone) { if(errEl){errEl.textContent='اكتب رقم القيد ورقم الهاتف المسجل';errEl.style.display='block';} return; }
   if(errEl) { errEl.style.display='none'; }
   try {
-    const { data: student, error } = await sb.from('students').select('id,name,branch,program_id,system_name').eq('id', studentId).maybeSingle();
+    const { data: student, error } = await sb.rpc('public_student_lookup', { p_student_id: studentId, p_phone: phone });
     if (error || !student) throw new Error('رقم القيد غير موجود أو تعذر تحميل بيانات الطالب');
     const { data: faceStatus, error: statusError } = await sb.rpc('student_face_status', {
       p_student_id: studentId, p_phone: phone
