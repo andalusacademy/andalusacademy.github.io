@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS public.student_requests (
 CREATE INDEX IF NOT EXISTS student_requests_student_created_idx ON public.student_requests(student_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS student_requests_status_created_idx ON public.student_requests(status, created_at DESC);
 ALTER TABLE public.student_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS student_requests_admin_all ON public.student_requests;
 CREATE POLICY student_requests_admin_all ON public.student_requests FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 REVOKE ALL ON TABLE public.student_requests FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.student_requests TO authenticated;
