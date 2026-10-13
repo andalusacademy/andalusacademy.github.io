@@ -639,7 +639,8 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
       </div>
     </div>
     <div class="content" style="max-width:800px;margin:0 auto;padding:16px;">
-      <div style="margin-bottom:12px;"><button class="btn btn-outline" onclick="openParentRequestForm()">🎫 تقديم شكوى أو طلب</button></div>
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline" onclick="openParentRequestForm()">🎫 تقديم شكوى أو طلب</button><button class="btn btn-outline" onclick="loadParentNotifications()">🔔 الإشعارات</button></div>
+      <div id="pp-notifications-widget" style="margin-bottom:14px;"></div>
       <div id="pp-request-widget" style="margin-bottom:14px;"></div>
       <div id="pp-content"></div>
     </div>
@@ -802,6 +803,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div class="nav-card c4" onclick="showPage('students')"><span class="nav-card-icon">👨‍🎓</span><span>الطلاب</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('achievements');loadAchievementsAdmin()"><span class="nav-card-icon">🏅</span><span>إنجازات وترتيب المتدربين</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('requests');loadStudentRequestsAdmin()"><span class="nav-card-icon">🎫</span><span>الشكاوى والطلبات</span></div>
+            <div class="nav-card c12 admin-only" onclick="showPage('notifications');loadNotificationsAdmin()"><span class="nav-card-icon">🔔</span><span>مركز التنبيهات</span></div>
             <div class="nav-card c3" onclick="showPage('programs')"><span class="nav-card-icon">📚</span><span>البرامج والكورسات</span></div>
             <div class="nav-card c2" onclick="showPage('attendance')"><span class="nav-card-icon">✅</span><span>الحضور والغياب</span></div>
             <div class="nav-card c1" onclick="showPage('leads')"><span class="nav-card-icon">📞</span><span>الحجوزات والاستفسارات</span></div>
@@ -1022,6 +1024,33 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           <div class="card">
             <div class="card-header"><h3>📋 الإنجازات المسجلة</h3><span id="ach-count" style="font-size:12px;color:var(--muted)">0 إنجاز</span></div>
             <div style="overflow-x:auto;"><table><thead><tr><th>المتدرب</th><th>نوع الإنجاز</th><th>العنوان</th><th>التاريخ</th><th>النقاط</th><th>نقاط الأنشطة</th><th>الوصف</th><th>إجراء</th></tr></thead><tbody id="ach-records-table"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px;">جاري التحميل...</td></tr></tbody></table></div>
+          </div>
+        </div>
+
+        <!-- NOTIFICATIONS CENTER -->
+        <div id="page-notifications" class="page">
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>🔔 مركز التنبيهات</h3><button class="btn btn-outline btn-sm" onclick="loadNotificationsAdmin()">تحديث</button></div>
+            <div style="padding:14px;">
+              <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+                <div class="form-group"><label>عنوان التنبيه</label><input id="notification-title" maxlength="180" placeholder="عنوان واضح للتنبيه"></div>
+                <div class="form-group"><label>نوع التنبيه</label><select id="notification-type"><option value="general">عام</option><option value="academic">أكاديمي</option><option value="attendance">حضور وغياب</option><option value="payments">مدفوعات</option><option value="exam">امتحانات</option><option value="competition">مسابقات</option><option value="request">طلبات وشكاوى</option><option value="system">النظام</option></select></div>
+                <div class="form-group"><label>الأولوية</label><select id="notification-priority"><option value="normal">عادية</option><option value="low">منخفضة</option><option value="high">عالية</option><option value="urgent">عاجلة</option></select></div>
+                <div class="form-group"><label>المستهدفون</label><select id="notification-audience" onchange="toggleNotificationTargetFields()"><option value="all">الجميع</option><option value="student">الطلاب</option><option value="parent">أولياء الأمور</option><option value="branch">فرع محدد</option><option value="program">برنامج محدد</option><option value="staff">الموظفون</option></select></div>
+                <div class="form-group" id="notification-branch-wrap" style="display:none;"><label>الفرع</label><select id="notification-branch"><option value="كفر الدوار">كفر الدوار</option><option value="فرع اسكندرية">فرع اسكندرية</option></select></div>
+                <div class="form-group" id="notification-program-wrap" style="display:none;"><label>اسم البرنامج</label><input id="notification-program" maxlength="180" placeholder="اسم البرنامج كما هو مسجل"></div>
+                <div class="form-group" id="notification-student-wrap" style="display:none;"><label>رقم القيد (اختياري لتخصيص التنبيه)</label><input id="notification-student-id" placeholder="رقم القيد"></div>
+                <div class="form-group"><label>موعد النشر (اختياري)</label><input id="notification-scheduled-for" type="datetime-local"></div>
+                <div class="form-group"><label>تاريخ الانتهاء (اختياري)</label><input id="notification-expires-at" type="datetime-local"></div>
+              </div>
+              <div class="form-group"><label>محتوى التنبيه</label><textarea id="notification-body" rows="4" maxlength="5000" placeholder="اكتب تفاصيل التنبيه..." style="width:100%;"></textarea></div>
+              <button class="btn btn-gold" onclick="saveNotification()">نشر التنبيه</button>
+              <div id="notification-form-status" style="margin-top:10px;font-size:12px;"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>التنبيهات المنشورة والمجدولة</h3></div>
+            <div style="overflow:auto;padding:12px;"><table class="data-table"><thead><tr><th>العنوان</th><th>المستهدفون</th><th>الأولوية</th><th>الحالة</th><th>النشر</th><th>إجراء</th></tr></thead><tbody id="notifications-admin-table"><tr><td colspan="6" style="text-align:center;padding:18px;">جاري التحميل...</td></tr></tbody></table></div>
           </div>
         </div>
 
@@ -12721,6 +12750,7 @@ function renderStudentPortalMenu() {
     <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أهلاً ${escapeHtml(unifiedPortalStudent.name)} 👋</p>
     <div style="display:flex;flex-direction:column;gap:10px;">
       <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;" onclick="goToPortalExams()">📝 الامتحانات الإلكترونية</button>
+      <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;" onclick="loadPortalNotifications('student')">🔔 الإشعارات والتنبيهات</button>
       <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;background:linear-gradient(135deg,#b45309,#78350f);" onclick="goToPortalWeeklyQuiz()">🏆 المسابقة الأسبوعية</button>
       <button class="btn btn-outline" style="width:100%;padding:14px;text-align:right;" onclick="openStudentRequestForm()">🎫 الشكاوى والطلبات</button>
     </div>
@@ -13503,6 +13533,117 @@ async function deleteAlbumPhoto(photoId) {
 /* ============================================================
    المسابقات — رابط عام للطلاب، دخول برقم القيد، مشاركة + فائزين
    ============================================================ */
+
+
+function toggleNotificationTargetFields() {
+  const audience = document.getElementById('notification-audience')?.value || 'all';
+  const branchWrap = document.getElementById('notification-branch-wrap');
+  const programWrap = document.getElementById('notification-program-wrap');
+  const studentWrap = document.getElementById('notification-student-wrap');
+  if (branchWrap) branchWrap.style.display = audience === 'branch' ? '' : 'none';
+  if (programWrap) programWrap.style.display = audience === 'program' ? '' : 'none';
+  if (studentWrap) studentWrap.style.display = ['student','parent'].includes(audience) ? '' : 'none';
+}
+
+async function loadNotificationsAdmin() {
+  if (typeof currentUser === 'undefined' || currentUser?.role !== 'admin') return;
+  const tbody = document.getElementById('notifications-admin-table');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:18px;">جاري تحميل التنبيهات...</td></tr>';
+  const { data, error } = await sb.from('notifications').select('*').order('created_at',{ascending:false}).limit(100);
+  if (error) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#b91c1c;padding:18px;">تعذر تحميل التنبيهات: '+escapeHtml(error.message||'خطأ غير معروف')+'</td></tr>';
+    return;
+  }
+  const audienceNames={all:'الجميع',student:'الطلاب',parent:'أولياء الأمور',branch:'فرع',program:'برنامج',staff:'الموظفون'};
+  const priorityNames={low:'منخفضة',normal:'عادية',high:'عالية',urgent:'عاجلة'};
+  tbody.innerHTML=(data||[]).map(n=>{
+    const state=n.is_published ? ((n.scheduled_for && new Date(n.scheduled_for)>new Date())?'مجدول':'منشور') : 'مسودة';
+    return `<tr><td><strong>${escapeHtml(n.title)}</strong><div style="font-size:11px;color:var(--muted);max-width:320px;">${escapeHtml(n.body)}</div></td>
+      <td>${escapeHtml(audienceNames[n.audience]||n.audience)}${n.branch?' · '+escapeHtml(n.branch):''}${n.program?' · '+escapeHtml(n.program):''}${n.student_id?' · '+escapeHtml(n.student_id):''}</td>
+      <td>${escapeHtml(priorityNames[n.priority]||n.priority)}</td><td>${escapeHtml(state)}</td>
+      <td>${n.published_at?new Date(n.published_at).toLocaleString('ar-EG'):(n.scheduled_for?new Date(n.scheduled_for).toLocaleString('ar-EG'):'—')}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="toggleNotificationPublish('${n.id}',${n.is_published?'false':'true'})">${n.is_published?'إيقاف':'نشر'}</button> <button class="btn btn-danger btn-sm" onclick="deleteNotification('${n.id}')">حذف</button></td></tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;padding:18px;">لا توجد تنبيهات بعد.</td></tr>';
+}
+
+async function saveNotification() {
+  if (typeof currentUser === 'undefined' || currentUser?.role !== 'admin') { showToast('هذه العملية متاحة للمدير فقط.','error'); return; }
+  const status = document.getElementById('notification-form-status');
+  const title = document.getElementById('notification-title')?.value.trim() || '';
+  const body = document.getElementById('notification-body')?.value.trim() || '';
+  const audience = document.getElementById('notification-audience')?.value || 'all';
+  if (!title || !body) { if(status) status.textContent='اكتب عنوان التنبيه ومحتواه.'; return; }
+  const scheduledRaw=document.getElementById('notification-scheduled-for')?.value || '';
+  const expiresRaw=document.getElementById('notification-expires-at')?.value || '';
+  const scheduledFor=scheduledRaw?new Date(scheduledRaw).toISOString():null;
+  const expiresAt=expiresRaw?new Date(expiresRaw).toISOString():null;
+  if (expiresAt && scheduledFor && new Date(expiresAt)<=new Date(scheduledFor)) { if(status) status.textContent='تاريخ الانتهاء يجب أن يكون بعد موعد النشر.'; return; }
+  const { data: authData } = await sb.auth.getUser();
+  const row = {
+    title, body, notification_type:document.getElementById('notification-type').value,
+    priority:document.getElementById('notification-priority').value, audience,
+    branch:audience==='branch'?document.getElementById('notification-branch').value:null,
+    program:audience==='program'?(document.getElementById('notification-program').value.trim()||null):null,
+    student_id:['student','parent'].includes(audience)?(document.getElementById('notification-student-id').value.trim()||null):null,
+    scheduled_for:scheduledFor, expires_at:expiresAt,
+    is_published:true, published_at:scheduledFor && new Date(scheduledFor)>new Date()?null:new Date().toISOString(),
+    created_by:authData?.user?.id || null
+  };
+  const { error } = await sb.from('notifications').insert(row);
+  if (error) { if(status) status.textContent='فشل حفظ التنبيه: '+(error.message||'خطأ غير معروف'); return; }
+  if(status) status.textContent='تم حفظ التنبيه.';
+  document.getElementById('notification-title').value='';
+  document.getElementById('notification-body').value='';
+  document.getElementById('notification-program').value='';
+  document.getElementById('notification-student-id').value='';
+  document.getElementById('notification-scheduled-for').value='';
+  document.getElementById('notification-expires-at').value='';
+  await loadNotificationsAdmin();
+}
+
+async function toggleNotificationPublish(id,publish) {
+  if (typeof currentUser === 'undefined' || currentUser?.role !== 'admin') return;
+  const updates={is_published:!!publish, published_at:publish?new Date().toISOString():null, updated_at:new Date().toISOString()};
+  const {error}=await sb.from('notifications').update(updates).eq('id',id);
+  if(error){showToast('تعذر تحديث التنبيه: '+error.message,'error');return;}
+  await loadNotificationsAdmin();
+}
+
+async function deleteNotification(id) {
+  if (typeof currentUser === 'undefined' || currentUser?.role !== 'admin' || !confirm('هل تريد حذف هذا التنبيه؟')) return;
+  const {error}=await sb.from('notifications').delete().eq('id',id);
+  if(error){showToast('تعذر حذف التنبيه: '+error.message,'error');return;}
+  await loadNotificationsAdmin();
+}
+
+function renderNotificationCards(items) {
+  if (!items?.length) return '<div style="padding:16px;text-align:center;color:var(--muted);">لا توجد إشعارات جديدة.</div>';
+  const priorities={low:'منخفضة',normal:'عادية',high:'مهمة',urgent:'عاجلة'};
+  return items.map(n=>`<article style="border:1px solid var(--border);border-right:4px solid ${n.priority==='urgent'?'#b91c1c':n.priority==='high'?'#c9a84c':'#dbe3ef'};border-radius:10px;padding:12px;margin-bottom:8px;background:#fff;">
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><strong>${escapeHtml(n.title)}</strong><small>${escapeHtml(priorities[n.priority]||'تنبيه')}</small></div>
+    <p style="font-size:13px;line-height:1.8;margin:8px 0;">${escapeHtml(n.body)}</p>
+    <small style="color:var(--muted);">${n.published_at?new Date(n.published_at).toLocaleString('ar-EG'):new Date(n.created_at).toLocaleString('ar-EG')}</small>
+  </article>`).join('');
+}
+
+async function loadPortalNotifications(portalType='student') {
+  const box=document.getElementById('student-portal-content');
+  if(!box||!unifiedPortalStudent||!unifiedPortalPhone) return;
+  box.innerHTML='<div style="padding:18px;text-align:center;">جاري تحميل التنبيهات...</div>';
+  const {data,error}=await sb.rpc('get_portal_notifications',{p_student_id:unifiedPortalStudent.id,p_phone:unifiedPortalPhone,p_portal_type:portalType});
+  if(error||!data?.verified){box.innerHTML='<div style="padding:16px;color:#b91c1c;">تعذر التحقق من الهوية لتحميل التنبيهات.</div><button class="btn btn-outline" onclick="renderStudentPortalMenu()">عودة</button>';return;}
+  box.innerHTML='<div style="padding:14px;"><button class="btn btn-outline" onclick="renderStudentPortalMenu()">← العودة للبوابة</button><h3 style="color:var(--navy);margin:12px 0;">🔔 الإشعارات والتنبيهات</h3>'+renderNotificationCards(data.notifications||[])+'</div>';
+}
+
+async function loadParentNotifications() {
+  const box=document.getElementById('pp-notifications-widget');
+  if(!box||!ppStudent||!ppPortalPhone) return;
+  box.innerHTML='<div style="padding:12px;text-align:center;">جاري تحميل التنبيهات...</div>';
+  const {data,error}=await sb.rpc('get_portal_notifications',{p_student_id:ppStudent.id,p_phone:ppPortalPhone,p_portal_type:'parent'});
+  if(error||!data?.verified){box.innerHTML='<div style="padding:12px;color:#b91c1c;">تعذر التحقق من بيانات ولي الأمر.</div>';return;}
+  box.innerHTML='<div style="border:1px solid var(--border);border-radius:12px;padding:12px;background:#f8fafc;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong>🔔 الإشعارات</strong><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'pp-notifications-widget\').innerHTML=\'\'">إخفاء</button></div>'+renderNotificationCards(data.notifications||[])+'</div>';
+}
 
 let currentPublicCompetitionId = null;
 let currentPublicCompetition = null;
