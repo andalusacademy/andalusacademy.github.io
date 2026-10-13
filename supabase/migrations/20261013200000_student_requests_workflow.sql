@@ -40,6 +40,7 @@ AS $function$
   FROM d;
 $function$
 
+
 CREATE OR REPLACE FUNCTION public.submit_student_request(p_student_id text, p_phone text, p_requester_type text, p_request_type text, p_title text, p_description text, p_priority text DEFAULT 'normal'::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -120,6 +121,7 @@ BEGIN
 END;
 $function$
 
+
 CREATE OR REPLACE FUNCTION public.get_student_requests(p_student_id text, p_phone text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -169,6 +171,7 @@ BEGIN
   RETURN jsonb_build_object('verified',true,'requests',rows_json);
 END;
 $function$
+
 
 REVOKE EXECUTE ON FUNCTION public.normalize_eg_phone(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.normalize_eg_phone(text) TO anon, authenticated;
