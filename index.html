@@ -12997,18 +12997,15 @@ async function ensureTodayQuizActivated() {
 }
 
 async function activateTodayQuizNow() {
-  const todayStr = new Date().toISOString().split('T')[0];
-  const { data: settings } = await sb.from('quiz_settings').select('id,daily_time,questions_per_day,updated_at').eq('id', 1).maybeSingle();
-  const count = settings?.questions_per_day || 5;
-
-  const { data: bank } = await sb.from('quiz_bank_questions').select('id').eq('active', true);
-  if (!bank || !bank.length) return;
-  const shuffled = [...bank].sort(() => Math.random() - 0.5);
-  const chosenIds = shuffled.slice(0, Math.min(count, bank.length)).map(q => q.id);
-
-  const { error } = await sb.from('quiz_daily_sessions').insert({ quiz_date: todayStr, question_ids: chosenIds });
-  // لو حصل تعارض (طالب تاني فعّلها فى نفس اللحظة) نتجاهل الخطأ بهدوء، الأهم إنها اتفعّلت
-  if (error && error.code !== '23505') console.warn('quiz activation error', error);
+  // Server-side activation enforces the configured local time and selects active questions.
+  const { data, error } = await sb.rpc('ensure_weekly_quiz_session');
+  if (error) {
+    console.warn('quiz activation error', error);
+    return;
+  }
+  if (!data?.ok && data?.reason !== 'not_started') {
+    console.warn('quiz activation skipped:', data?.reason || 'unknown');
+  }
 }
 
 async function loadWeeklyQuizSection() {
