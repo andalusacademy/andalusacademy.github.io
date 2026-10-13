@@ -1,0 +1,18 @@
+REVOKE ALL ON FUNCTION public.can_access_student(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.can_access_student(text) TO authenticated;
+REVOKE ALL ON FUNCTION public.get_student_branch(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_student_branch(text) TO authenticated;
+REVOKE ALL ON FUNCTION public.get_user_branch() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_user_branch() TO authenticated;
+REVOKE ALL ON FUNCTION public.get_user_role() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_user_role() TO authenticated;
+REVOKE ALL ON FUNCTION public.is_active_user() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_active_user() TO authenticated;
+REVOKE ALL ON FUNCTION public.is_admin() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+REVOKE ALL ON FUNCTION public.student_in_user_branch(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.student_in_user_branch(text) TO authenticated;
+REVOKE ALL ON FUNCTION public.competition_security_admin_logs(integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.competition_security_admin_logs(integer) TO authenticated;
+REVOKE ALL ON FUNCTION public.weekly_quiz_admin_audit(integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.weekly_quiz_admin_audit(integer) TO authenticated;
