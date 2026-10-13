@@ -13029,7 +13029,7 @@ async function loadWeeklyQuizSection() {
   const answered = answeredResult.answers || [];
   const answeredKeys = new Set(answered.map(a => a.quiz_date + '|' + a.question_id));
 
-  const { data: allQs, error: questionsError } = await sb.from('quiz_bank_questions').select('id,question,option_a,option_b,option_c,option_d,category,points,active,created_at');
+  const { data: allQs, error: questionsError } = await sb.rpc('weekly_quiz_get_public_questions');
   if (questionsError) throw questionsError;
   const qMap = {}; (allQs || []).forEach(q => qMap[q.id] = q);
 
