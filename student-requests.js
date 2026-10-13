@@ -79,6 +79,7 @@
       toast('سجّل الدخول إلى بوابة الطالب أولًا.', 'error'); return;
     }
     requestContext = { studentId: String(unifiedPortalStudent.id), phone: unifiedPortalPhone, requesterType: 'student' };
+    const modal = ensureSubmitModal();
     $('student-request-modal-title').textContent = '🎫 شكوى أو طلب — بوابة الطالب';
     $('student-request-modal-subtitle').textContent = 'سيتم التحقق من رقم الهاتف المسجل وربط الطلب برقم قيدك. يمكنك إرسال 5 طلبات كحد أقصى خلال 24 ساعة.';
     $('student-request-type').value = 'complaint';
@@ -87,13 +88,14 @@
     $('student-request-description').value = '';
     $('student-request-submit-error').style.display = 'none';
     $('student-request-submit-button').disabled = false;
-    ensureSubmitModal().style.display = 'flex';
+    modal.style.display = 'flex';
   };
   window.openParentRequestForm = function() {
     if (typeof ppStudent === 'undefined' || !ppStudent || typeof ppPortalPhone === 'undefined' || !ppPortalPhone) {
       toast('سجّل الدخول إلى بوابة ولي الأمر أولًا.', 'error'); return;
     }
     requestContext = { studentId: String(ppStudent.id), phone: ppPortalPhone, requesterType: 'parent' };
+    const modal = ensureSubmitModal();
     $('student-request-modal-title').textContent = '🎫 شكوى أو طلب — بوابة ولي الأمر';
     $('student-request-modal-subtitle').textContent = 'سيتم التحقق من رقم هاتف ولي الأمر المسجل وربط الطلب بملف المتدرب.';
     $('student-request-type').value = 'complaint';
@@ -102,7 +104,7 @@
     $('student-request-description').value = '';
     $('student-request-submit-error').style.display = 'none';
     $('student-request-submit-button').disabled = false;
-    ensureSubmitModal().style.display = 'flex';
+    modal.style.display = 'flex';
   };
   window.closeStudentRequestForm = function() {
     const modal = $('student-request-submit-modal');
@@ -233,6 +235,7 @@
     const r = adminRequests.find(item => String(item.id) === String(id));
     if (!r) { toast('تعذر العثور على الطلب. حدّث القائمة وحاول مرة أخرى.','error'); return; }
     activeAdminRequestId = String(r.id);
+    const modal = ensureAdminModal();
     $('student-request-admin-details').innerHTML =
       '<div><strong>مقدم الطلب:</strong> '+esc(r.requester_name||'—')+' ('+esc(r.requester_type==='parent'?'ولي أمر':'طالب')+')</div>'+
       '<div><strong>رقم القيد:</strong> '+esc(r.student_id)+' · <strong>الهاتف:</strong> '+esc(r.requester_phone||'—')+'</div>'+
@@ -243,7 +246,7 @@
       '<div style="margin-top:5px;white-space:pre-wrap;"><strong>التفاصيل:</strong><br>'+esc(r.description)+'</div>';
     $('student-request-admin-status').value = r.status;
     $('student-request-admin-response').value = r.admin_response || '';
-    ensureAdminModal().style.display = 'flex';
+    modal.style.display = 'flex';
   };
   window.closeStudentRequestAdmin = function() {
     const modal = $('student-request-admin-modal');
