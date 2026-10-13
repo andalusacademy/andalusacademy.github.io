@@ -12844,7 +12844,7 @@ function weeklyQuizBrowserName(ua) {
   return 'متصفح غير محدد';
 }
 
-async function submitWeeklyQuizEntry() {
+async async function submitWeeklyQuizEntry() {
   const id = document.getElementById('wq-entry-student-id')?.value.trim();
   const video = document.getElementById('wq-audit-video');
   const status = document.getElementById('wq-entry-status');
