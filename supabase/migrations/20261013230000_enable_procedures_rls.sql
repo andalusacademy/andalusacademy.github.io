@@ -1,0 +1,1 @@
+ALTER TABLE public.procedures ENABLE ROW LEVEL SECURITY;
