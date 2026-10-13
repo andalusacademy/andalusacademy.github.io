@@ -12711,7 +12711,8 @@ async function finishStudentFaceVerification(descriptor, contextType, contextId)
     weeklyQuizStudent = unifiedPortalStudent;
     document.getElementById('student-portal-screen').style.display = 'none';
     document.getElementById('weekly-quiz-screen').style.display = 'block';
-    await loadWeeklyQuizSection();
+    // Keep the existing activity-audit workflow, but only after face verification succeeds.
+    showWeeklyQuizEntryLogin();
     return;
   }
   renderStudentPortalMenu();
@@ -12785,17 +12786,19 @@ async function goToPortalWeeklyQuiz() {
 
 let weeklyQuizAuditStream = null;
 
-function showWeeklyQuizEntryLogin(prefillId = '') {
+function showWeeklyQuizEntryLogin() {
   stopWeeklyQuizAuditCamera();
-  weeklyQuizStudent = null;
-  weeklyQuizFaceToken = null;
   const box = document.getElementById('weekly-quiz-content');
   if (!box) return;
+  if (!weeklyQuizStudent?.id || !weeklyQuizFaceToken) {
+    box.innerHTML = '<div role="alert" style="padding:18px;text-align:center;color:#b91c1c;">يلزم التحقق من بصمة الوجه قبل دخول المسابقة.</div><button class="btn btn-outline" onclick="backToPortalFromWeeklyQuiz()">رجوع إلى بوابة الطالب</button>';
+    return;
+  }
   box.innerHTML = `
     <div style="text-align:center;font-size:13px;color:var(--muted);line-height:1.8;margin-bottom:12px;">
-      الدخول للمسابقة الأسبوعية برقم القيد فقط. قبل الدخول، ستلتقط الكاميرا صورة تدقيق بعد موافقتك، وتُحفظ في مساحة خاصة يقتصر الاطلاع عليها على الإدارة المخوّلة.
+      تم التحقق من هوية الطالب. قبل فتح المسابقة، يمكنك الموافقة على التقاط صورة تدقيق لحفظ سجل نشاط الدخول. تُحفظ الصورة في مساحة خاصة للإدارة المخوّلة فقط.
+      <div style="margin-top:6px;font-weight:800;color:var(--navy);">${escapeHtml(weeklyQuizStudent.name || '')} · رقم القيد: ${escapeHtml(weeklyQuizStudent.id)}</div>
     </div>
-    <div class="form-group"><label>رقم القيد</label><input id="wq-entry-student-id" type="text" inputmode="numeric" autocomplete="off" placeholder="اكتب رقم القيد" value="${escapeHtml(prefillId)}" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;"></div>
     <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.8;margin:12px 0;">
       <input id="wq-photo-consent" type="checkbox" onchange="toggleWeeklyQuizPhotoConsent()" style="margin-top:5px;">
       أوافق على التقاط وحفظ صورة وجهي في سجل نشاطات المسابقة لتوثيق الدخول ومراجعة حالات انتحال الهوية. أعلم أن الصورة خاصة ومخصصة للإدارة المخوّلة، ويمكنني طلب حذفها من إدارة المركز.
@@ -12803,7 +12806,7 @@ function showWeeklyQuizEntryLogin(prefillId = '') {
     <button class="btn btn-gold" id="wq-camera-start" disabled style="width:100%;padding:12px;" onclick="startWeeklyQuizAuditCamera()">الموافقة ثم تشغيل الكاميرا</button>
     <video id="wq-audit-video" autoplay muted playsinline style="display:none;width:100%;max-height:320px;object-fit:cover;border-radius:12px;background:#0f172a;margin-top:12px;"></video>
     <div id="wq-entry-status" role="status" style="font-size:12px;margin:10px 0;color:var(--muted);"></div>
-    <button class="btn btn-gold" id="wq-entry-submit" disabled style="display:none;width:100%;padding:12px;" onclick="submitWeeklyQuizEntry()">التقاط الصورة والدخول للمسابقة</button>
+    <button class="btn btn-gold" id="wq-entry-submit" disabled style="display:none;width:100%;padding:12px;" onclick="submitWeeklyQuizEntry()">حفظ سجل النشاط والدخول للمسابقة</button>
   `;
 }
 
@@ -12853,19 +12856,16 @@ function weeklyQuizBrowserName(ua) {
 }
 
 async function submitWeeklyQuizEntry() {
-  const id = document.getElementById('wq-entry-student-id')?.value.trim();
+  const student = weeklyQuizStudent;
   const video = document.getElementById('wq-audit-video');
   const status = document.getElementById('wq-entry-status');
   const button = document.getElementById('wq-entry-submit');
-  if (!id) { if(status) status.textContent = 'اكتب رقم القيد أولًا.'; return; }
+  if (!student?.id || !weeklyQuizFaceToken) { if(status) status.textContent = 'انتهت جلسة التحقق. ارجع وتحقق من الوجه مرة أخرى.'; return; }
   if (!document.getElementById('wq-photo-consent')?.checked) { if(status) status.textContent = 'الموافقة على صورة التدقيق مطلوبة.'; return; }
   if (!weeklyQuizAuditStream || !video || video.readyState < 2) { if(status) status.textContent = 'شغّل الكاميرا وانتظر ظهور الصورة.'; return; }
   button.disabled = true;
   if(status) { status.style.color = 'var(--muted)'; status.textContent = 'جاري التحقق من رقم القيد وحفظ سجل الدخول...'; }
   try {
-    const { data: student, error: studentError } = await sb.from('students').select('id,name').eq('id', id).maybeSingle();
-    if (studentError) throw new Error('تعذر البحث عن رقم القيد: ' + studentError.message);
-    if (!student) throw new Error('رقم القيد غير موجود في سجلات المركز.');
     const canvas = document.createElement('canvas');
     const width = Math.min(video.videoWidth || 640, 640);
     const height = Math.round(width * ((video.videoHeight || 480) / (video.videoWidth || 640)));
@@ -12884,8 +12884,6 @@ async function submitWeeklyQuizEntry() {
     });
     if (logError) throw new Error('تم رفع الصورة لكن تعذر تسجيل النشاط: ' + logError.message);
     if (!logged?.ok) throw new Error(logged?.reason === 'registration_not_found' ? 'رقم القيد غير موجود.' : 'تعذر تسجيل نشاط الدخول (' + (logged?.reason || 'خطأ غير معروف') + ').');
-    weeklyQuizStudent = { id: student.id, name: student.name };
-    weeklyQuizFaceToken = null;
     stopWeeklyQuizAuditCamera();
     await loadWeeklyQuizSection();
   } catch (e) {
