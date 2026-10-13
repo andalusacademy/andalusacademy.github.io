@@ -78,7 +78,7 @@ async function loadAchievementsAdmin() {
       s.activity += Number(a.activity_points || 0);
       sums.set(a.student_id, s);
     });
-    const ranked = allStudents.map(student => {
+    const ranked = allStudents.filter(student => !['dismissed','final_dismissed'].includes(String(student.student_status || 'active'))).map(student => {
       const exam = getStudentGradePct(student.id);
       const attRows = allAttendanceGlobal.filter(a => a.student_id === student.id && (a.status === 'حاضر' || a.status === 'غائب'));
       const attendance = attRows.length ? Math.round(attRows.filter(a => a.status === 'حاضر').length / attRows.length * 100) : null;
