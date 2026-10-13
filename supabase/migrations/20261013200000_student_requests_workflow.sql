@@ -30,6 +30,7 @@ CREATE OR REPLACE FUNCTION public.normalize_eg_phone(p_phone text)
  RETURNS text
  LANGUAGE sql
  IMMUTABLE
+ SET search_path TO 'public'
 AS $function$
   WITH d AS (SELECT regexp_replace(coalesce(p_phone,''), '[^0-9]', '', 'g') AS v)
   SELECT CASE
