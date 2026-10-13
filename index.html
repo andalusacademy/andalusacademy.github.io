@@ -13042,10 +13042,17 @@ async function loadWeeklyQuizSection() {
     });
   });
 
-  const { data: myScore } = await sb.from('quiz_weekly_scores').select('*').eq('student_id', weeklyQuizStudent.id).eq('week_start', weekStart).maybeSingle();
-  const { data: leaderboard } = await sb.from('quiz_weekly_scores').select('*').eq('week_start', weekStart).order('total_points', { ascending: false }).limit(10);
-
-  renderWeeklyQuizHome(myScore, leaderboard);
+  const { data: scoreResult, error: scoreError } = await sb.rpc('weekly_quiz_get_public_scores', {
+    p_student_id: weeklyQuizStudent.id,
+    p_face_token: weeklyQuizFaceToken,
+    p_week_start: weekStart
+  });
+  if (scoreError || !scoreResult?.ok) {
+    console.warn('Weekly quiz score lookup failed:', scoreError || scoreResult?.reason);
+    contentEl.innerHTML = '<div role="alert" style="text-align:center;padding:20px;"><p style="color:#b91c1c;">تعذر تحميل النقاط ولوحة الصدارة. أعد التحقق بالوجه.</p><button class="btn btn-gold" onclick="goToPortalWeeklyQuiz()">إعادة التحقق بالوجه</button></div>';
+    return;
+  }
+  renderWeeklyQuizHome(scoreResult.my_score, scoreResult.leaderboard || []);
 }
 
 function renderWeeklyQuizHome(myScore, leaderboard) {
@@ -13064,8 +13071,8 @@ function renderWeeklyQuizHome(myScore, leaderboard) {
       <div class="card-header"><h3 style="font-size:14px;">🏆 لوحة الصدارة (هذا الأسبوع)</h3></div>
       <div style="padding:10px 14px;">
         ${(leaderboard && leaderboard.length) ? leaderboard.map((l, i) => `
-          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;${l.student_id === weeklyQuizStudent.id ? 'font-weight:800;color:var(--navy);' : ''}">
-            <span>${i + 1}. ${escapeHtml(l.student_name || l.student_id)}</span>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;${l.is_me ? 'font-weight:800;color:var(--navy);' : ''}">
+            <span>${i + 1}. ${escapeHtml(l.student_name || (l.is_me ? weeklyQuizStudent.name : 'متدرب'))}</span>
             <span>${l.total_points} نقطة</span>
           </div>`).join('') : '<p style="text-align:center;color:var(--muted);font-size:12px;">لسه محدش جاوب الأسبوع ده</p>'}
       </div>
