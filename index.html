@@ -13019,8 +13019,15 @@ async function loadWeeklyQuizSection() {
 
   const weekStart = getWeekStartDate(new Date());
   const { data: sessions } = await sb.from('quiz_daily_sessions').select('*').gte('quiz_date', weekStart).order('quiz_date', { ascending: true });
-  const { data: answered } = await sb.from('quiz_answers').select('quiz_date,question_id').eq('student_id', weeklyQuizStudent.id);
-  const answeredKeys = new Set((answered || []).map(a => a.quiz_date + '|' + a.question_id));
+  const { data: answeredResult, error: answeredError } = await sb.rpc('weekly_quiz_get_answered_questions', {
+    p_student_id: weeklyQuizStudent.id,
+    p_face_token: weeklyQuizFaceToken,
+    p_week_start: weekStart
+  });
+  if (answeredError) throw answeredError;
+  if (!answeredResult?.ok) throw new Error('انتهت صلاحية التحقق بالوجه. اخرج من المسابقة وأعد التحقق.');
+  const answered = answeredResult.answers || [];
+  const answeredKeys = new Set(answered.map(a => a.quiz_date + '|' + a.question_id));
 
   const { data: allQs, error: questionsError } = await sb.from('quiz_bank_questions').select('id,question,option_a,option_b,option_c,option_d,category,points,active,created_at');
   if (questionsError) throw questionsError;
