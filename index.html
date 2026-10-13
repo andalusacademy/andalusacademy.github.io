@@ -12537,7 +12537,9 @@ function renderStudentFaceGate(enrolling, contextType = 'student_portal', contex
   }
   const box = contextType === 'exam_portal'
     ? document.getElementById('student-face-gate-content')
-    : document.getElementById('student-portal-content');
+    : contextType === 'public_competition'
+      ? document.getElementById('competition-content')
+      : document.getElementById('student-portal-content');
   if (!box) return;
   box.innerHTML = `
     <div style="border:1px solid var(--border);border-radius:14px;padding:16px;background:#fff;max-width:560px;margin:auto;">
@@ -12686,6 +12688,11 @@ async function finishStudentFaceVerification(descriptor, contextType, contextId)
     examStudentPhone = unifiedPortalPhone || '';
     document.getElementById('student-face-gate-overlay')?.remove();
     await examStudentLogin();
+    return;
+  }
+  if (contextType === 'public_competition') {
+    publicCompetitionFaceToken = data.token || null;
+    renderPublicCompetitionSubmitForm();
     return;
   }
   if (contextType === 'weekly_quiz') {
@@ -13496,6 +13503,103 @@ async function deleteAlbumPhoto(photoId) {
 /* ============================================================
    المسابقات — رابط عام للطلاب، دخول برقم القيد، مشاركة + فائزين
    ============================================================ */
+
+let currentPublicCompetitionId = null;
+let currentPublicCompetition = null;
+let publicCompetitionFaceToken = null;
+
+async function loadCompetitionEntryForm(competitionId) {
+  currentPublicCompetitionId = competitionId;
+  publicCompetitionFaceToken = null;
+  const box = document.getElementById('competition-content');
+  box.innerHTML = '<div style="text-align:center;padding:24px;">جاري تحميل المسابقة...</div>';
+  const { data, error } = await sb.rpc('get_public_competition', { p_competition_id: competitionId });
+  if (error || !data?.ok || !data.competition) {
+    box.innerHTML = '<div style="text-align:center;padding:24px;"><h3>المسابقة غير متاحة حاليًا</h3><p style="margin-top:8px;color:var(--muted);">تحقق من الرابط أو موعد المسابقة.</p></div>';
+    return;
+  }
+  currentPublicCompetition = data.competition;
+  box.innerHTML = `
+    <div style="padding:14px;">
+      <h3 style="color:var(--navy);margin-bottom:8px;">🏆 ${escapeHtml(currentPublicCompetition.title)}</h3>
+      <p style="font-size:13px;line-height:1.8;color:var(--muted);margin-bottom:16px;">${escapeHtml(currentPublicCompetition.description || 'يسعدنا اشتراكك في المسابقة.')}</p>
+      <div class="form-group"><label>رقم القيد</label><input id="public-comp-student-id" autocomplete="username" placeholder="رقم القيد"></div>
+      <div class="form-group"><label>رقم الهاتف المسجل بالمركز</label><input id="public-comp-phone" type="tel" autocomplete="tel" placeholder="01xxxxxxxxx"></div>
+      <div id="public-comp-error" style="display:none;color:#b91c1c;font-size:12px;margin:8px 0;"></div>
+      <button class="btn btn-gold" style="width:100%;" onclick="beginPublicCompetitionEntry()">التحقق من الهوية والمتابعة</button>
+      <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-top:12px;">الدخول برقم القيد فقط غير كافٍ. يلزم مطابقة الهاتف والتحقق من الوجه.</p>
+    </div>`;
+}
+
+async function beginPublicCompetitionEntry() {
+  const id = document.getElementById('public-comp-student-id')?.value.trim() || '';
+  const phone = document.getElementById('public-comp-phone')?.value.trim() || '';
+  const errorEl = document.getElementById('public-comp-error');
+  if (errorEl) errorEl.style.display = 'none';
+  if (!id || !phone || !currentPublicCompetitionId) {
+    if (errorEl) { errorEl.textContent = 'أدخل رقم القيد والهاتف المسجل.'; errorEl.style.display = 'block'; }
+    return;
+  }
+  const { data: student, error } = await sb.rpc('public_student_lookup', { p_student_id: id, p_phone: phone });
+  if (error || !student) {
+    if (errorEl) { errorEl.textContent = 'تعذر التحقق من بيانات الطالب. راجع رقم القيد والهاتف المسجل.'; errorEl.style.display = 'block'; }
+    return;
+  }
+  const { data: faceStatus, error: faceError } = await sb.rpc('student_face_status', { p_student_id: id, p_phone: phone });
+  if (faceError || !faceStatus?.verified) {
+    if (errorEl) { errorEl.textContent = 'تعذر مطابقة الهاتف المسجل.'; errorEl.style.display = 'block'; }
+    return;
+  }
+  unifiedPortalStudent = student;
+  unifiedPortalPhone = phone;
+  renderStudentFaceGate(!faceStatus.enrolled, 'public_competition', currentPublicCompetitionId);
+}
+
+function renderPublicCompetitionSubmitForm() {
+  const box = document.getElementById('competition-content');
+  box.innerHTML = `
+    <div style="padding:14px;">
+      <h3 style="color:var(--navy);margin-bottom:8px;">مرحبًا ${escapeHtml(unifiedPortalStudent?.name || 'بك')}</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">تم التحقق من الهوية. أكمل المشاركة التالية.</p>
+      <div class="form-group"><label>إجابة أو وصف المشاركة</label><textarea id="public-comp-answer" rows="4" maxlength="3000" placeholder="اكتب مشاركتك هنا..." style="width:100%;"></textarea></div>
+      <div class="form-group"><label>رابط صورة (اختياري، يبدأ بـ https://)</label><input id="public-comp-photo-url" type="url" placeholder="https://..."></div>
+      <div id="public-comp-submit-error" style="display:none;color:#b91c1c;font-size:12px;margin:8px 0;"></div>
+      <button class="btn btn-gold" style="width:100%;" onclick="submitPublicCompetitionEntry()">إرسال المشاركة</button>
+    </div>`;
+}
+
+async function submitPublicCompetitionEntry() {
+  const answer = document.getElementById('public-comp-answer')?.value.trim() || '';
+  const photoUrl = document.getElementById('public-comp-photo-url')?.value.trim() || null;
+  const errorEl = document.getElementById('public-comp-submit-error');
+  if (errorEl) errorEl.style.display = 'none';
+  if (!answer && !photoUrl) {
+    if (errorEl) { errorEl.textContent = 'اكتب إجابتك أو أضف رابط الصورة.'; errorEl.style.display = 'block'; }
+    return;
+  }
+  const { data, error } = await sb.rpc('submit_public_competition_entry', {
+    p_competition_id: currentPublicCompetitionId,
+    p_student_id: unifiedPortalStudent?.id,
+    p_phone: unifiedPortalPhone,
+    p_face_token: publicCompetitionFaceToken,
+    p_answer_text: answer,
+    p_photo_url: photoUrl
+  });
+  if (error || !data?.ok) {
+    const messages = {
+      verification_required: 'انتهت صلاحية التحقق. أعد التحقق من الوجه.',
+      already_submitted: 'تم تسجيل مشاركة لهذا الطالب من قبل.',
+      competition_unavailable: 'انتهى موعد المسابقة أو أصبحت غير متاحة.',
+      branch_not_allowed: 'المسابقة غير متاحة لفرعك.',
+      invalid_photo_url: 'رابط الصورة غير صالح؛ استخدم رابط HTTPS.',
+      entry_required: 'أدخل إجابة أو رابط صورة.'
+    };
+    if (errorEl) { errorEl.textContent = messages[data?.reason] || 'تعذر حفظ المشاركة. حاول مرة أخرى.'; errorEl.style.display = 'block'; }
+    return;
+  }
+  document.getElementById('competition-content').innerHTML = '<div style="text-align:center;padding:28px;"><div style="font-size:42px;">✅</div><h3 style="color:var(--navy);margin:10px 0;">تم تسجيل مشاركتك بنجاح</h3><p style="font-size:13px;color:var(--muted);">شكرًا لمشاركتك. سيتم مراجعة المشاركة من إدارة المركز.</p></div>';
+}
+
 let allCompetitions = [];
 let currentCompetitionId = null;
 
