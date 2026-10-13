@@ -14797,7 +14797,7 @@ async function issueCertificateRecord(s) {
 
 async function loadCertVerification(serial) {
   const contentEl = document.getElementById('verify-cert-content');
-  const { data: rec } = await sb.from('certificate_records').select('*').eq('serial', serial).maybeSingle();
+  const { data: rec, error: verifyError } = await sb.rpc('verify_certificate_by_serial', { p_serial: serial });
   if (!rec) {
     contentEl.innerHTML = `<div style="text-align:center;padding:10px;">
       <div style="font-size:44px;margin-bottom:10px;">❌</div>
