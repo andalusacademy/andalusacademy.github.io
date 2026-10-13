@@ -639,6 +639,8 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
       </div>
     </div>
     <div class="content" style="max-width:800px;margin:0 auto;padding:16px;">
+      <div style="margin-bottom:12px;"><button class="btn btn-outline" onclick="openParentRequestForm()">🎫 تقديم شكوى أو طلب</button></div>
+      <div id="pp-request-widget" style="margin-bottom:14px;"></div>
       <div id="pp-content"></div>
     </div>
   </div>
@@ -799,6 +801,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           <div class="nav-cards-grid no-print" id="nav-cards-grid">
             <div class="nav-card c4" onclick="showPage('students')"><span class="nav-card-icon">👨‍🎓</span><span>الطلاب</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('achievements');loadAchievementsAdmin()"><span class="nav-card-icon">🏅</span><span>إنجازات وترتيب المتدربين</span></div>
+            <div class="nav-card c12 admin-only" onclick="showPage('requests');loadStudentRequestsAdmin()"><span class="nav-card-icon">🎫</span><span>الشكاوى والطلبات</span></div>
             <div class="nav-card c3" onclick="showPage('programs')"><span class="nav-card-icon">📚</span><span>البرامج والكورسات</span></div>
             <div class="nav-card c2" onclick="showPage('attendance')"><span class="nav-card-icon">✅</span><span>الحضور والغياب</span></div>
             <div class="nav-card c1" onclick="showPage('leads')"><span class="nav-card-icon">📞</span><span>الحجوزات والاستفسارات</span></div>
@@ -1019,6 +1022,22 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           <div class="card">
             <div class="card-header"><h3>📋 الإنجازات المسجلة</h3><span id="ach-count" style="font-size:12px;color:var(--muted)">0 إنجاز</span></div>
             <div style="overflow-x:auto;"><table><thead><tr><th>المتدرب</th><th>نوع الإنجاز</th><th>العنوان</th><th>التاريخ</th><th>النقاط</th><th>نقاط الأنشطة</th><th>الوصف</th><th>إجراء</th></tr></thead><tbody id="ach-records-table"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px;">جاري التحميل...</td></tr></tbody></table></div>
+          </div>
+        </div>
+
+        <!-- STUDENT REQUESTS / COMPLAINTS -->
+        <div id="page-requests" class="page">
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>🎫 الشكاوى والطلبات</h3><button class="btn btn-gold btn-sm" onclick="loadStudentRequestsAdmin()">🔄 تحديث</button></div>
+            <div style="padding:14px;display:flex;gap:10px;flex-wrap:wrap;">
+              <select id="student-requests-status-filter" class="search-input" onchange="loadStudentRequestsAdmin()">
+                <option value="all">كل الحالات</option><option value="new">جديد</option><option value="in_progress">قيد المراجعة</option><option value="waiting_student">بانتظار الطالب</option><option value="resolved">تم الحل</option><option value="closed">مغلق</option>
+              </select>
+              <select id="student-requests-type-filter" class="search-input" onchange="loadStudentRequestsAdmin()">
+                <option value="all">كل الأنواع</option><option value="complaint">شكوى</option><option value="request">طلب</option><option value="academic">أكاديمي</option><option value="financial">مالي</option><option value="technical">تقني</option><option value="other">أخرى</option>
+              </select>
+            </div>
+            <div style="overflow:auto;"><table><thead><tr><th>تاريخ الإرسال</th><th>مقدم الطلب</th><th>رقم القيد</th><th>النوع</th><th>العنوان</th><th>الأولوية</th><th>الحالة</th><th>الفرع</th><th>إجراء</th></tr></thead><tbody id="student-requests-admin-table"><tr><td colspan="9" style="text-align:center;padding:18px;">اضغط تحديث لعرض الطلبات.</td></tr></tbody></table></div>
           </div>
         </div>
 
@@ -3844,6 +3863,7 @@ let allSubjectsCacheForPortal2 = null;
    ============================================================ */
 let ppStudent = null;
 let ppPortalData = null;
+let ppPortalPhone = '';
 
 async function parentPortalLogin() {
   const id = document.getElementById('pp-student-id').value.trim();
@@ -3870,6 +3890,7 @@ async function parentPortalLogin() {
 
   ppPortalData = data;
   ppStudent = data.student;
+  ppPortalPhone = phone;
   try {
     const rankingResult = await sb.rpc('student_portal_get_ranking', { p_student_id: id, p_phone: phone });
     if (!rankingResult.error && rankingResult.data && rankingResult.data.verified) ppPortalData.ranking = rankingResult.data;
@@ -3881,11 +3902,13 @@ async function parentPortalLogin() {
   document.getElementById('pp-login-screen').style.display = 'none';
   document.getElementById('pp-dashboard-screen').style.display = 'block';
   await renderParentPortalDashboard();
+  if (typeof loadParentPortalRequests === 'function') await loadParentPortalRequests();
 }
 
 function parentPortalLogout() {
   ppStudent = null;
   ppPortalData = null;
+  ppPortalPhone = '';
   document.getElementById('pp-dashboard-screen').style.display = 'none';
   document.getElementById('pp-login-screen').style.display = 'block';
   document.getElementById('pp-student-id').value = '';
@@ -12683,11 +12706,16 @@ function renderStudentPortalMenu() {
     <div style="display:flex;flex-direction:column;gap:10px;">
       <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;" onclick="goToPortalExams()">📝 الامتحانات الإلكترونية</button>
       <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;background:linear-gradient(135deg,#b45309,#78350f);" onclick="goToPortalWeeklyQuiz()">🏆 المسابقة الأسبوعية</button>
+      <button class="btn btn-outline" style="width:100%;padding:14px;text-align:right;" onclick="openStudentRequestForm()">🎫 الشكاوى والطلبات</button>
     </div>
+    <div id="student-portal-requests" style="margin-top:14px;"></div>
     <div id="student-portal-achievements" style="margin-top:14px;"></div>
   `;
   if (typeof loadStudentPortalAchievements === 'function') {
     loadStudentPortalAchievements(unifiedPortalPhone || '');
+  }
+  if (typeof loadStudentPortalRequests === 'function') {
+    loadStudentPortalRequests();
   }
 }
 
@@ -15101,5 +15129,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTraineeRanking(
 </script>
 <script src="competition-security-admin.js"></script>
 <script src="student-achievements.js"></script>
+<script src="student-requests.js"></script>
 </body>
 </html>
