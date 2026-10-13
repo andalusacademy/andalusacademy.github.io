@@ -10663,6 +10663,28 @@ async function buildNotifications() {
       });
     });
   }
+  // 6) تنبيهات الشكاوى والطلبات الجديدة للمدير فقط
+  try {
+    if (currentUser && currentUser.role === 'admin') {
+      const { data: requestRows, error: requestError } = await sb.from('student_requests')
+        .select('id,student_id,title,requester_name,priority,status,created_at')
+        .in('status', ['new','in_progress','waiting_student'])
+        .order('created_at', { ascending: false }).limit(25);
+      if (!requestError && requestRows) requestRows.forEach(r => {
+        allNotifications.push({
+          key: 'request:' + r.id,
+          type: 'request',
+          icon: '🎫',
+          title: r.priority === 'urgent' ? 'شكوى أو طلب عاجل' : 'شكوى / طلب يحتاج متابعة',
+          body: (r.requester_name || 'مقدم الطلب') + ' — ' + r.title,
+          requestId: r.id,
+          studentId: r.student_id,
+          priority: r.priority,
+          phone: null
+        });
+      });
+    }
+  } catch (e) {}
   // ✅ استبعاد أي تنبيه اتعمله "تم كمقروء" فعليًا (محفوظ فى localStorage) — الإصلاح الحقيقي (v6.3)
   const readKeys = getReadNotificationKeys();
   allNotifications = allNotifications.filter(n => !readKeys.has(n.key));
@@ -10713,6 +10735,8 @@ function renderNotifications() {
       ? `showPage('tasks'); document.getElementById('notif-panel').classList.remove('open');`
       : n.type === 'lead'
       ? `document.getElementById('notif-panel').classList.remove('open'); showPage('leads'); setTimeout(() => openFollowupModal('${escapeHtml(n.leadId)}'), 150);`
+      : n.type === 'request'
+      ? `document.getElementById('notif-panel').classList.remove('open'); showPage('requests'); document.getElementById('student-requests-status-filter').value='all'; document.getElementById('student-requests-type-filter').value='all'; loadStudentRequestsAdmin().then(() => openStudentRequestAdmin('${escapeHtml(n.requestId)}'));`
       : `openProfileFromNotif('${escapeHtml(n.studentId)}')`;
     return `<div class="notif-item" onclick="${clickHandler}" style="position:relative;">
       <div class="notif-icon ${n.type}">${escapeHtml(n.icon)}</div>
@@ -15037,15 +15061,23 @@ function openSmartAlertCenter(){
 }
 function closeSmartAlertCenter(){document.getElementById('smart-alert-overlay')?.classList.remove('open')}
 function smartAlertPriority(n){
+  if(n.type==='request') return ['urgent','high'].includes(n.priority) ? 'high' : 'medium';
   if(n.type==='late'||n.type==='attend'||n.type==='task'||n.type==='lead') return 'high';
   if(n.type==='upcoming') return 'medium';
   return 'low';
 }
 function smartAlertPriorityLabel(level){return level==='high'?'عاجل':level==='medium'?'متوسط':'متابعة'}
-function smartAlertTypeLabel(type){return ({late:'تأخر سداد',upcoming:'قسط قريب',attend:'غياب مرتفع',task:'مهمة مستحقة',lead:'متابعة متأخرة'})[type]||'تنبيه'}
+function smartAlertTypeLabel(type){return ({late:'تأخر سداد',upcoming:'قسط قريب',attend:'غياب مرتفع',task:'مهمة مستحقة',lead:'متابعة متأخرة',request:'شكوى / طلب'})[type]||'تنبيه'}
 function smartAlertAction(n){
   if(n.type==='task') {showPage('tasks');closeSmartAlertCenter();return}
   if(n.type==='lead') {showPage('leads');closeSmartAlertCenter();setTimeout(()=>openFollowupModal(String(n.leadId||'')),150);return}
+  if(n.type==='request' && n.requestId) {
+    closeSmartAlertCenter(); showPage('requests');
+    const sf=document.getElementById('student-requests-status-filter'); if(sf)sf.value='all';
+    const tf=document.getElementById('student-requests-type-filter'); if(tf)tf.value='all';
+    Promise.resolve(loadStudentRequestsAdmin()).then(()=>openStudentRequestAdmin(String(n.requestId)));
+    return;
+  }
   if(n.studentId){closeSmartAlertCenter();openProfileFromNotif(String(n.studentId));return}
   showToast('لا يوجد إجراء مباشر لهذا التنبيه');
 }
