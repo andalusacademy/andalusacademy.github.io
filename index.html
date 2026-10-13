@@ -4426,44 +4426,30 @@ function examStudentLogout() {
 }
 
 async function loadAvailableExamsForStudent() {
-  const now = new Date().toISOString();
-  const { data: exams } = await sb.from('exams').select('*')
-    .eq('branch', examStudent.branch)
-    .lte('available_from', now)
-    .gte('available_until', now);
-
-  const matching = [];
-  for (const exam of (exams || [])) {
-    if (await isStudentEligibleForExam(exam, examStudent)) matching.push(exam);
-  }
-
+  const { data: result, error } = await sb.rpc('student_exam_list', {
+    p_student_id: examStudent?.id,
+    p_phone: examStudentPhone,
+    p_face_token: examFaceVerificationToken
+  });
   const listEl = document.getElementById('exam-available-list');
+  if (error || !result?.ok) {
+    listEl.innerHTML = '<div class="empty-state"><div class="emoji">🔐</div><h4>انتهت صلاحية التحقق. سجّل الدخول وتحقق من الوجه مرة أخرى.</h4></div>';
+    return;
+  }
+  const matching = result.exams || [];
   if (!matching.length) {
     listEl.innerHTML = '<div class="empty-state" style="padding:20px"><div class="emoji">📭</div><h4>لا يوجد امتحان متاح لك حاليًا</h4></div>';
     return;
   }
-
-  // تحقق من المحاولات السابقة لكل امتحان
-  const { data: attempts } = await sb.from('exam_attempts').select('exam_id,status').eq('student_id', examStudent.id);
-  const attemptMap = {}; (attempts || []).forEach(a => attemptMap[a.exam_id] = a.status);
-
   listEl.innerHTML = matching.map(e => {
-    const subj = allSubjectsCacheForPortal?.find?.(s => s.id === e.subject_id);
-    const status = attemptMap[e.id];
+    const subj = e.subject_name || allSubjectsCacheForPortal?.find?.(s => String(s.id) === String(e.subject_id))?.name || 'المادة';
+    const status = e.attempt_status;
     const until = new Date(e.available_until).toLocaleString('ar-EG', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
     let actionHtml;
-    if (status === 'submitted') {
-      actionHtml = `<span class="badge badge-success">✓ تم التسليم مسبقًا</span>`;
-    } else if (status === 'in_progress') {
-      actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="resumeExam('${e.id}')">▶ استكمال الامتحان</button>`;
-    } else {
-      actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="startExam('${e.id}')">▶ بدء الامتحان</button>`;
-    }
-    return `<div class="exam-avail-item">
-      <h4>${escapeHtml(e.title)}</h4>
-      <p>المدة: ${e.duration_minutes} دقيقة — متاح حتى ${escapeHtml(until)}</p>
-      ${actionHtml}
-    </div>`;
+    if (status === 'submitted') actionHtml = '<span class="badge badge-success">✓ تم التسليم مسبقًا</span>';
+    else if (status === 'in_progress') actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="resumeExam('${e.id}')">▶ استكمال الامتحان</button>`;
+    else actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="startExam('${e.id}')">▶ بدء الامتحان</button>`;
+    return `<div class="exam-avail-item"><h4>${escapeHtml(e.title)}</h4><p>${escapeHtml(subj)} · المدة: ${Number(e.duration_minutes)||0} دقيقة — متاح حتى ${escapeHtml(until)}</p>${actionHtml}</div>`;
   }).join('');
 }
 
@@ -4486,63 +4472,48 @@ async function isStudentEligibleForExam(exam, student, options = {}) {
     if (!Number.isFinite(from) || !Number.isFinite(until) || now < from || now >= until) return false;
   }
   if (Number(exam.round) === 2 && !exam.is_placement_test) {
-    const [{ data: subject }, { data: grade, error: gradeError }] = await Promise.all([
-      sb.from('subjects').select('id,pass_grade_1,min_pass').eq('id', exam.subject_id).maybeSingle(),
-      sb.from('grades').select('grade_1').eq('student_id', student.id).eq('subject_id', exam.subject_id).maybeSingle()
-    ]);
-    if (gradeError || !grade || grade.grade_1 == null) return false;
-    const passMark = Number(subject?.pass_grade_1 ?? subject?.min_pass ?? 25);
-    if (Number(grade.grade_1) >= passMark) return false;
+    if (options.serverValidated) return true;
+    if (exam.round2_eligible !== true) return false;
   }
   return true;
 }
 
 async function startExam(examId) {
-  await ensurePortalSubjects();
-  const { data: exam } = await sb.from('exams').select('*').eq('id', examId).maybeSingle();
-  if (!exam) { showToast('الامتحان غير موجود', 'error'); return; }
-  if (!(await isStudentEligibleForExam(exam, examStudent))) {
-    showToast('هذا الامتحان غير متاح لك حاليًا أو أنك ناجح في هذه المادة بالدور الأول.', 'error');
-    await loadAvailableExamsForStudent();
+  const { data: result, error } = await sb.rpc('student_exam_start_attempt', {
+    p_exam_id: examId, p_student_id: examStudent?.id,
+    p_phone: examStudentPhone, p_face_token: examFaceVerificationToken
+  });
+  if (error || !result?.ok) {
+    if (result?.reason === 'attempt_exists') { await resumeExam(examId); return; }
+    const messages = {
+      verification_required: 'انتهت صلاحية التحقق بالوجه. أعد تسجيل الدخول.',
+      exam_unavailable: 'الامتحان غير متاح الآن.',
+      program_not_allowed: 'هذا الامتحان غير مخصص لبرنامجك.',
+      round2_not_eligible: 'لا يمكنك دخول الدور الثاني لأن شرط الرسوب في الدور الأول غير متحقق.',
+      no_questions: 'لا توجد أسئلة في هذا الامتحان بعد.'
+    };
+    showToast(messages[result?.reason] || error?.message || 'تعذر بدء الامتحان.', 'error');
     return;
   }
-
-  const { data: questions } = await sb.from('exam_questions')
-    .select('id,question_text,question_type,option_a,option_b,option_c,option_d,points,order_num')
-    .eq('exam_id', examId);
-  if (!questions || !questions.length) { showToast('لا توجد أسئلة فى هذا الامتحان بعد', 'error'); return; }
-
-  // ترتيب عشوائي ثابت لهذا الطالب
-  const shuffled = [...questions].sort(() => Math.random() - 0.5);
-  const orderIds = shuffled.map(q => q.id);
-
-  const { data: attempt, error } = await sb.from('exam_attempts').insert({
-    exam_id: examId, student_id: examStudent.id,
-    question_order: orderIds, started_at: new Date().toISOString(), status: 'in_progress'
-  }).select().single();
-
-  if (error) {
-    if (error.code === '23505') { showToast('لقد بدأت هذا الامتحان من قبل', 'error'); resumeExam(examId); return; }
-    showToast('❌ خطأ: ' + error.message, 'error'); return;
-  }
-
-  examCurrentExam = exam;
-  examCurrentAttempt = attempt;
-  examQuestionsForStudent = orderIds.map(id => shuffled.find(q => q.id === id));
-  renderExamQuestionsForStudent();
+  examCurrentExam = result.exam;
+  examCurrentAttempt = result.attempt;
+  examQuestionsForStudent = result.questions || [];
+  renderExamQuestionsForStudent(examCurrentAttempt.answers || {});
   showExamScreen('exam-active-screen');
   startExamTimer();
 }
 
 async function resumeExam(examId) {
-  await ensurePortalSubjects();
-  const { data: exam } = await sb.from('exams').select('*').eq('id', examId).maybeSingle();
-  const { data: attempt } = await sb.from('exam_attempts').select('*').eq('exam_id', examId).eq('student_id', examStudent.id).maybeSingle();
-  if (!exam || !attempt) return;
-  if (!(await isStudentEligibleForExam(exam, examStudent, { allowPastWindow: true }))) {
-    showToast('لا يمكنك استكمال هذا الامتحان وفق بيانات الفرع أو البرنامج أو شروط الدور الثاني.', 'error');
+  const { data: result, error } = await sb.rpc('student_exam_resume_attempt', {
+    p_exam_id: examId, p_student_id: examStudent?.id,
+    p_phone: examStudentPhone, p_face_token: examFaceVerificationToken
+  });
+  if (error || !result?.ok) {
+    showToast(result?.reason === 'verification_required' ? 'انتهت صلاحية التحقق بالوجه. أعد تسجيل الدخول.' : 'تعذر استكمال الامتحان.', 'error');
     return;
   }
+  const exam = result.exam, attempt = result.attempt;
+  if (!exam || !attempt) return;
   if (attempt.status === 'submitted') {
     if (attempt.flagged_cheating) showToast('🚫 تم إلغاء هذا الامتحان مسبقًا بسبب اكتشاف محاولة غش — النتيجة: راسب', 'error');
     else showToast('لقد سلّمت هذا الامتحان من قبل', 'error');
@@ -4550,15 +4521,13 @@ async function resumeExam(examId) {
     showExamScreen('exam-select-screen');
     return;
   }
-
-  const { data: questions } = await sb.from('exam_questions')
-    .select('id,question_text,question_type,option_a,option_b,option_c,option_d,points,order_num')
-    .eq('exam_id', examId);
-
-  const orderIds = attempt.question_order || questions.map(q => q.id);
+  if (!(await isStudentEligibleForExam(exam, examStudent, { allowPastWindow: true, serverValidated: true }))) {
+    showToast('لا يمكنك استكمال هذا الامتحان وفق بيانات الفرع أو البرنامج أو شروط الدور الثاني.', 'error');
+    return;
+  }
   examCurrentExam = exam;
   examCurrentAttempt = attempt;
-  examQuestionsForStudent = orderIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
+  examQuestionsForStudent = result.questions || [];
   renderExamQuestionsForStudent(attempt.answers || {});
   showExamScreen('exam-active-screen');
   startExamTimer();
@@ -4598,15 +4567,16 @@ async function saveExamAnswer(questionId, value) {
   const answers = examCurrentAttempt.answers || {};
   answers[questionId] = value;
   examCurrentAttempt.answers = answers;
-  // تحديث الواجهة (تمييز الاختيار المحدد بصريًا)
   document.querySelectorAll(`input[name="q_${questionId}"]`).forEach(inp => {
     inp.closest('.exam-option-label').classList.toggle('selected', inp.checked);
   });
-  // حفظ تلقائي فوري في قاعدة البيانات مع إظهار الخطأ بدل فقد الإجابة بصمت.
-  const { error } = await sb.from('exam_attempts').update({ answers }).eq('id', examCurrentAttempt.id);
-  if (error) {
-    console.error('تعذر حفظ إجابة الامتحان:', error);
-    showToast('تعذر حفظ الإجابة على قاعدة البيانات: ' + error.message, 'error');
+  const { data: result, error } = await sb.rpc('student_exam_save_answers', {
+    p_attempt_id: examCurrentAttempt.id, p_student_id: examStudent?.id,
+    p_phone: examStudentPhone, p_face_token: examFaceVerificationToken, p_answers: answers
+  });
+  if (error || !result?.ok) {
+    console.error('تعذر حفظ إجابة الامتحان:', error || result?.reason);
+    showToast('تعذر حفظ الإجابة على قاعدة البيانات. تحقق من الاتصال قبل المتابعة.', 'error');
   }
 }
 
@@ -4684,41 +4654,24 @@ async function submitExam(autoSubmitted, cheatingDetected) {
   const effectiveAutoSubmit = !!autoSubmitted || Date.now() >= hardEnd;
   const timeTakenSeconds = Math.max(0, Math.round((Math.min(Date.now(), hardEnd) - startedAt) / 1000));
 
-  let score = 0, finalScore = 0, maxScore = examCurrentExam.total_score || 100;
-
-  if (cheatingDetected) {
-    // ✅ غش مكتشف: الدرجة صفر مباشرة، بدون حتى تصحيح الإجابات
-    score = 0; finalScore = 0;
-  } else {
-    // ✅ جلب الإجابات الصحيحة فقط الآن، وقت التسليم — لا تكون متاحة فى المتصفح قبل ذلك
-    const { data: correctData } = await sb.from('exam_questions').select('id,question_text,question_type,option_a,option_b,option_c,option_d,correct_answer,points').eq('exam_id', examCurrentExam.id);
-    let rawScore = 0, rawMax = 0;
-    (correctData || []).forEach(q => {
-      rawMax += parseFloat(q.points) || 1;
-      if (answers[q.id] && answers[q.id] === q.correct_answer) rawScore += parseFloat(q.points) || 1;
-    });
-    // تحويل الدرجة المحققة من نقاط الأسئلة إلى نسبة من الدرجة الكلية المستقلة للامتحان
-    finalScore = rawMax > 0 ? Math.round((rawScore / rawMax) * maxScore * 100) / 100 : 0;
-    score = finalScore;
-    examLastCorrectData = correctData || [];
-    examLastAnswers = answers;
-  }
-
-  const { error: submitSaveError } = await sb.from('exam_attempts').update({
-    answers, score: finalScore, max_score: maxScore,
-    submitted_at: new Date().toISOString(), status: 'submitted',
-    flagged_cheating: !!cheatingDetected, time_taken_seconds: timeTakenSeconds
-  }).eq('id', examCurrentAttempt.id);
-
-  if (submitSaveError) {
-    console.error('تعذر حفظ تسليم الامتحان:', submitSaveError);
-    showToast('تعذر حفظ تسليم الامتحان على قاعدة البيانات: ' + submitSaveError.message + ' — حاول إعادة الاتصال ثم استكمال المحاولة.', 'error');
+  let finalScore = 0, maxScore = examCurrentExam.total_score || 100;
+  const { data: submitResult, error: submitError } = await sb.rpc('student_exam_submit_attempt', {
+    p_attempt_id: examCurrentAttempt.id, p_student_id: examStudent?.id,
+    p_phone: examStudentPhone, p_face_token: examFaceVerificationToken,
+    p_answers: answers, p_cheating: !!cheatingDetected
+  });
+  if (submitError || !submitResult?.ok) {
+    console.error('تعذر حفظ تسليم الامتحان:', submitError || submitResult?.reason);
+    showToast('تعذر حفظ تسليم الامتحان: تحقق من اتصال الإنترنت وصلاحية التحقق بالوجه.', 'error');
     examSubmitLock = false;
     return;
   }
-
-  // لا نحدّث سجل الدرجات الرسمي إلا بعد تأكيد حفظ محاولة الامتحان بنجاح.
-  await syncExamScoreToGrades(examCurrentExam, examStudent.id, finalScore, cheatingDetected ? 'غشاش' : null);
+  finalScore = Number(submitResult.score) || 0;
+  maxScore = Number(submitResult.max_score) || maxScore;
+  cheatingDetected = !!submitResult.flagged_cheating;
+  examCurrentAttempt = { ...examCurrentAttempt, answers: submitResult.answers || answers, status: 'submitted', score: finalScore, max_score: maxScore, flagged_cheating: cheatingDetected };
+  examLastCorrectData = submitResult.correct_data || [];
+  examLastAnswers = submitResult.answers || answers;
 
   if (cheatingDetected) {
     document.getElementById('exam-result-emoji').textContent = '🚫';
@@ -12532,6 +12485,8 @@ let studentFaceContextType = 'student_portal';
 let studentFaceContextId = null;
 let weeklyQuizFaceToken = null;
 let examFaceVerifiedStudentId = null;
+let examFaceVerificationToken = null;
+let examStudentPhone = '';
 
 function showStudentPortalLoginStep() {
   stopStudentFaceCamera();
@@ -12726,6 +12681,8 @@ async function finishStudentFaceVerification(descriptor, contextType, contextId)
   stopStudentFaceCamera();
   if (contextType === 'exam_portal') {
     examFaceVerifiedStudentId = unifiedPortalStudent.id;
+    examFaceVerificationToken = data.token || null;
+    examStudentPhone = unifiedPortalPhone || '';
     document.getElementById('student-face-gate-overlay')?.remove();
     await examStudentLogin();
     return;
