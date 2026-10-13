@@ -13022,7 +13022,8 @@ async function loadWeeklyQuizSection() {
   const { data: answered } = await sb.from('quiz_answers').select('quiz_date,question_id').eq('student_id', weeklyQuizStudent.id);
   const answeredKeys = new Set((answered || []).map(a => a.quiz_date + '|' + a.question_id));
 
-  const { data: allQs } = await sb.from('quiz_bank_questions').select('*');
+  const { data: allQs, error: questionsError } = await sb.from('quiz_bank_questions').select('id,question,option_a,option_b,option_c,option_d,category,points,active,created_at');
+  if (questionsError) throw questionsError;
   const qMap = {}; (allQs || []).forEach(q => qMap[q.id] = q);
 
   weeklyQuizPendingList = [];
@@ -13107,6 +13108,7 @@ async function answerWeeklyQuizQuestion(selectedKey) {
   const q = item.question;
   let isCorrect = false;
   let pointsEarned = 0;
+  let correctOption = null;
   try {
     const { data, error } = await sb.rpc('weekly_quiz_submit_answer', {
       p_quiz_date: weeklyQuizCurrentDate,
@@ -13127,6 +13129,7 @@ async function answerWeeklyQuizQuestion(selectedKey) {
     }
     isCorrect = data.is_correct === true;
     pointsEarned = Number(data.points_earned || 0);
+    correctOption = data.correct_option || null;
   } catch (e) {
     console.error('Weekly quiz answer submission failed:', e);
     weeklyQuizAnswered = false;
@@ -13143,7 +13146,7 @@ async function answerWeeklyQuizQuestion(selectedKey) {
       <div style="font-size:40px;margin-bottom:8px;">${selectedKey === null ? '⏰' : (isCorrect ? '🎉' : '❌')}</div>
       <h3 style="color:${isCorrect ? '#16a34a' : '#dc2626'};">${selectedKey === null ? 'خلص الوقت!' : (isCorrect ? '+' + pointsEarned + ' نقطة!' : 'إجابة غلط')}</h3>
       <div style="background:#f0fdf4;border:1px solid #16a34a55;border-radius:8px;padding:10px;font-size:13px;color:#16a34a;font-weight:700;margin-top:10px;">
-        ✅ الإجابة الصحيحة: ${escapeHtml(options[q.correct_option])}
+        ✅ الإجابة الصحيحة: ${escapeHtml(options[correctOption])}
       </div>
       <button class="btn btn-gold" style="width:100%;padding:12px;margin-top:16px;" onclick="loadWeeklyQuizSection()">متابعة ➜</button>
     </div>`;
