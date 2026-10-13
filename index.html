@@ -13105,28 +13105,36 @@ async function answerWeeklyQuizQuestion(selectedKey) {
 
   const item = weeklyQuizPendingList.find(p => p.quiz_date === weeklyQuizCurrentDate);
   const q = item.question;
-  const isCorrect = selectedKey === q.correct_option;
-  const pointsEarned = isCorrect ? (q.points || 10) : 0;
-
-  await sb.from('quiz_answers').upsert({
-    quiz_date: weeklyQuizCurrentDate, student_id: weeklyQuizStudent.id, question_id: q.id,
-    selected_option: selectedKey, is_correct: isCorrect, points_earned: pointsEarned,
-    face_verification_token: weeklyQuizFaceToken
-  }, { onConflict: 'quiz_date,student_id,question_id' });
-
-  if (pointsEarned > 0) {
-    const weekStart = getWeekStartDate(new Date());
-    const { data: existing } = await sb.from('quiz_weekly_scores').select('*').eq('student_id', weeklyQuizStudent.id).eq('week_start', weekStart).maybeSingle();
-    if (existing) {
-      await sb.from('quiz_weekly_scores').update({
-        total_points: existing.total_points + pointsEarned, correct_count: existing.correct_count + 1, updated_at: new Date().toISOString()
-      }).eq('id', existing.id);
-    } else {
-      await sb.from('quiz_weekly_scores').insert({
-        student_id: weeklyQuizStudent.id, student_name: weeklyQuizStudent.name, week_start: weekStart,
-        total_points: pointsEarned, correct_count: 1
-      });
+  let isCorrect = false;
+  let pointsEarned = 0;
+  try {
+    const { data, error } = await sb.rpc('weekly_quiz_submit_answer', {
+      p_quiz_date: weeklyQuizCurrentDate,
+      p_student_id: weeklyQuizStudent.id,
+      p_question_id: q.id,
+      p_selected_option: selectedKey,
+      p_face_token: weeklyQuizFaceToken
+    });
+    if (error) throw error;
+    if (!data?.ok) {
+      const messages = {
+        face_verification_required: 'انتهت صلاحية التحقق أو سجل الدخول غير موجود. اخرج من المسابقة وأعد التحقق بالوجه.',
+        question_not_scheduled: 'السؤال غير مدرج في جلسة المسابقة الحالية.',
+        already_answered: 'تم تسجيل إجابتك عن هذا السؤال بالفعل.',
+        question_unavailable: 'السؤال غير متاح حاليًا.'
+      };
+      throw new Error(messages[data?.reason] || 'تعذر تسجيل الإجابة في قاعدة البيانات.');
     }
+    isCorrect = data.is_correct === true;
+    pointsEarned = Number(data.points_earned || 0);
+  } catch (e) {
+    console.error('Weekly quiz answer submission failed:', e);
+    weeklyQuizAnswered = false;
+    document.querySelectorAll('#weekly-quiz-options button').forEach(b => b.disabled = false);
+    document.getElementById('weekly-quiz-content').insertAdjacentHTML('afterbegin',
+      '<div role="alert" style="margin:8px 0;padding:10px;border-radius:8px;background:#fef2f2;color:#991b1b;">' +
+      escapeHtml(e?.message || 'تعذر حفظ الإجابة. حاول مرة أخرى.') + '</div>');
+    return;
   }
 
   const options = { a: q.option_a, b: q.option_b, c: q.option_c, d: q.option_d };
