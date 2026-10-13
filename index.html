@@ -3867,43 +3867,58 @@ let ppPortalData = null;
 let ppPortalPhone = '';
 
 async function parentPortalLogin() {
-  const id = document.getElementById('pp-student-id').value.trim();
-  const phone = sanitizePhone(document.getElementById('pp-phone').value.trim());
+  const id = document.getElementById('pp-student-id')?.value?.trim() || '';
+  const phone = sanitizePhone(document.getElementById('pp-phone')?.value?.trim() || '');
   const errEl = document.getElementById('pp-login-error');
-  errEl.style.display = 'none';
-  if (!id || !phone) { errEl.textContent = 'ادخل رقم القيد ورقم الهاتف'; errEl.style.display = 'block'; return; }
-
-  // بوابة ولي الأمر لا تقرأ جدول الطلاب مباشرة من المتصفح؛ لأن RLS يمنع القراءة العامة.
-  // يتم التحقق من رقم القيد + الهاتف داخل دالة آمنة في Supabase ثم ترجع بيانات الطالب المطلوبة فقط.
-  const { data, error } = await sb.rpc('parent_portal_get_data', {
-    p_student_id: id,
-    p_phone: phone
-  });
-
-  if (error || !data || !data.student) {
-    console.error('Parent portal login error:', error);
-    errEl.textContent = error?.message?.toLowerCase().includes('function')
-      ? 'بوابة ولي الأمر تحتاج تشغيل كود الإعداد الخاص بها في Supabase أولاً'
-      : 'رقم القيد أو رقم الهاتف غير صحيح';
-    errEl.style.display = 'block';
+  const loginBtn = document.querySelector('#pp-login-screen button[onclick="parentPortalLogin()"]');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  if (!id || !phone) {
+    if (errEl) { errEl.textContent = 'ادخل رقم القيد ورقم الهاتف'; errEl.style.display = 'block'; }
     return;
   }
-
-  ppPortalData = data;
-  ppStudent = data.student;
-  ppPortalPhone = phone;
+  if (loginBtn) { loginBtn.disabled = true; loginBtn.dataset.originalText = loginBtn.textContent; loginBtn.textContent = 'جاري التحقق وتحميل البيانات...'; }
   try {
-    const rankingResult = await sb.rpc('student_portal_get_ranking', { p_student_id: id, p_phone: phone });
-    if (!rankingResult.error && rankingResult.data && rankingResult.data.verified) ppPortalData.ranking = rankingResult.data;
-  } catch (rankingErr) { console.warn('Parent portal ranking unavailable', rankingErr); }
-  if (data.program_fees != null) {
-    allPrograms = [{ id: ppStudent.program_id, fees: data.program_fees }];
+    // التحقق من رقم القيد والهاتف داخل RPC آمنة؛ لا نقرأ بيانات الطالب مباشرة قبل التحقق.
+    const { data, error } = await sb.rpc('parent_portal_get_data', {
+      p_student_id: id,
+      p_phone: phone
+    });
+    if (error) throw error;
+    if (!data || !data.student) {
+      if (errEl) { errEl.textContent = 'رقم القيد أو رقم الهاتف غير صحيح'; errEl.style.display = 'block'; }
+      return;
+    }
+
+    ppPortalData = data;
+    ppStudent = data.student;
+    ppPortalPhone = phone;
+    // الترتيب ميزة إضافية؛ فتعذّر تحميله لا يمنع ولي الأمر من رؤية درجات الطالب ومدفوعاته.
+    try {
+      const rankingResult = await sb.rpc('student_portal_get_ranking', { p_student_id: id, p_phone: phone });
+      if (!rankingResult.error && rankingResult.data && rankingResult.data.verified) ppPortalData.ranking = rankingResult.data;
+      else if (rankingResult.error) console.warn('Parent portal ranking unavailable:', rankingResult.error);
+    } catch (rankingErr) { console.warn('Parent portal ranking unavailable:', rankingErr); }
+    if (data.program_fees != null) allPrograms = [{ id: ppStudent.program_id, fees: data.program_fees }];
+    allSubjectsCacheForPortal2 = data.subjects || [];
+    document.getElementById('pp-login-screen').style.display = 'none';
+    document.getElementById('pp-dashboard-screen').style.display = 'block';
+    await renderParentPortalDashboard();
+    if (typeof loadParentPortalRequests === 'function') await loadParentPortalRequests();
+  } catch (e) {
+    console.error('Parent portal login failed:', e);
+    if (errEl) {
+      const msg = String(e?.message || '');
+      errEl.textContent = msg.toLowerCase().includes('function') || msg.toLowerCase().includes('schema cache')
+        ? 'خدمة بوابة ولي الأمر غير جاهزة في قاعدة البيانات. راجع إعدادات Supabase.'
+        : 'تعذر الاتصال بقاعدة البيانات. تحقق من الإنترنت ثم حاول مرة أخرى.';
+      errEl.style.display = 'block';
+    }
+    ppStudent = null; ppPortalData = null; ppPortalPhone = '';
+    document.getElementById('pp-dashboard-screen').style.display = 'none';
+    document.getElementById('pp-login-screen').style.display = 'block';
+  } finally {
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = loginBtn.dataset.originalText || 'دخول'; delete loginBtn.dataset.originalText; }
   }
-  allSubjectsCacheForPortal2 = data.subjects || [];
-  document.getElementById('pp-login-screen').style.display = 'none';
-  document.getElementById('pp-dashboard-screen').style.display = 'block';
-  await renderParentPortalDashboard();
-  if (typeof loadParentPortalRequests === 'function') await loadParentPortalRequests();
 }
 
 function parentPortalLogout() {
