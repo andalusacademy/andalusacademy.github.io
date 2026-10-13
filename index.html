@@ -6061,7 +6061,10 @@ function updateStudentsBranchCounts() {
   if (b) b.textContent = 'عدد الطلاب: ' + count('فرع اسكندرية');
 }
 function renderStudents(list) {
-  const fullData = list || getFilteredStudents();
+  // ترتيب قائمة الطلاب حسب رقم القيد ترتيبًا طبيعيًا رقميًا (4001، 4002، 40010 لا كنصوص).
+  const fullData = [...(list || getFilteredStudents())].sort((a, b) =>
+    String(a.id ?? '').localeCompare(String(b.id ?? ''), 'ar', { numeric: true, sensitivity: 'base' })
+  );
   document.getElementById('student-count').textContent = fullData.length + ' طالب';
   updateStudentsBranchCounts();
   const tbody = document.getElementById('students-table');
