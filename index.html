@@ -11770,40 +11770,83 @@ function renderExamGradesOverview() {
 }
 
 async function saveExamGradesOverview() {
-  const inputs = document.querySelectorAll('.exam-grade-grid-input');
+  const inputs = [...document.querySelectorAll('.exam-grade-grid-input')];
   if (!inputs.length) { showToast('لا توجد درجات لإدخالها', 'info'); return; }
   const records = [];
+  const expected = [];
   let invalidCount = 0;
+  const seenPairs = new Set();
+  const existingRows = Array.isArray(allGradesOverviewData) ? allGradesOverviewData : [];
   inputs.forEach(inp => {
     const value = inp.value.trim();
     const round = Number(inp.dataset.round);
+    const studentId = String(inp.dataset.student || '').trim();
+    const subjectId = String(inp.dataset.subject || '').trim();
     const max = Number(inp.max);
+    const pairKey = studentId + '::' + subjectId;
+    if (!studentId || !subjectId || ![1, 2].includes(round) || seenPairs.has(pairKey)) {
+      inp.classList.add('invalid');
+      invalidCount++;
+      return;
+    }
     if (value !== '' && (!Number.isFinite(Number(value)) || Number(value) < 0 || (Number.isFinite(max) && Number(value) > max))) {
       inp.classList.add('invalid');
       invalidCount++;
       return;
     }
     inp.classList.remove('invalid');
-    const rec = { student_id: inp.dataset.student, subject_id: inp.dataset.subject, updated_at: new Date().toISOString() };
+    seenPairs.add(pairKey);
+    const old = existingRows.find(g => String(g.student_id) === studentId && String(g.subject_id) === subjectId) || {};
+    const rec = {
+      student_id: studentId,
+      subject_id: subjectId,
+      grade_1: old.grade_1 ?? null,
+      grade_2: old.grade_2 ?? null,
+      grade_1_source: old.grade_1_source ?? null,
+      grade_2_source: old.grade_2_source ?? null,
+      grade_1_note: old.grade_1_note ?? null,
+      grade_2_note: old.grade_2_note ?? null,
+      updated_at: new Date().toISOString()
+    };
+    if (old.id) rec.id = old.id;
     rec[round === 1 ? 'grade_1' : 'grade_2'] = value === '' ? null : Number(value);
     rec[round === 1 ? 'grade_1_source' : 'grade_2_source'] = value === '' ? null : 'paper';
     records.push(rec);
+    expected.push({ student_id: studentId, subject_id: subjectId, column: round === 1 ? 'grade_1' : 'grade_2', value: value === '' ? null : Number(value) });
   });
   if (invalidCount) {
-    showToast('راجع الدرجات المحددة بالأحمر: الدرجة لا يمكن أن تقل عن صفر أو تتجاوز الدرجة العظمى.', 'error');
+    showToast('راجع الخانات المحددة بالأحمر: تحقق من الطالب والمادة، ومن أن الدرجة بين صفر والدرجة العظمى.', 'error');
     return;
   }
-  let failed = 0;
-  for (const rec of records) {
-    const { error } = await sb.from('grades').upsert(rec, { onConflict: 'student_id,subject_id' });
-    if (error) { console.error(error); failed++; }
-  }
-  if (failed) {
-    showToast(`تم الحفظ مع ${failed} خطأ — راجع الاتصال وقاعدة البيانات`, 'error');
-  } else {
-    await logActivity('edit', `حفظ درجات ${examGradesRound === 1 ? 'الدور الأول' : 'الدور الثاني'} من شاشة درجات الامتحانات`);
-    showToast('✅ تم حفظ الدرجات بنجاح');
+  const saveBtn = document.querySelector('button[onclick="saveExamGradesOverview()"]');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.dataset.originalText = saveBtn.textContent; saveBtn.textContent = 'جاري الحفظ والتحقق...'; }
+  try {
+    const { error: saveError } = await sb.from('grades').upsert(records, { onConflict: 'student_id,subject_id' });
+    if (saveError) throw saveError;
+
+    // لا نعلن نجاح الحفظ إلا بعد إعادة قراءة القيم من قاعدة البيانات ومطابقتها.
+    const studentIds = [...new Set(expected.map(x => x.student_id))];
+    const subjectIds = [...new Set(expected.map(x => x.subject_id))];
+    const { data: savedRows, error: verifyError } = await sb.from('grades')
+      .select('student_id,subject_id,grade_1,grade_2')
+      .in('student_id', studentIds)
+      .in('subject_id', subjectIds);
+    if (verifyError) throw verifyError;
+    const savedMap = new Map((savedRows || []).map(g => [String(g.student_id) + '::' + String(g.subject_id), g]));
+    const mismatches = expected.filter(x => {
+      const row = savedMap.get(x.student_id + '::' + x.subject_id);
+      const actual = row ? row[x.column] : null;
+      return x.value == null ? actual != null : actual == null || Number(actual) !== x.value;
+    });
+    if (mismatches.length) throw new Error('لم يتم تأكيد حفظ ' + mismatches.length + ' درجة بعد إعادة القراءة من قاعدة البيانات.');
+    try { await logActivity('edit', `حفظ درجات ${examGradesRound === 1 ? 'الدور الأول' : 'الدور الثاني'} من شاشة درجات الامتحانات`); } catch (logErr) { console.warn('Grade save activity log failed', logErr); }
+    showToast('✅ تم حفظ الدرجات والتحقق منها داخل قاعدة البيانات');
     await loadExamGradesOverview();
+  } catch (e) {
+    console.error('Exam grades save/verify failed:', e);
+    showToast('❌ لم يتم تأكيد حفظ الدرجات في قاعدة البيانات: ' + (e?.message || 'خطأ غير معروف'), 'error');
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '💾 حفظ الدرجات'; delete saveBtn.dataset.originalText; }
   }
 }
 
