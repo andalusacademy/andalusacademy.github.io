@@ -1,0 +1,1 @@
+REVOKE ALL PRIVILEGES ON TABLE public.procedures FROM anon, PUBLIC;
