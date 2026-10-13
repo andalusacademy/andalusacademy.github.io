@@ -3591,11 +3591,12 @@ async function doLogout() {
     return;
   }
 
-  // ✅ بوابة المسابقة الأسبوعية المستقلة — دخول برقم القيد مع صورة تدقيق بموافقة الطالب
+  // بوابة المسابقة الأسبوعية: تحقق موحد من رقم القيد والهاتف وبصمة الوجه.
+  // لا نسمح بمسار دخول مستقل يتجاوز التحقق من الهوية.
   if (new URLSearchParams(window.location.search).get('weekly-quiz') === '1') {
     document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('weekly-quiz-screen').style.display = 'block';
-    showWeeklyQuizEntryLogin();
+    document.getElementById('student-portal-screen').style.display = 'block';
+    showStudentPortalLoginStep();
     return;
   }
   await loadSystemName();
@@ -12539,7 +12540,8 @@ async function enterStudentPortal() {
     if (!faceStatus?.verified) throw new Error('رقم الهاتف غير مطابق للهاتف المسجل لدى المركز');
     unifiedPortalStudent = student;
     unifiedPortalPhone = phone;
-    renderStudentFaceGate(!faceStatus.enrolled);
+    const weeklyEntry = new URLSearchParams(window.location.search).get('weekly-quiz') === '1';
+    renderStudentFaceGate(!faceStatus.enrolled, weeklyEntry ? 'weekly_quiz' : 'student_portal');
   } catch (e) {
     if(errEl) { errEl.textContent = e.message || 'تعذر التحقق من البيانات'; errEl.style.display='block'; }
     else showToast(e.message || 'تعذر التحقق من البيانات','error');
@@ -12770,9 +12772,15 @@ function getWeekStartDate(d) {
 
 async function goToPortalWeeklyQuiz() {
   stopWeeklyQuizAuditCamera();
-  document.getElementById('student-portal-screen').style.display = 'none';
-  document.getElementById('weekly-quiz-screen').style.display = 'block';
-  showWeeklyQuizEntryLogin(unifiedPortalStudent?.id || '');
+  if (!unifiedPortalStudent || !unifiedPortalPhone) {
+    document.getElementById('student-portal-screen').style.display = 'block';
+    showStudentPortalLoginStep();
+    return;
+  }
+  // كل دخول للمسابقة الأسبوعية يعيد التحقق من الوجه ويصدر رمز جلسة محدود المدة.
+  document.getElementById('weekly-quiz-screen').style.display = 'none';
+  document.getElementById('student-portal-screen').style.display = 'block';
+  renderStudentFaceGate(false, 'weekly_quiz');
 }
 
 let weeklyQuizAuditStream = null;
