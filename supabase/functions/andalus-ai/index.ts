@@ -32,8 +32,7 @@ async function auth(req:Request){
 
  if(pe)throw Error("تعذر التحقق من الصلاحيات.");
  if(!p || p.is_active===false)throw Error("الحساب غير نشط أو لا يملك ملف صلاحيات.");
- if(p.role!=="admin" && (!Array.isArray(p.allowed_pages) || !p.allowed_pages.includes("dashboard")))
-   throw Error("ليس لديك صلاحية استخدام Andalus AI.");
+ if(p.role!=="admin")throw Error("Andalus AI متاح لحساب المدير فقط لحماية بيانات المركز.");
 
  return {user,profile:p,db};
 }
