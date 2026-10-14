@@ -146,21 +146,36 @@ function wireDemoInteractions(){
  }));
 }
 function renderLivePreview(){
- const chosen=[...document.querySelectorAll('input[type=checkbox]:checked')];
+ const all=[...document.querySelectorAll('input[type=checkbox][data-name]')];
+ const chosen=all.filter(c=>c.checked);
  const name=document.getElementById("centerName").value.trim();
  document.getElementById("mockCenterName").textContent=name||"اسم المركز يظهر هنا";
  document.getElementById("mockWelcome").textContent=name?"أهلاً بيك في "+name:"أهلاً بيك في نظامك";
  document.getElementById("mockFeatureCount").textContent=chosen.length;
  document.getElementById("mockGroupCount").textContent=new Set(chosen.map(x=>x.dataset.group)).size;
  const nav=document.getElementById("mockNav");nav.innerHTML="";
- if(!chosen.length){nav.innerHTML='<div class="empty-preview">اختار وظيفة من الكتالوج علشان تظهر هنا</div>';document.getElementById("mockSelectedIcon").textContent="✦";document.getElementById("mockSelectedTitle").textContent="ابدأ بتخصيص نظامك";document.getElementById("mockSelectedDesc").textContent="اختياراتك هتظهر في المعاينة دي.";document.getElementById("mockFeatureDemo").innerHTML="";return}
- chosen.forEach((c,i)=>{const b=document.createElement("button");b.type="button";b.innerHTML='<span class="feature-icon">'+(featureIcons[c.dataset.name]||"🧩")+'</span><span>'+c.dataset.name+'</span>';b.className=i===0?"active":"";b.addEventListener("click",()=>{nav.querySelectorAll("button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.getElementById("mockSelectedIcon").textContent=featureIcons[c.dataset.name]||"🧩";document.getElementById("mockSelectedTitle").textContent=c.dataset.name;document.getElementById("mockSelectedDesc").textContent="معاينة توضيحية — الفئة "+c.dataset.group;document.getElementById("mockFeatureDemo").innerHTML=demoMarkup(c.dataset.name);
-  wireDemoInteractions();});nav.appendChild(b)});
- document.getElementById("mockSelectedIcon").textContent=featureIcons[chosen[0].dataset.name]||"🧩";
- document.getElementById("mockSelectedTitle").textContent=chosen[0].dataset.name;
- document.getElementById("mockSelectedDesc").textContent="معاينة توضيحية — الفئة "+chosen[0].dataset.group;
- document.getElementById("mockFeatureDemo").innerHTML=demoMarkup(chosen[0].dataset.name);
- wireDemoInteractions();
+ const title=document.getElementById("mockSelectedTitle"),desc=document.getElementById("mockSelectedDesc"),icon=document.getElementById("mockSelectedIcon"),demo=document.getElementById("mockFeatureDemo");
+ if(!all.length){nav.innerHTML='<div class="empty-preview">مفيش مميزات في الكتالوج</div>';return}
+ const showFeature=c=>{
+   nav.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x.dataset.featureName===c.dataset.name));
+   const isOn=c.checked,group=c.dataset.group;
+   icon.textContent=featureIcons[c.dataset.name]||"🧩";
+   title.textContent=c.dataset.name;
+   desc.textContent=isOn?"مفعّلة ضمن الاختيارات الحالية — الفئة "+group:"غير مفعّلة في الاختيارات الحالية — الفئة "+group;
+   demo.innerHTML=demoMarkup(c.dataset.name);
+   if(!isOn){
+     const note=document.createElement("div");note.className="notice";note.style.margin="10px";note.innerHTML='<strong>الميزة غير مفعّلة في الباقة المختارة.</strong><br>دي معاينة توضيحية لشكل الميزة. لإتاحتها للعميل، اختارها من قائمة المميزات وراجع الفئة المطلوبة والسعر قبل اعتماد الباقة.';
+     demo.appendChild(note);
+   }
+   wireDemoInteractions();
+ };
+ all.forEach(c=>{
+   const b=document.createElement("button");b.type="button";b.dataset.featureName=c.dataset.name;
+   b.innerHTML='<span class="feature-icon">'+(featureIcons[c.dataset.name]||"🧩")+'</span><span>'+c.dataset.name+'</span><small style="display:block;font-size:9px;opacity:.8">الفئة '+c.dataset.group+(c.checked?' · مختارة':' · غير مفعّلة')+'</small>';
+   b.className="";
+   b.addEventListener("click",()=>showFeature(c));nav.appendChild(b);
+ });
+ showFeature(chosen[0]||all[0]);
 }
 document.getElementById("centerName").addEventListener("input",renderLivePreview);
 document.addEventListener("change",e=>{if(e.target.matches('input[type=checkbox]'))renderLivePreview()});
