@@ -77,7 +77,7 @@ function demoMarkup(name){
    '<button type="button" class="profile-tab" data-tab="grades">📝 الدرجات</button>'+
    '<button type="button" class="profile-tab" data-tab="payments">💳 المصروفات</button>'+
    '<button type="button" class="profile-tab" data-tab="files">📎 الملفات</button></div>'+
-   '<div class="profile-panel" data-panel="data"><div class="profile-form">'+
+   '<div class="profile-panel" data-panel="data"><div style="display:flex;gap:8px;align-items:center;padding:12px;background:#fff;border-bottom:1px solid #e5eaf2"><div style="width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#e6edf8;font-size:22px">👨‍🎓</div><div style="flex:1;min-width:0"><strong style="display:block;font-size:12px">أحمد محمد علي</strong><small style="display:block;color:#68758b;font-size:10px">رقم القيد: AND-1024 · مساعد خدمات صحية</small></div><button type="button" class="secondary" data-profile-action="call">📞 اتصال</button><button type="button" class="secondary" data-profile-action="whatsapp">واتساب</button></div><div class="profile-form">'+
    '<label>اسم الطالب<input data-field="studentName" placeholder="اكتب اسمًا تجريبيًا" value="أحمد محمد علي"></label>'+
    '<label>رقم القيد<input data-field="studentCode" placeholder="مثال: AND-1024" value="AND-1024"></label>'+
    '<label>الرقم القومي<input data-field="nationalId" inputmode="numeric" maxlength="14" placeholder="14 رقمًا تجريبيًا"></label>'+
@@ -114,6 +114,7 @@ function safeExamText(value){return String(value||"").replace(/[&<>"]/g,c=>({"&"
 function wireDemoInteractions(){
  const root=document.getElementById("mockFeatureDemo");
  if(!root)return;
+ root.querySelectorAll("[data-profile-action]").forEach(btn=>btn.addEventListener("click",()=>{const msg=root.querySelector(".profile-panel[data-panel=\"data\"] [data-message]");if(msg)msg.textContent=btn.dataset.profileAction==="whatsapp"?"زر واتساب تجريبي: في النظام الفعلي يُربط برقم الطالب أو ولي الأمر وإعدادات الرسائل.":"زر اتصال تجريبي: في النظام الفعلي يستخدم رقم الهاتف المسجل للطالب.";}));
  root.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{
   root.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===btn));
   root.querySelectorAll("[data-panel]").forEach(panel=>panel.hidden=panel.dataset.panel!==btn.dataset.tab);
