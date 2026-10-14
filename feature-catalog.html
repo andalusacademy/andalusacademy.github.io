@@ -17,6 +17,22 @@ aside{position:sticky;top:12px;background:white;border:1px solid var(--line);bor
 footer{padding:28px 0 45px;color:var(--muted);font-size:12px}
 @media(max-width:850px){.layout{grid-template-columns:1fr}aside{position:static;order:-1}.items{grid-template-columns:1fr}.builder{grid-template-columns:1fr}.mock-body{grid-template-columns:112px minmax(0,1fr)}}
 @media print{header{background:white;color:black;padding:10px 0}header p{color:#333}.tools,aside,.notice button{display:none}.layout{display:block}.group{break-inside:avoid;box-shadow:none}.items{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.profile-demo{margin-top:12px;background:#fff;border:1px solid #dfe6f0;border-radius:12px;overflow:hidden}
+.profile-toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:#f5f7fb;border-bottom:1px solid #e5eaf2}
+.profile-tab{font-size:10px;padding:7px 9px;background:#fff;border:1px solid #dce3ee;border-radius:8px;color:#34445f}
+.profile-tab.active{background:#203b67;color:#fff;border-color:#203b67}
+.profile-form{padding:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.profile-form label{font-size:10px;color:#59657a;display:block}
+.profile-form input,.profile-form select{width:100%;min-width:0;margin-top:3px;padding:7px;border:1px solid #d8e0ec;border-radius:7px;font:inherit;font-size:11px;background:#fff;color:#172033}
+.profile-actions{display:flex;gap:6px;flex-wrap:wrap;padding:0 10px 10px}
+.profile-actions button{font-size:10px;padding:7px 9px}
+.profile-message{padding:0 10px 10px;color:#68758b;font-size:10px}
+.branch-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.branch-card{border:1px solid #e0e6f0;border-radius:10px;padding:10px;background:#fff;text-align:right;color:#172033}
+.branch-card strong,.branch-card small{display:block}.branch-card strong{font-size:11px}.branch-card small{font-size:9px;color:#68758b}
+.demo-action{background:#203b67;color:white;border:0;border-radius:7px}
+@media(max-width:600px){.profile-form{grid-template-columns:1fr}.branch-grid{grid-template-columns:1fr}}
 </style></head>
 <body>
 <header><div class="wrap"><h1>كتالوج مميزات نظام إدارة الأكاديميات ومراكز التدريب</h1><p>اختر المميزات المطلوبة، وراجع الاختيارات في القائمة الجانبية، ثم احفظ ملخص الاختيارات أو اطبعه.</p></div></header>
@@ -47,9 +63,76 @@ document.getElementById("clear").addEventListener("click",()=>{document.querySel
 document.getElementById("export").addEventListener("click",()=>{const chosen=[...document.querySelectorAll('input[type=checkbox]:checked')];const lines=["ملخص اختيار مميزات نظام إدارة الأكاديميات","تاريخ الإنشاء: "+new Date().toLocaleDateString("ar-EG"),"عدد المميزات المختارة: "+chosen.length,"","التصنيف مبدئي والأسعار غير مضافة في هذه المرحلة.",""];groups.forEach(g=>{const names=chosen.filter(c=>c.dataset.group===g.key).map(c=>"☐ "+c.dataset.name);if(names.length){lines.push(g.title);lines.push(...names);lines.push("")}});const blob=new Blob(["\ufeff"+lines.join("\n")],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="اختيارات-كتالوج-المميزات.txt";a.click();URL.revokeObjectURL(a.href)});
 const featureIcons={"إدارة الطلاب":"👨‍🎓","إدارة الفروع":"🏢","إدارة البرامج والكورسات":"📚","المواد الدراسية":"📖","جدول الكورسات والمحاضرات":"🗓️","الحضور والغياب":"🕒","إدارة المدفوعات والأقساط":"💳","إدارة المصروفات":"🧾","الموظفون":"👥","صلاحيات المستخدمين":"🔐","لوحة التحكم الرئيسية":"📊","التقارير الأساسية":"📈","تصدير بيانات الطلاب":"📤","سجل النشاط":"🧭","إعدادات النظام":"⚙️","الامتحانات الإلكترونية":"📝","درجات الامتحانات":"🎯","ملف الطالب التفصيلي":"🗂️","بوابة الطالب":"🎓","بوابة ولي الأمر":"👪","أكواد QR للطلاب":"▦","الشكاوى والطلبات":"🎫","مركز التنبيهات":"🔔","Andalus AI":"🤖","إنجازات المتدربين":"🏅","ترتيب المتدربين":"🏆","المسابقات":"🥇","هوية بصرية باسم العميل":"🎨","رسائل واتساب للطلاب":"💬","تهنئة أعياد الميلاد":"🎂"};
 function demoMarkup(name){
- if(name==="إدارة الطلاب"||name==="ملف الطالب التفصيلي") return '<div class="mock-placeholder" style="margin-top:10px"><span>👨‍🎓</span><div><strong>ملف طالب تجريبي</strong><small>بيانات وهمية للمعاينة فقط</small></div></div><table class="demo-table"><tr><th>اسم الطالب</th><th>رقم القيد</th><th>الحالة</th></tr><tr><td>أحمد محمد علي</td><td>AND-1024</td><td>منتظم</td></tr><tr><td>مريم محمود حسن</td><td>AND-1025</td><td>منتظمة</td></tr><tr><td>يوسف إبراهيم</td><td>AND-1026</td><td>منتظم</td></tr></table><div style="margin-top:8px"><span class="demo-chip">البيانات</span><span class="demo-chip">المصروفات</span><span class="demo-chip">الدرجات</span><span class="demo-chip">الحضور</span><span class="demo-chip">الملفات</span><span class="demo-chip">سجل التواصل</span></div>';
- if(name.includes("واتساب")||name.includes("تهنئة")) return '<div class="mock-placeholder" style="margin-top:10px"><span>💬</span><div><strong>رسالة تجريبية</strong><small>معاينة يدوية فقط — لا يتم إرسال رسائل فعلية</small></div></div><div class="demo-table" style="padding:10px">أهلًا أحمد، نتمنى لك يومًا سعيدًا 🌟</div>';
+ const safe = s => String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+ if(name==="إدارة الطلاب"||name==="ملف الطالب التفصيلي"){
+  return '<div class="profile-demo" id="studentProfileDemo"><div class="profile-toolbar">'+
+   '<button type="button" class="profile-tab active" data-tab="data">👤 بيانات الطالب</button>'+
+   '<button type="button" class="profile-tab" data-tab="attendance">🕒 الحضور</button>'+
+   '<button type="button" class="profile-tab" data-tab="grades">📝 الدرجات</button>'+
+   '<button type="button" class="profile-tab" data-tab="payments">💳 المصروفات</button>'+
+   '<button type="button" class="profile-tab" data-tab="files">📎 الملفات</button></div>'+
+   '<div class="profile-panel" data-panel="data"><div class="profile-form">'+
+   '<label>اسم الطالب<input data-field="studentName" placeholder="اكتب اسمًا تجريبيًا" value="أحمد محمد علي"></label>'+
+   '<label>رقم القيد<input data-field="studentCode" placeholder="مثال: AND-1024" value="AND-1024"></label>'+
+   '<label>الرقم القومي<input data-field="nationalId" inputmode="numeric" maxlength="14" placeholder="14 رقمًا تجريبيًا"></label>'+
+   '<label>رقم التليفون<input data-field="phone" inputmode="tel" placeholder="01xxxxxxxxx"></label>'+
+   '<label>الفرع<select data-field="branch"><option>كفر الدوار</option><option>دمنهور</option><option>الإسكندرية</option><option>فرع تجريبي آخر</option></select></label>'+
+   '<label>البرنامج<select data-field="program"><option>مساعد خدمات صحية</option><option>مساعد معمل</option><option>برنامج تجريبي</option></select></label>'+
+   '<label>حالة القيد<select data-field="status"><option>منتظم</option><option>موقوف</option><option>خريج</option></select></label>'+
+   '<label>تاريخ التسجيل<input data-field="enrollDate" type="date"></label></div>'+
+   '<div class="profile-actions"><button type="button" class="demo-action" data-action="save">حفظ داخل المعاينة</button><button type="button" class="secondary" data-action="reset">إعادة البيانات التجريبية</button></div>'+
+   '<div class="profile-message" data-message>كل الحقول تجريبية؛ الحفظ هنا لا يرسل البيانات ولا يحفظها في السيستم.</div></div>'+
+   '<div class="profile-panel" data-panel="attendance" hidden><div class="mock-stats"><div><b>18</b><small>أيام حضور</small></div><div><b>2</b><small>أيام غياب</small></div><div><b>90%</b><small>نسبة الحضور</small></div></div><table class="demo-table"><tr><th>التاريخ</th><th>المحاضرة</th><th>الحالة</th></tr><tr><td>12/10/2026</td><td>أساسيات التمريض</td><td>حاضر</td></tr><tr><td>10/10/2026</td><td>الإسعافات الأولية</td><td>حاضر</td></tr><tr><td>08/10/2026</td><td>مصطلحات طبية</td><td>غائب</td></tr></table></div>'+
+   '<div class="profile-panel" data-panel="grades" hidden><table class="demo-table"><tr><th>المادة</th><th>النهاية</th><th>الدرجة</th><th>النتيجة</th></tr><tr><td>أساسيات التمريض</td><td>100</td><td>86</td><td>ناجح</td></tr><tr><td>مصطلحات طبية</td><td>50</td><td>42</td><td>ناجح</td></tr><tr><td>إسعافات أولية</td><td>100</td><td>—</td><td>لم يُرصد</td></tr></table></div>'+
+   '<div class="profile-panel" data-panel="payments" hidden><table class="demo-table"><tr><th>البند</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th></tr><tr><td>رسوم البرنامج</td><td>7500 ج.م</td><td>5000 ج.م</td><td>2500 ج.م</td></tr><tr><td>الملف</td><td>350 ج.م</td><td>350 ج.م</td><td>0 ج.م</td></tr></table></div>'+
+   '<div class="profile-panel" data-panel="files" hidden><div class="profile-form"><label>بطاقة الطالب<input type="text" value="متاحة تجريبيًا" readonly></label><label>المستندات<input type="text" value="لا توجد ملفات فعلية" readonly></label></div></div></div>';
+ }
+ if(name==="إدارة الفروع"){
+  return '<div class="branch-grid">'+
+   '<button type="button" class="branch-card" data-branch="كفر الدوار"><span style="font-size:22px">🏢</span><strong>فرع كفر الدوار</strong><small>طلاب · حضور · مدفوعات</small></button>'+
+   '<button type="button" class="branch-card" data-branch="دمنهور"><span style="font-size:22px">🏬</span><strong>فرع دمنهور</strong><small>طلاب · جداول · تقارير</small></button>'+
+   '<button type="button" class="branch-card" data-branch="الإسكندرية"><span style="font-size:22px">🏙️</span><strong>فرع الإسكندرية</strong><small>برامج · حضور · حسابات</small></button>'+
+   '<button type="button" class="branch-card" data-branch="فرع جديد"><span style="font-size:22px">➕</span><strong>إضافة فرع تجريبي</strong><small>عرض توضيحي فقط</small></button></div>'+
+   '<div class="profile-message" id="branchDemoMessage">اختار فرعًا لعرض أقسامه التجريبية. أسماء الفروع وبياناتها هنا أمثلة وليست بيانات متصلة بالنظام.</div>'+
+   '<div class="profile-toolbar"><span class="demo-chip">👨‍🎓 إدارة الطلاب</span><span class="demo-chip">🕒 الحضور والغياب</span><span class="demo-chip">💳 المدفوعات</span><span class="demo-chip">📊 تقارير الفرع</span></div>';
+ }
+ if(name==="الحضور والغياب") return '<div class="mock-stats"><div><b>42</b><small>طلاب اليوم</small></div><div><b>38</b><small>حاضر</small></div><div><b>4</b><small>غائب</small></div></div><div class="profile-actions"><button class="demo-action" type="button" data-action="attendance">تسجيل حضور تجريبي</button><button class="secondary" type="button" data-action="attendanceReport">تقرير اليوم</button></div><table class="demo-table"><tr><th>اسم الطالب</th><th>رقم القيد</th><th>الحالة</th></tr><tr><td>أحمد محمد علي</td><td>AND-1024</td><td>حاضر</td></tr><tr><td>مريم محمود حسن</td><td>AND-1025</td><td>غائب</td></tr><tr><td>يوسف إبراهيم</td><td>AND-1026</td><td>متأخر</td></tr></table><div class="profile-message" data-message>بيانات توضيحية غير متصلة بسجل الحضور الفعلي.</div>';
+ if(name==="إدارة المدفوعات والأقساط") return '<div class="mock-stats"><div><b>7,500 ج.م</b><small>إجمالي مستحق</small></div><div><b>5,000 ج.م</b><small>تم تحصيله</small></div><div><b>2,500 ج.م</b><small>متبقي</small></div></div><table class="demo-table"><tr><th>الطالب</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr><tr><td>أحمد محمد علي</td><td>7500</td><td>5000</td><td>2500</td><td>متبقي</td></tr><tr><td>مريم محمود حسن</td><td>7500</td><td>7500</td><td>0</td><td>مسدد</td></tr></table><div class="profile-message">المبالغ بعملة الجنيه المصري وهي بيانات تجريبية.</div>';
+ if(name==="إدارة المصروفات") return '<div class="mock-stats"><div><b>12,450 ج.م</b><small>إجمالي المصروفات</small></div><div><b>8</b><small>عمليات مسجلة</small></div><div><b>3</b><small>بنود رئيسية</small></div></div><table class="demo-table"><tr><th>البند</th><th>التاريخ</th><th>المبلغ</th><th>طريقة الدفع</th></tr><tr><td>إيجار</td><td>01/10/2026</td><td>7000</td><td>تحويل</td></tr><tr><td>مستلزمات تدريب</td><td>04/10/2026</td><td>3450</td><td>نقدي</td></tr><tr><td>إنترنت ومرافق</td><td>08/10/2026</td><td>2000</td><td>نقدي</td></tr></table>';
+ if(name==="إدارة البرامج والكورسات"||name==="المواد الدراسية"||name==="جدول الكورسات والمحاضرات") return '<div class="mock-stats"><div><b>6</b><small>برامج تجريبية</small></div><div><b>14</b><small>مادة</small></div><div><b>22</b><small>محاضرة مجدولة</small></div></div><table class="demo-table"><tr><th>البرنامج / المادة</th><th>المدرب</th><th>الموعد</th><th>الحالة</th></tr><tr><td>مساعد خدمات صحية</td><td>مدرب تجريبي</td><td>الأحد 4 م</td><td>نشط</td></tr><tr><td>إسعافات أولية</td><td>مدرب تجريبي</td><td>الثلاثاء 5 م</td><td>نشط</td></tr></table>';
+ if(name==="الامتحانات الإلكترونية"||name==="درجات الامتحانات"||name==="الدور الأول والدور الثاني"||name==="بنك الأسئلة") return '<div class="profile-toolbar"><button class="profile-tab active" type="button">📝 الامتحانات</button><button class="profile-tab" type="button">📚 بنك الأسئلة</button><button class="profile-tab" type="button">🎯 الدرجات</button><button class="profile-tab" type="button">🔁 الدور الثاني</button></div><div class="mock-stats"><div><b>3</b><small>امتحانات</small></div><div><b>28</b><small>سؤالًا</small></div><div><b>2</b><small>بانتظار التصحيح</small></div></div><table class="demo-table"><tr><th>الامتحان</th><th>المادة</th><th>المدة</th><th>الحالة</th></tr><tr><td>اختبار تجريبي 1</td><td>أساسيات التمريض</td><td>30 دقيقة</td><td>مسودة</td></tr><tr><td>اختبار تجريبي 2</td><td>مصطلحات طبية</td><td>20 دقيقة</td><td>منشور تجريبيًا</td></tr></table>';
+ if(name.includes("واتساب")||name.includes("تهنئة")) return '<div class="mock-placeholder" style="margin-top:10px"><span>💬</span><div><strong>رسالة تجريبية</strong><small>معاينة فقط — لا يتم إرسال رسائل فعلية</small></div></div><div class="demo-table" style="padding:10px">أهلًا أحمد، نتمنى لك يومًا سعيدًا 🌟</div>';
  return '<div class="mock-placeholder" style="margin-top:10px"><span>'+(featureIcons[name]||"🧩")+'</span><div><strong>واجهة '+name+'</strong><small>نموذج تجريبي توضيحي لهذه الميزة</small></div></div><div style="margin-top:10px"><span class="demo-chip">نظرة عامة</span><span class="demo-chip">السجلات</span><span class="demo-chip">التقارير</span></div>';
+}
+function wireDemoInteractions(){
+ const root=document.getElementById("mockFeatureDemo");
+ if(!root)return;
+ root.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{
+  root.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===btn));
+  root.querySelectorAll("[data-panel]").forEach(panel=>panel.hidden=panel.dataset.panel!==btn.dataset.tab);
+ }));
+ root.querySelectorAll('[data-action="save"]').forEach(btn=>btn.addEventListener("click",()=>{
+  const form=root.querySelector(".profile-panel[data-panel='data']");
+  const nameField=form.querySelector('[data-field="studentName"]');
+  const msg=form.querySelector("[data-message]");
+  msg.textContent="تم تحديث بيانات "+(nameField.value.trim()||"الطالب التجريبي")+" داخل المعاينة فقط. لم يتم إرسال أو حفظ أي بيانات فعلية.";
+ }));
+ root.querySelectorAll('[data-action="reset"]').forEach(btn=>btn.addEventListener("click",()=>{
+  root.querySelectorAll("[data-field]").forEach(field=>{if(field.tagName==="SELECT")field.selectedIndex=0;else field.value=field.type==="date"?"":"";});
+  const n=root.querySelector('[data-field="studentName"]');if(n)n.value="أحمد محمد علي";
+  const c=root.querySelector('[data-field="studentCode"]');if(c)c.value="AND-1024";
+  const msg=root.querySelector("[data-message]");if(msg)msg.textContent="تمت إعادة النموذج إلى بيانات تجريبية.";
+ }));
+ root.querySelectorAll("[data-branch]").forEach(btn=>btn.addEventListener("click",()=>{
+  const msg=root.querySelector("#branchDemoMessage");
+  if(msg)msg.textContent="تم اختيار "+btn.dataset.branch+" — الأقسام الظاهرة أدناه للعرض التجريبي فقط.";
+ }));
+ root.querySelectorAll("[data-action='attendance']").forEach(btn=>btn.addEventListener("click",()=>{
+  const msg=root.querySelector("[data-message]");if(msg)msg.textContent="تمت تجربة زر تسجيل الحضور داخل المعاينة فقط؛ لم يتغير سجل حضور حقيقي.";
+ }));
+ root.querySelectorAll("[data-action='attendanceReport']").forEach(btn=>btn.addEventListener("click",()=>{
+  const msg=root.querySelector("[data-message]");if(msg)msg.textContent="هذا مثال لتقرير حضور اليوم ببيانات وهمية.";
+ }));
 }
 function renderLivePreview(){
  const chosen=[...document.querySelectorAll('input[type=checkbox]:checked')];
@@ -60,11 +143,13 @@ function renderLivePreview(){
  document.getElementById("mockGroupCount").textContent=new Set(chosen.map(x=>x.dataset.group)).size;
  const nav=document.getElementById("mockNav");nav.innerHTML="";
  if(!chosen.length){nav.innerHTML='<div class="empty-preview">اختار وظيفة من الكتالوج علشان تظهر هنا</div>';document.getElementById("mockSelectedIcon").textContent="✦";document.getElementById("mockSelectedTitle").textContent="ابدأ بتخصيص نظامك";document.getElementById("mockSelectedDesc").textContent="اختياراتك هتظهر في المعاينة دي.";document.getElementById("mockFeatureDemo").innerHTML="";return}
- chosen.forEach((c,i)=>{const b=document.createElement("button");b.type="button";b.innerHTML='<span class="feature-icon">'+(featureIcons[c.dataset.name]||"🧩")+'</span><span>'+c.dataset.name+'</span>';b.className=i===0?"active":"";b.addEventListener("click",()=>{nav.querySelectorAll("button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.getElementById("mockSelectedIcon").textContent=featureIcons[c.dataset.name]||"🧩";document.getElementById("mockSelectedTitle").textContent=c.dataset.name;document.getElementById("mockSelectedDesc").textContent="معاينة توضيحية — الفئة "+c.dataset.group;document.getElementById("mockFeatureDemo").innerHTML=demoMarkup(c.dataset.name);});nav.appendChild(b)});
+ chosen.forEach((c,i)=>{const b=document.createElement("button");b.type="button";b.innerHTML='<span class="feature-icon">'+(featureIcons[c.dataset.name]||"🧩")+'</span><span>'+c.dataset.name+'</span>';b.className=i===0?"active":"";b.addEventListener("click",()=>{nav.querySelectorAll("button").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.getElementById("mockSelectedIcon").textContent=featureIcons[c.dataset.name]||"🧩";document.getElementById("mockSelectedTitle").textContent=c.dataset.name;document.getElementById("mockSelectedDesc").textContent="معاينة توضيحية — الفئة "+c.dataset.group;document.getElementById("mockFeatureDemo").innerHTML=demoMarkup(c.dataset.name);
+  wireDemoInteractions();});nav.appendChild(b)});
  document.getElementById("mockSelectedIcon").textContent=featureIcons[chosen[0].dataset.name]||"🧩";
  document.getElementById("mockSelectedTitle").textContent=chosen[0].dataset.name;
  document.getElementById("mockSelectedDesc").textContent="معاينة توضيحية — الفئة "+chosen[0].dataset.group;
  document.getElementById("mockFeatureDemo").innerHTML=demoMarkup(chosen[0].dataset.name);
+ wireDemoInteractions();
 }
 document.getElementById("centerName").addEventListener("input",renderLivePreview);
 document.addEventListener("change",e=>{if(e.target.matches('input[type=checkbox]'))renderLivePreview()});
