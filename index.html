@@ -12616,12 +12616,22 @@ async function ensureStudentFaceModels() {
         document.head.appendChild(script);
       });
     }
-    const modelUrl = 'https://justadudewhohacks.github.io/face-api.js/models';
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl),
-      faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl),
-      faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl)
-    ]);
+    // Use the versioned jsDelivr weights directory. The old GitHub Pages
+    // model URL may stall or fail on some mobile networks.
+    const modelUrl = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+    const loadWithTimeout = async (label, loader) => {
+      setStudentFaceStatus('جاري تحميل نموذج ' + label + '...');
+      let timer;
+      try {
+        await Promise.race([
+          loader(),
+          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('تأخر تحميل نماذج الوجه. تأكد من الإنترنت ثم أعد المحاولة.')), 60000); })
+        ]);
+      } finally { clearTimeout(timer); }
+    };
+    await loadWithTimeout('اكتشاف الوجه', () => faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl));
+    await loadWithTimeout('تحديد ملامح الوجه', () => faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl));
+    await loadWithTimeout('البصمة الرقمية', () => faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl));
     studentFaceModelsReady = true;
   })();
   try { await studentFaceModelsPromise; }
