@@ -1,5 +1,5 @@
 /* Andalus Academy Service Worker — basic offline cache */
-const CACHE = 'andalus-v6.6';
+const CACHE = 'andalus-v6.7';
 const ASSETS = [
   './',
   './index.html',
