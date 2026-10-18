@@ -63,4 +63,35 @@ async function load(today){
  }catch(e){out.textContent='تعذر تحميل سجل التحقق: '+(e?.message||'خطأ غير معروف')}
 }
 setInterval(mount,1500);mount();
+
+/* Face capture enhancement: the main portal function uses a strict 0.50 threshold.
+   Override it after the main script has loaded, with several tolerant passes. */
+function installFaceCaptureEnhancement(){
+  if(typeof window.faceapi==='undefined' || typeof window.faceapi.detectSingleFace!=='function') return false;
+  const enhancedCapture=async function(){
+    const video=document.getElementById('student-face-video');
+    if(!video || !window.studentFaceStream || video.readyState<2) throw new Error('شغّل الكاميرا وانتظر ظهور الصورة أولًا.');
+    if(video.videoWidth<160 || video.videoHeight<120) throw new Error('الكاميرا لم تُجهّز الصورة بعد؛ ثبّت وجهك أمام الكاميرا لثانية.');
+    const passes=[
+      [160,0.25],[224,0.30],[320,0.35]
+    ];
+    for(let attempt=0;attempt<3;attempt++){
+      for(const [inputSize,scoreThreshold] of passes){
+        const detection=await window.faceapi.detectSingleFace(video,new window.faceapi.TinyFaceDetectorOptions({inputSize,scoreThreshold}))
+          .withFaceLandmarks().withFaceDescriptor();
+        if(detection){
+          if(detection.detection.box.width<55 || detection.detection.box.height<55) continue;
+          return Array.from(detection.descriptor);
+        }
+      }
+      if(attempt<2) await new Promise(r=>setTimeout(r,220));
+    }
+    throw new Error('لم يظهر وجه واضح بعد. قرّب الوجه قليلًا، واجعل الإضاءة أمامك، وانظر مباشرة للكاميرا.');
+  };
+  window.captureStudentFaceDescriptor=enhancedCapture;
+  return true;
+}
+if(!installFaceCaptureEnhancement()){
+  let tries=0;const timer=setInterval(()=>{if(installFaceCaptureEnhancement()||++tries>=40)clearInterval(timer)},250);
+}
 })();
