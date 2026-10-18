@@ -1,5 +1,5 @@
 /* Andalus Academy Service Worker — basic offline cache */
-const CACHE = 'andalus-v6.9';
+const CACHE = 'andalus-v6.10';
 const ASSETS = [
   './',
   './index.html',
@@ -15,15 +15,27 @@ const ASSETS = [
 ];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {})); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
+async function injectFaceCameraFix(response){
+ try{
+  if(!response || !response.ok)return response;
+  const type=response.headers.get('content-type')||'';
+  if(!type.includes('text/html'))return response;
+  const text=await response.clone().text();
+  if(text.includes('face-camera-fix.js'))return response;
+  const tag='<script src="./face-camera-fix.js?v=1"></script>';
+  const body=text.replace('</head>',tag+'\n</head>');
+  return new Response(body,{status:response.status,statusText:response.statusText,headers:response.headers});
+ }catch(_){return response;}
+}
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(caches.match(e.request).then(cached => {
-    const network = fetch(e.request).then(res => {
-      if (res && res.status === 200 && (e.request.url.startsWith(self.location.origin) || e.request.url.includes('fonts.') || e.request.url.includes('cdn.jsdelivr'))) {
-        const clone = res.clone(); caches.open(CACHE).then(c => c.put(e.request, clone));
-      }
-      return res;
-    }).catch(() => cached);
-    return cached || network;
-  }));
+ if(e.request.method!=='GET')return;
+ const isHtml=e.request.mode==='navigate'||e.request.destination==='document'||e.request.url.endsWith('/index.html');
+ e.respondWith(caches.match(e.request).then(async cached=>{
+  const network=fetch(e.request).then(res=>{
+   if(res&&res.status===200&&(e.request.url.startsWith(self.location.origin)||e.request.url.includes('fonts.')||e.request.url.includes('cdn.jsdelivr'))){const clone=res.clone();caches.open(CACHE).then(c=>c.put(e.request,clone));}
+   return res;
+  }).catch(()=>cached);
+  const response=cached||await network;
+  return isHtml?injectFaceCameraFix(response):response;
+ }));
 });
