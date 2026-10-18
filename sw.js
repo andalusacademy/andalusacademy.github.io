@@ -1,9 +1,11 @@
 /* Andalus Academy Service Worker — basic offline cache */
-const CACHE = 'andalus-v6.12';
+const CACHE = 'andalus-v6.13';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './face-camera-fix.js?v=2',
+  './student-portal-logs-ui.js?v=1',
   'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
   'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
