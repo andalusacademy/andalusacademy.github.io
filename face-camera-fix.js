@@ -1,6 +1,7 @@
-/* Andalus Face Camera Fix — robust mobile video startup + tolerant face capture */
+/* Andalus Face Camera Fix v2 — mobile camera + explicit face-api model loading + tolerant detection */
 (()=>{
 'use strict';
+const MODEL_URL='https://justadudewhohacks.github.io/face-api.js/models';
 function status(msg,error){try{if(typeof setStudentFaceStatus==='function')setStudentFaceStatus(msg,!!error);}catch(_){} }
 function stop(){try{if(typeof stopStudentFaceCamera==='function')stopStudentFaceCamera();}catch(_){try{const v=document.getElementById('student-face-video');if(v){v.pause();v.srcObject=null;}}catch(__){}}}
 async function waitVideo(video,timeout=7000){
@@ -11,28 +12,43 @@ async function waitVideo(video,timeout=7000){
  }
  throw new Error('تعذر تشغيل صورة الكاميرا. اسمح للمتصفح باستخدام الكاميرا ثم حاول مرة أخرى.');
 }
+async function ensureFaceModels(){
+ if(!window.faceapi)throw new Error('مكتبة التحقق من الوجه لم تكتمل. أعد تحميل الصفحة وحاول مرة أخرى.');
+ status('جاري تحميل نماذج التحقق من الوجه...');
+ try{
+  if(!faceapi.nets.tinyFaceDetector.isLoaded)await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+  if(!faceapi.nets.faceLandmark68Net.isLoaded)await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+  if(!faceapi.nets.faceRecognitionNet.isLoaded)await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+ }catch(e){
+  throw new Error('تعذر تحميل نماذج التحقق من الوجه. تأكد من اتصال الإنترنت ثم أعد المحاولة.');
+ }
+}
 window.startStudentFaceCamera=async function(){
  try{
-  if(document.getElementById('student-face-consent') && !document.getElementById('student-face-consent').checked)throw new Error('يجب الموافقة على معالجة بصمة الوجه أولًا.');
+  const consent=document.getElementById('student-face-consent');
+  if(consent && !consent.checked)throw new Error('يجب الموافقة على معالجة بصمة الوجه أولًا.');
   const old=window.studentFaceStream;
   if(old){try{old.getTracks().forEach(t=>t.stop());}catch(_){} window.studentFaceStream=null;}
+  const video=document.getElementById('student-face-video');
+  if(!video)throw new Error('لم يتم العثور على نافذة الكاميرا.');
+  try{video.pause();}catch(_){}
+  video.srcObject=null;
   status('جاري تجهيز الكاميرا...');
-  if(typeof ensureStudentFaceModels==='function')await ensureStudentFaceModels();
+  await ensureFaceModels();
   if(!navigator.mediaDevices?.getUserMedia)throw new Error('الكاميرا غير متاحة. افتح الرابط عبر HTTPS واستخدم متصفحًا حديثًا.');
   const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'user'},width:{ideal:640},height:{ideal:480},frameRate:{ideal:24,max:30}},audio:false});
   window.studentFaceStream=stream;
-  const video=document.getElementById('student-face-video');
-  if(!video)throw new Error('لم يتم العثور على نافذة الكاميرا.');
-  video.autoplay=true;video.muted=true;video.playsInline=true;video.setAttribute('playsinline','');video.setAttribute('muted','');video.srcObject=null;
+  video.autoplay=true;video.muted=true;video.playsInline=true;video.setAttribute('playsinline','');video.setAttribute('muted','');
   await new Promise(r=>requestAnimationFrame(r));
-  video.srcObject=stream;video.style.display='block';
+  video.srcObject=stream;
+  video.style.display='block';
   await waitVideo(video);
   try{await video.play();}
   catch(e){
    if(e?.name==='AbortError'){
-    await new Promise(r=>setTimeout(r,300));
-    try{await video.play();}catch(__){/* autoplay race; camera is still attached */}
-   } else throw e;
+    await new Promise(r=>setTimeout(r,350));
+    try{await video.play();}catch(__){}
+   }else throw e;
   }
   const startBtn=document.getElementById('student-face-start');
   const captureBtn=document.getElementById('student-face-capture');
@@ -43,26 +59,30 @@ window.startStudentFaceCamera=async function(){
 };
 window.captureStudentFaceDescriptor=async function(){
  const video=document.getElementById('student-face-video');
- if(!video || !window.studentFaceStream || video.readyState<2)throw new Error('شغّل الكاميرا وانتظر ظهور الصورة أولًا.');
- if(!window.faceapi)throw new Error('مكتبة التحقق من الوجه لم تكتمل. أعد تحميل الصفحة وحاول مرة أخرى.');
+ if(!video || !window.studentFaceStream || video.readyState<2 || !video.videoWidth)throw new Error('شغّل الكاميرا وانتظر ظهور الصورة أولًا.');
+ await ensureFaceModels();
  status('جاري التعرف على الوجه...');
  const configs=[
-  {inputSize:160,scoreThreshold:0.35},
-  {inputSize:224,scoreThreshold:0.40},
-  {inputSize:320,scoreThreshold:0.45}
+  {inputSize:160,scoreThreshold:0.25},
+  {inputSize:224,scoreThreshold:0.30},
+  {inputSize:320,scoreThreshold:0.35}
  ];
- let best=null;
- for(let round=0;round<5 && !best;round++){
+ let lastError='';
+ for(let round=0;round<5;round++){
   for(const cfg of configs){
    try{
-    const d=await faceapi.detectSingleFace(video,new faceapi.TinyFaceDetectorOptions(cfg)).withFaceLandmarks().withFaceDescriptor();
-    if(d && (!best || d.detection.score>best.detection.score))best=d;
-   }catch(_){}
+    const detections=await faceapi.detectAllFaces(video,new faceapi.TinyFaceDetectorOptions(cfg)).withFaceLandmarks().withFaceDescriptors();
+    if(detections&&detections.length){
+     const best=detections.slice().sort((a,b)=>b.detection.score-a.detection.score)[0];
+     const w=best.detection.box.width,h=best.detection.box.height;
+     if(w<55||h<55){lastError='الوجه بعيد جدًا';continue;}
+     return Array.from(best.descriptor);
+    }
+   }catch(e){lastError=e?.message||String(e);}
   }
-  if(!best)await new Promise(r=>setTimeout(r,280));
+  await new Promise(r=>setTimeout(r,220));
  }
- if(!best)throw new Error('لم نتعرف على وجه واضح. اقترب قليلًا من الكاميرا، حسّن الإضاءة، وانظر مباشرة للكاميرا دون تغطية الوجه.');
- if(best.detection.box.width<70 || best.detection.box.height<70)throw new Error('الوجه بعيد جدًا. اقترب قليلًا من الكاميرا مع إبقاء الوجه كاملًا ظاهرًا.');
- return Array.from(best.descriptor);
+ if(lastError && /model|net|load|landmark|recognition/i.test(lastError))throw new Error('نماذج التحقق من الوجه لم تعمل بشكل صحيح. أعد تحميل الصفحة وحاول مرة أخرى.');
+ throw new Error('لم نتعرف على وجه واضح. اقترب قليلًا من الكاميرا، حسّن الإضاءة، وانظر مباشرة للكاميرا دون تغطية الوجه.');
 };
 })();
