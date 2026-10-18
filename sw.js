@@ -1,5 +1,5 @@
 /* Andalus Academy Service Worker — basic offline cache */
-const CACHE = 'andalus-v6.10';
+const CACHE = 'andalus-v6.11';
 const ASSETS = [
   './',
   './index.html',
@@ -22,7 +22,7 @@ async function injectFaceCameraFix(response){
   if(!type.includes('text/html'))return response;
   const text=await response.clone().text();
   if(text.includes('face-camera-fix.js'))return response;
-  const tag='<script src="./face-camera-fix.js?v=1"></script>';
+  const tag='<script src="./face-camera-fix.js?v=2"></script>';
   const body=text.replace('</head>',tag+'\n</head>');
   return new Response(body,{status:response.status,statusText:response.statusText,headers:response.headers});
  }catch(_){return response;}
