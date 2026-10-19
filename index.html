@@ -798,6 +798,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div class="nav-card c12 admin-only" onclick="showPage('achievements');loadAchievementsAdmin()"><span class="nav-card-icon">🏅</span><span>إنجازات وترتيب المتدربين</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('requests');loadStudentRequestsAdmin()"><span class="nav-card-icon">🎫</span><span>الشكاوى والطلبات</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('notifications');loadNotificationsAdmin()"><span class="nav-card-icon">🔔</span><span>مركز التنبيهات</span></div>
+            <div class="nav-card c12 admin-only" onclick="showPage('competition-security')"><span class="nav-card-icon">🔐</span><span>أمان المسابقات والتحقق والهوية</span></div>
             <div class="nav-card c3" onclick="showPage('programs')"><span class="nav-card-icon">📚</span><span>البرامج والكورسات</span></div>
             <div class="nav-card c2" onclick="showPage('attendance')"><span class="nav-card-icon">✅</span><span>الحضور والغياب</span></div>
             <div class="nav-card c1" onclick="showPage('leads')"><span class="nav-card-icon">📞</span><span>الحجوزات والاستفسارات</span></div>
@@ -1691,21 +1692,6 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <tbody id="wq-leaderboard-table"></tbody></table>
           </div>
 
-          <div class="card" style="margin-bottom:16px;">
-            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-              <h3>🧾 سجل نشاطات المسابقة الأسبوعية</h3>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="btn btn-outline btn-sm" onclick="copyWeeklyQuizEntryLink()">🔗 نسخ رابط دخول الطلاب</button>
-                <button class="btn btn-outline btn-sm" onclick="loadWeeklyQuizAuditAdmin()">🔄 تحديث السجل</button>
-              </div>
-            </div>
-            <div style="padding:10px 14px;color:var(--muted);font-size:12px;">يعرض رقم القيد والاسم والوقت والمتصفح والجهاز وصورة التدقيق التي وافق الطالب على حفظها. الصور خاصة ولا تظهر إلا للإدارة المخوّلة.</div>
-            <div style="overflow-x:auto;">
-              <table><thead><tr><th>الطالب</th><th>رقم القيد</th><th>التاريخ والوقت</th><th>المتصفح</th><th>الجهاز</th><th>صورة الوجه</th></tr></thead>
-              <tbody id="wq-audit-table"><tr><td colspan="6" style="text-align:center;padding:16px;">اضغط تحديث السجل لعرض النشاطات.</td></tr></tbody></table>
-            </div>
-          </div>
-
           <div class="card">
             <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
               <h3>📚 بنك الأسئلة (<span id="wq-bank-count">0</span> سؤال)</h3>
@@ -1720,6 +1706,33 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           </div>
         </div>
 
+        <!-- COMPETITION SECURITY / IDENTITY CENTER -->
+        <div id="page-competition-security" class="page">
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+              <h3>🔐 أمان المسابقات والتحقق والهوية</h3>
+              <button class="btn btn-outline btn-sm" onclick="loadCompetitionIdentityAdmin()">🔄 تحديث كل السجلات</button>
+            </div>
+            <div style="padding:12px 16px;color:var(--muted);font-size:12px;line-height:1.8;">مركز موحّد لمراجعة محاولات الدخول والتحقق، وأسباب الفشل أو المنع، وصور التدقيق المتاحة، وتسجيلات الهوية والجلسات. البيانات الحساسة متاحة للمدير المخوّل فقط.</div>
+          </div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>🛡️ سجل أمان المسابقات <span id="cis-security-count"></span></h3></div>
+            <div style="overflow-x:auto;"><table><thead><tr><th>التاريخ والوقت</th><th>الطالب / رقم القيد</th><th>نوع البوابة</th><th>الحدث</th><th>النتيجة</th><th>سبب الفشل / المنع</th><th>الجهاز</th></tr></thead><tbody id="cis-security-table"><tr><td colspan="7" style="text-align:center;padding:16px;">اضغط تحديث كل السجلات لعرض البيانات.</td></tr></tbody></table></div>
+          </div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>📸 تسجيلات ومحاولات التحقق <span id="cis-attempts-count"></span></h3></div>
+            <div style="padding:8px 14px;color:var(--muted);font-size:12px;">يعرض المحاولات الناجحة والفاشلة وسبب الفشل، مع صورة المحاولة إن كانت محفوظة ومتاحة.</div>
+            <div style="overflow-x:auto;"><table><thead><tr><th>التاريخ والوقت</th><th>الطالب / رقم القيد</th><th>نوع التحقق</th><th>النتيجة</th><th>سبب الفشل</th><th>المسافة / الحد</th><th>صورة المحاولة</th></tr></thead><tbody id="cis-attempts-table"><tr><td colspan="7" style="text-align:center;padding:16px;">جاري انتظار تحميل السجل.</td></tr></tbody></table></div>
+          </div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>🪪 سجل تسجيل الهوية وبصمة الوجه <span id="cis-identity-count"></span></h3></div>
+            <div style="overflow-x:auto;"><table><thead><tr><th>الطالب</th><th>رقم القيد</th><th>الحالة</th><th>مزود التحقق</th><th>تاريخ الموافقة</th><th>إصدار النموذج</th><th>آخر تحديث</th></tr></thead><tbody id="cis-identity-table"><tr><td colspan="7" style="text-align:center;padding:16px;">جاري انتظار تحميل السجل.</td></tr></tbody></table></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>🔑 جلسات الهوية التي تم التحقق منها <span id="cis-sessions-count"></span></h3></div>
+            <div style="overflow-x:auto;"><table><thead><tr><th>الطالب / رقم القيد</th><th>نوع البوابة</th><th>معرّف المسابقة</th><th>تاريخ التحقق</th><th>انتهاء الجلسة</th><th>الحالة</th></tr></thead><tbody id="cis-sessions-table"><tr><td colspan="6" style="text-align:center;padding:16px;">جاري انتظار تحميل السجل.</td></tr></tbody></table></div>
+          </div>
+        </div>
         <!-- INSTALLMENT REMINDERS -->
         <div id="page-installment-reminders" class="page">
           <div class="search-bar">
@@ -4831,7 +4844,7 @@ function updateTime() {
    ============================================================ */
 
 // الصفحات الإدارية المحمية دائمًا للمدير فقط، بصرف النظر عن أي تخصيص
-const ADMIN_ONLY_PAGES = new Set(['subjects', 'breakeven', 'court', 'dream', 'employees', 'logs', 'achievements', 'requests']);
+const ADMIN_ONLY_PAGES = new Set(['subjects', 'breakeven', 'court', 'dream', 'employees', 'logs', 'achievements', 'requests', 'competition-security']);
 
 function showPage(page) {
   // ✅ فحص أمني: منع الموظف من فتح صفحة إدارية أو غير مسموح له بها، حتى لو استُدعيت الدالة مباشرة
@@ -4859,7 +4872,7 @@ function showPage(page) {
     attendance: 'الحضور والغياب', leads: 'الحجوزات والاستفسارات', payments: 'المدفوعات',
     expenses: 'المصروفات',
     reports: 'التقارير',
-    subjects: 'المواد الدراسية', employees: 'الموظفين', logs: 'سجل النشاط', profile: 'بروفايل الطالب', exams: 'الامتحانات الإلكترونية', 'exam-grades': 'درجات الامتحانات', breakeven: 'نقطة التعادل', court: 'محكمة الأداء', dream: 'النظام يحلم', campaigns: 'الحملات التسويقية', achievements: 'إنجازات وترتيب المتدربين', requests: 'الشكاوى والطلبات'
+    subjects: 'المواد الدراسية', employees: 'الموظفين', logs: 'سجل النشاط', profile: 'بروفايل الطالب', exams: 'الامتحانات الإلكترونية', 'exam-grades': 'درجات الامتحانات', breakeven: 'نقطة التعادل', court: 'محكمة الأداء', dream: 'النظام يحلم', campaigns: 'الحملات التسويقية', achievements: 'إنجازات وترتيب المتدربين', requests: 'الشكاوى والطلبات', 'competition-security': 'أمان المسابقات والتحقق والهوية'
   };
   document.getElementById('page-title').textContent = titles[page] || '';
   if (page === 'leads') { loadLeads(); loadCampaigns(); }
@@ -4868,6 +4881,7 @@ function showPage(page) {
   if (page === 'expenses') loadExpenses();
   if (page === 'employees') loadEmployees();
   if (page === 'logs') loadLogs();
+  if (page === 'competition-security') loadCompetitionIdentityAdmin();
   if (page === 'trainers') renderTrainersPerformance();
   if (page === 'alumni') loadAlumni();
   if (page === 'cashregister') {
@@ -12924,6 +12938,52 @@ function copyWeeklyQuizEntryLink() {
   navigator.clipboard.writeText(url).then(() => {
     showToast('تم نسخ رابط الدخول المباشر للمسابقة الأسبوعية');
   }).catch(() => showToast('رابط الدخول: ' + url, 'info'));
+}
+
+function cisOutcomeLabel(value) {
+  const labels = { success:'ناجح', failure:'فشل', blocked:'تم المنع', pending:'قيد المراجعة', verified:'تم التحقق', passed:'ناجح', failed:'فشل' };
+  return labels[String(value || '').toLowerCase()] || value || '—';
+}
+function cisTypeLabel(value) {
+  const labels = { weekly_quiz:'المسابقة الأسبوعية', public_competition:'مسابقة عامة', student_portal:'بوابة الطالب', exam_portal:'بوابة الامتحانات', identity:'التحقق من الهوية' };
+  return labels[value] || value || '—';
+}
+function cisDate(value) { if (!value) return '—'; const d = new Date(value); return Number.isNaN(d.getTime()) ? escapeHtml(String(value)) : escapeHtml(d.toLocaleString('ar-EG')); }
+function cisCount(id, rows) { const el = document.getElementById(id); if (el) el.textContent = '(' + rows.length + ')'; }
+function cisEmptyRow(cols, message) { return '<tr><td colspan="' + cols + '" style="text-align:center;padding:16px;color:var(--muted);">' + escapeHtml(message) + '</td></tr>'; }
+async function loadCompetitionIdentityAdmin() {
+  const ids = ['cis-security-table','cis-attempts-table','cis-identity-table','cis-sessions-table'];
+  if (!ids.some(id => document.getElementById(id))) return;
+  if (!currentUser || currentUser.role !== 'admin') { ids.forEach((id,i) => { const el=document.getElementById(id); if(el) el.innerHTML=cisEmptyRow([7,7,7,6][i],'هذا السجل متاح للمدير فقط.'); }); showToast('سجلات أمان المسابقات والهوية متاحة للمدير فقط.', 'error'); return; }
+  ids.forEach((id,i) => { const el=document.getElementById(id); if(el) el.innerHTML=cisEmptyRow([7,7,7,6][i],'جاري تحميل السجل...'); });
+  try {
+    const { data, error } = await sb.rpc('competition_identity_admin_report', { p_limit: 200 }); if (error) throw error;
+    const report = data || {};
+    const security = Array.isArray(report.security_logs) ? report.security_logs : [];
+    const rawAttempts = Array.isArray(report.verification_attempts) ? report.verification_attempts : [];
+    const portalLogs = Array.isArray(report.portal_access_logs) ? report.portal_access_logs : [];
+    const attempts = [
+      ...rawAttempts.map(r => ({...r, at:r.entered_at, student_label:r.student_name || r.enrollment_number || r.student_id, reason:r.failure_reason || r.reason || r.failure_code, distance:r.face_distance, threshold:r.face_threshold, image_path:r.photo_path, image_url:r.reference_photo_url, method:r.verification_method || r.event_type})),
+      ...portalLogs.map(r => ({...r, at:r.created_at, student_label:r.student_name || r.enrollment_number || r.student_id, reason:r.reason, distance:r.distance, threshold:r.threshold, method:r.provider || r.event_type, image_path:null, image_url:null}))
+    ].sort((a,b) => new Date(b.at || 0)-new Date(a.at || 0));
+    const attemptsWithImages = await Promise.all(attempts.map(async r => {
+      let imageUrl = '';
+      if (r.image_path) { const { data: signed, error: signError } = await sb.storage.from('weekly-quiz-face-audit').createSignedUrl(r.image_path, 300); if (!signError && signed?.signedUrl) imageUrl = signed.signedUrl; }
+      if (!imageUrl && typeof r.image_url === 'string' && r.image_url.startsWith('https://')) imageUrl = r.image_url;
+      return {...r, displayImage:imageUrl};
+    }));
+    const enrollments = Array.isArray(report.face_enrollments) ? report.face_enrollments : [];
+    const sessions = Array.isArray(report.verified_sessions) ? report.verified_sessions : [];
+    const securityBody=document.getElementById('cis-security-table');
+    if(securityBody) securityBody.innerHTML=security.length ? security.map(r=>'<tr><td>'+cisDate(r.created_at)+'</td><td><strong>'+escapeHtml(r.student_id || r.enrollment_number || '—')+'</strong></td><td>'+escapeHtml(cisTypeLabel(r.competition_type))+'</td><td>'+escapeHtml(r.event_type || '—')+'</td><td>'+escapeHtml(cisOutcomeLabel(r.outcome))+'</td><td style="min-width:180px;white-space:normal;">'+escapeHtml(r.reason || '—')+'</td><td>'+escapeHtml(r.device_label || '—')+'</td></tr>').join('') : cisEmptyRow(7,'لا توجد سجلات أمان في البيانات المتاحة.');
+    const attemptsBody=document.getElementById('cis-attempts-table');
+    if(attemptsBody) attemptsBody.innerHTML=attemptsWithImages.length ? attemptsWithImages.map(r=>'<tr><td>'+cisDate(r.at)+'</td><td><strong>'+escapeHtml(r.student_label || '—')+'</strong>'+(r.phone_masked?'<div style="font-size:11px;color:var(--muted);">'+escapeHtml(r.phone_masked)+'</div>':'')+'</td><td>'+escapeHtml(r.method || '—')+'</td><td>'+escapeHtml(cisOutcomeLabel(r.outcome))+'</td><td style="min-width:180px;white-space:normal;">'+escapeHtml(r.reason || '—')+'</td><td>'+escapeHtml(r.distance == null ? '—' : String(r.distance))+' / '+escapeHtml(r.threshold == null ? '—' : String(r.threshold))+'</td><td>'+(r.displayImage?'<a href="'+escapeHtml(r.displayImage)+'" target="_blank" rel="noopener"><img src="'+escapeHtml(r.displayImage)+'" alt="صورة التحقق" loading="lazy" style="width:76px;height:76px;object-fit:cover;border-radius:9px;"></a>':'<span style="color:var(--muted);font-size:11px;">لا توجد صورة متاحة</span>')+'</td></tr>').join('') : cisEmptyRow(7,'لا توجد محاولات تحقق مسجلة في البيانات المتاحة.');
+    const identityBody=document.getElementById('cis-identity-table');
+    if(identityBody) identityBody.innerHTML=enrollments.length ? enrollments.map(r=>'<tr><td>'+escapeHtml(r.student_id || '—')+'</td><td>'+escapeHtml(r.enrollment_number || r.student_id || '—')+'</td><td><span style="color:'+(r.active?'#15803d':'#b91c1c')+';font-weight:800;">'+(r.active?'نشطة':'غير نشطة')+'</span></td><td>'+escapeHtml(r.provider || '—')+'</td><td>'+cisDate(r.consent_at)+'</td><td>'+escapeHtml(r.model_version || '—')+'</td><td>'+cisDate(r.updated_at || r.created_at)+'</td></tr>').join('') : cisEmptyRow(7,'لا توجد تسجيلات هوية في البيانات المتاحة.');
+    const sessionsBody=document.getElementById('cis-sessions-table');
+    if(sessionsBody) sessionsBody.innerHTML=sessions.length ? sessions.map(r=>'<tr><td>'+escapeHtml(r.student_id || '—')+'</td><td>'+escapeHtml(cisTypeLabel(r.competition_type))+'</td><td>'+escapeHtml(r.competition_id || '—')+'</td><td>'+cisDate(r.created_at)+'</td><td>'+cisDate(r.expires_at)+'</td><td><span style="font-weight:800;color:'+(r.session_active?'#15803d':'#64748b')+';">'+(r.session_active?'سارية':'منتهية')+'</span></td></tr>').join('') : cisEmptyRow(6,'لا توجد جلسات تحقق محفوظة.');
+    cisCount('cis-security-count',security); cisCount('cis-attempts-count',attempts); cisCount('cis-identity-count',enrollments); cisCount('cis-sessions-count',sessions);
+  } catch (e) { const msg='تعذر تحميل السجلات: '+(e?.message || 'خطأ غير معروف'); ids.forEach((id,i)=>{const el=document.getElementById(id);if(el)el.innerHTML=cisEmptyRow([7,7,7,6][i],msg);}); console.error('competition identity admin report failed',e); showToast(msg,'error'); }
 }
 
 async function loadWeeklyQuizAuditAdmin() {
