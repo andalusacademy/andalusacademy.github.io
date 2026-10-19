@@ -186,7 +186,9 @@
   function cleanup() {
     removeAndalusAI();
     removeOldCompetitionLog();
-    ensureLogsNavItem();
+    // Records now live in the unified main-dashboard icon, not in a side-nav overlay.
+    document.querySelectorAll('[data-student-portal-logs-nav]').forEach(el => el.remove());
+    document.getElementById('student-portal-logs-page')?.remove();
   }
 
   function boot() {
