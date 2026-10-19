@@ -1,5 +1,5 @@
-/* Andalus Academy Service Worker — dismissed students v11 */
-const CACHE='andalus-v11-dismissed-students';
+/* Andalus Academy Service Worker — dismissed students v12 */
+const CACHE='andalus-v12-dismissed-students';
 const ASSETS=['./','./index.html','./manifest.json','./face-camera-fix.js?v=4','./student-portal-logs-ui.js?v=4','./cache-reset.js?v=2'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).catch(()=>{}));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
