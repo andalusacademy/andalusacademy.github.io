@@ -799,6 +799,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div class="nav-card c12 admin-only" onclick="showPage('requests');loadStudentRequestsAdmin()"><span class="nav-card-icon">🎫</span><span>الشكاوى والطلبات</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('notifications');loadNotificationsAdmin()"><span class="nav-card-icon">🔔</span><span>مركز التنبيهات</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('competition-security')"><span class="nav-card-icon">🔐</span><span>أمان المسابقات والتحقق والهوية</span></div>
+            <div class="nav-card c12 admin-only" onclick="showPage('dismissed-students');loadDismissedStudentsAdmin()" style="background:linear-gradient(135deg,#991b1b,#ef4444);color:#fff;border:1px solid #fecaca;"><span class="nav-card-icon" style="font-size:32px;">🚨</span><span>الطلاب المفصولون</span></div>
             <div class="nav-card c3" onclick="showPage('programs')"><span class="nav-card-icon">📚</span><span>البرامج والكورسات</span></div>
             <div class="nav-card c2" onclick="showPage('attendance')"><span class="nav-card-icon">✅</span><span>الحضور والغياب</span></div>
             <div class="nav-card c1" onclick="showPage('leads')"><span class="nav-card-icon">📞</span><span>الحجوزات والاستفسارات</span></div>
@@ -1731,6 +1732,20 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           <div class="card">
             <div class="card-header"><h3>🔑 جلسات الهوية التي تم التحقق منها <span id="cis-sessions-count"></span></h3></div>
             <div style="overflow-x:auto;"><table><thead><tr><th>الطالب / رقم القيد</th><th>نوع البوابة</th><th>معرّف المسابقة</th><th>تاريخ التحقق</th><th>انتهاء الجلسة</th><th>الحالة</th></tr></thead><tbody id="cis-sessions-table"><tr><td colspan="6" style="text-align:center;padding:16px;">جاري انتظار تحميل السجل.</td></tr></tbody></table></div>
+          </div>
+        </div>
+        <!-- DISMISSED STUDENTS ADMIN PAGE -->
+        <div id="page-dismissed-students" class="page">
+          <div class="card" style="margin-bottom:16px;border:1px solid #fecaca;">
+            <div class="card-header" style="background:linear-gradient(135deg,#991b1b,#ef4444);color:#fff;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+              <h3 style="color:#fff;">🚨 سجل الطلاب المفصولين</h3>
+              <button class="btn btn-outline btn-sm" style="background:#fff;color:#991b1b;" onclick="loadDismissedStudentsAdmin()">🔄 تحديث السجل</button>
+            </div>
+            <div style="padding:14px 18px;color:var(--muted);line-height:1.8;">قائمة مستقلة للطلاب الذين صدر بحقهم قرار فصل. يظل سجل الطالب وبياناته السابقة محفوظة، لكن لا يظهر في كشوف الحضور للمحاضرات التي تأتي بعد تاريخ الفصل.</div>
+          </div>
+          <div class="card">
+            <div style="padding:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><input id="dismissed-students-search" class="search-input" placeholder="بحث بالاسم أو رقم القيد أو الفرع..." style="flex:1;min-width:240px;" oninput="renderDismissedStudentsAdmin()"><span id="dismissed-students-count" style="font-weight:800;color:#b91c1c;">—</span></div>
+            <div style="overflow-x:auto;"><table><thead><tr><th>#</th><th>اسم الطالب</th><th>رقم القيد</th><th>الفرع</th><th>البرنامج</th><th>حالة الفصل</th><th>تاريخ قرار الفصل</th></tr></thead><tbody id="dismissed-students-table"><tr><td colspan="7" style="text-align:center;padding:22px;">اضغط تحديث السجل لتحميل البيانات.</td></tr></tbody></table></div>
           </div>
         </div>
         <!-- INSTALLMENT REMINDERS -->
@@ -4872,7 +4887,7 @@ function showPage(page) {
     attendance: 'الحضور والغياب', leads: 'الحجوزات والاستفسارات', payments: 'المدفوعات',
     expenses: 'المصروفات',
     reports: 'التقارير',
-    subjects: 'المواد الدراسية', employees: 'الموظفين', logs: 'سجل النشاط', profile: 'بروفايل الطالب', exams: 'الامتحانات الإلكترونية', 'exam-grades': 'درجات الامتحانات', breakeven: 'نقطة التعادل', court: 'محكمة الأداء', dream: 'النظام يحلم', campaigns: 'الحملات التسويقية', achievements: 'إنجازات وترتيب المتدربين', requests: 'الشكاوى والطلبات', 'competition-security': 'أمان المسابقات والتحقق والهوية'
+    subjects: 'المواد الدراسية', employees: 'الموظفين', logs: 'سجل النشاط', profile: 'بروفايل الطالب', exams: 'الامتحانات الإلكترونية', 'exam-grades': 'درجات الامتحانات', breakeven: 'نقطة التعادل', court: 'محكمة الأداء', dream: 'النظام يحلم', campaigns: 'الحملات التسويقية', achievements: 'إنجازات وترتيب المتدربين', requests: 'الشكاوى والطلبات', 'competition-security': 'أمان المسابقات والتحقق والهوية', 'dismissed-students': 'الطلاب المفصولون'
   };
   document.getElementById('page-title').textContent = titles[page] || '';
   if (page === 'leads') { loadLeads(); loadCampaigns(); }
@@ -4882,6 +4897,7 @@ function showPage(page) {
   if (page === 'employees') loadEmployees();
   if (page === 'logs') loadLogs();
   if (page === 'competition-security') loadCompetitionIdentityAdmin();
+  if (page === 'dismissed-students') loadDismissedStudentsAdmin();
   if (page === 'trainers') renderTrainersPerformance();
   if (page === 'alumni') loadAlumni();
   if (page === 'cashregister') {
@@ -6327,9 +6343,16 @@ async function renderAttendanceBySession() {
   document.getElementById('att-session-title').textContent =
     `كشف حضور: ${session.program_name || ''}${session.subject_name ? ' — ' + session.subject_name : ''} (${session.branch})`;
 
-  const matchingStudents = allStudents.filter(s =>
-    s.branch === session.branch && sessionMatchesStudent(session, s)
-  );
+  const attendanceEffectiveDate = date || new Date().toISOString().slice(0, 10);
+  const matchingStudents = allStudents.filter(s => {
+    if (s.branch !== session.branch || !sessionMatchesStudent(session, s)) return false;
+    const status = String(s.student_status || 'active');
+    if (!['dismissed','final_dismissed'].includes(status)) return true;
+    // Preserve records up to the dismissal date; exclude from later lecture attendance sheets.
+    const dismissedDate = String(s.dismissed_at || '').slice(0, 10);
+    if (dismissedDate && attendanceEffectiveDate > dismissedDate) return false;
+    return true;
+  });
 
   // ✅ استبعاد طلاب معينين من هذه المحاضرة بالذات (بيفضلوا فى البرنامج، بس مش من ضمن كشف الحضور ده)
   let excludedIds = new Set();
@@ -12938,6 +12961,27 @@ function copyWeeklyQuizEntryLink() {
   navigator.clipboard.writeText(url).then(() => {
     showToast('تم نسخ رابط الدخول المباشر للمسابقة الأسبوعية');
   }).catch(() => showToast('رابط الدخول: ' + url, 'info'));
+}
+
+let dismissedStudentsAdminRows = [];
+async function loadDismissedStudentsAdmin() {
+  const tbody = document.getElementById('dismissed-students-table');
+  if (!tbody) return;
+  if (!currentUser || currentUser.role !== 'admin') { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#b91c1c;">هذه الصفحة متاحة للمدير فقط.</td></tr>'; return; }
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">جاري تحميل الطلاب المفصولين...</td></tr>';
+  try {
+    const { data, error } = await sb.from('students').select('id,name,branch,program,system_name,student_status,dismissed_at,enrollment_date').is('deleted_at', null).in('student_status', ['dismissed','final_dismissed']).order('dismissed_at', { ascending: false });
+    if (error) throw error;
+    dismissedStudentsAdminRows = data || [];
+    renderDismissedStudentsAdmin();
+  } catch (e) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#b91c1c;">تعذر تحميل السجل: '+escapeHtml(e?.message || 'خطأ غير معروف')+'</td></tr>'; }
+}
+function renderDismissedStudentsAdmin() {
+  const tbody = document.getElementById('dismissed-students-table'); if (!tbody) return;
+  const q = (document.getElementById('dismissed-students-search')?.value || '').trim().toLowerCase();
+  const rows = dismissedStudentsAdminRows.filter(s => [s.id,s.name,s.branch,s.program,s.system_name].some(v => String(v || '').toLowerCase().includes(q)));
+  const count = document.getElementById('dismissed-students-count'); if (count) count.textContent = 'إجمالي المفصولين: ' + rows.length;
+  tbody.innerHTML = rows.length ? rows.map((s,i) => '<tr><td>'+(i+1)+'</td><td><strong>'+escapeHtml(s.name || '—')+'</strong></td><td>'+escapeHtml(s.enrollment_number || s.id || '—')+'</td><td>'+escapeHtml(s.branch || '—')+'</td><td>'+escapeHtml([s.program,s.system_name].filter(v=>v && v!=='—').join(' — ') || '—')+'</td><td><span style="display:inline-block;padding:4px 9px;border-radius:20px;background:#fee2e2;color:#991b1b;font-weight:800;">'+(s.student_status === 'final_dismissed' ? 'فصل نهائي' : 'مفصول')+'</span></td><td>'+escapeHtml(s.dismissed_at ? new Date(s.dismissed_at).toLocaleDateString('ar-EG') : 'غير مسجل')+'</td></tr>').join('') : '<tr><td colspan="7" style="text-align:center;padding:22px;">لا توجد نتائج مطابقة.</td></tr>';
 }
 
 function cisOutcomeLabel(value) {
