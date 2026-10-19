@@ -12970,7 +12970,7 @@ async function loadDismissedStudentsAdmin() {
   if (!currentUser || currentUser.role !== 'admin') { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:#b91c1c;">هذه الصفحة متاحة للمدير فقط.</td></tr>'; return; }
   tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;">جاري تحميل الطلاب المفصولين...</td></tr>';
   try {
-    const { data, error } = await sb.from('students').select('id,name,enrollment_number,branch,program,program_id,system_name,qualification,edu,guardian_name,parent_name,guardian_phone,parent_phone,student_status,dismissed_at,enrollment_date').is('deleted_at', null).in('student_status', ['dismissed','final_dismissed']).order('dismissed_at', { ascending: false });
+    const { data, error } = await sb.from('students').select('*').is('deleted_at', null).in('student_status', ['dismissed','final_dismissed']).order('dismissed_at', { ascending: false });
     if (error) throw error;
     dismissedStudentsAdminRows = data || [];
     renderDismissedStudentsAdmin();
@@ -12978,51 +12978,49 @@ async function loadDismissedStudentsAdmin() {
 }
 function renderDismissedStudentsAdmin() {
   const tbody = document.getElementById('dismissed-students-table'); if (!tbody) return;
-  const q = (document.getElementById('dismissed-students-search')?.value || '').trim().toLowerCase();
-  const rows = dismissedStudentsAdminRows.filter(s => [s.id,s.name,s.branch,s.program,s.system_name,s.qualification,s.edu,s.guardian_name,s.parent_name].some(v => String(v || '').toLowerCase().includes(q)));
+  const q = (document.getElementById('dismissed-students-search')?.value || '').trim().toLocaleLowerCase();
+  const rows = dismissedStudentsAdminRows.filter(s => [s.id,s.enrollment_number,s.name,s.branch,s.program,s.system_name,s.guardian_name,s.qualification].some(v => String(v || '').toLocaleLowerCase().includes(q)));
   const count = document.getElementById('dismissed-students-count'); if (count) count.textContent = 'إجمالي المفصولين: ' + rows.length;
-  tbody.innerHTML = rows.length ? rows.map((s) => {
-    const reg = s.enrollment_number || s.id || '—';
-    const status = s.student_status === 'final_dismissed' ? 'فصل نهائي' : 'في فترة التظلم';
-    const statusStyle = s.student_status === 'final_dismissed' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;';
-    const dismissedDate = s.dismissed_at ? new Date(s.dismissed_at).toLocaleDateString('ar-EG') : 'غير مسجل';
-    const guardian = s.guardian_name || s.parent_name || '—';
+  tbody.innerHTML = rows.length ? rows.map(s => {
+    const id = String(s.id);
+    const enrollment = s.enrollment_number || s.registration_number || s.id || '—';
     const program = s.program || '—';
     const system = s.system_name || '—';
-    const actions = '<div style="display:flex;gap:6px;flex-wrap:wrap;min-width:255px;">' +
-      (s.student_status !== 'final_dismissed' ? '<button class="btn btn-sm" style="background:#d97706;color:#fff;" onclick="restoreDismissedStudentForAppeal(\''+escapeHtml(String(s.id))+'\')">⚖️ قرار تظلم / استعادة</button><button class="btn btn-sm" style="background:#b91c1c;color:#fff;" onclick="finalizeStudentDismissal(\''+escapeHtml(String(s.id))+'\')">🔴 فصل نهائي</button>' : '<button class="btn btn-sm" style="background:#d97706;color:#fff;" onclick="restoreDismissedStudentForAppeal(\''+escapeHtml(String(s.id))+'\')">⚖️ قرار تظلم / استعادة</button>') +
-      '<button class="btn btn-sm btn-outline" onclick="openDismissedStudentFile(\''+escapeHtml(String(s.id))+'\')">👤 الملف</button></div>';
-    return '<tr><td>'+escapeHtml(String(reg))+'</td><td><strong>'+escapeHtml(s.name || '—')+'</strong></td><td>'+escapeHtml(s.qualification || s.edu || '—')+'</td><td>'+escapeHtml(program)+'</td><td>'+escapeHtml(system)+'</td><td>'+escapeHtml(s.branch || '—')+'</td><td>'+escapeHtml(guardian)+'</td><td><span style="display:inline-block;padding:4px 9px;border-radius:20px;font-weight:800;white-space:nowrap;'+statusStyle+'">'+status+'</span></td><td>'+escapeHtml(dismissedDate)+'</td><td>'+actions+'</td></tr>';
+    const statusLabel = s.student_status === 'final_dismissed' ? 'فصل نهائي' : 'في فترة التظلم';
+    const statusStyle = s.student_status === 'final_dismissed' ? 'background:#fee2e2;color:#991b1b;' : 'background:#fef3c7;color:#92400e;';
+    const date = s.dismissed_at ? new Date(s.dismissed_at).toLocaleDateString('ar-EG') : 'غير مسجل';
+    return '<tr><td><strong>'+escapeHtml(enrollment)+'</strong></td><td><strong>'+escapeHtml(s.name || '—')+'</strong></td><td>'+escapeHtml(s.qualification || s.edu || '—')+'</td><td>'+escapeHtml(program)+'</td><td>'+escapeHtml(system)+'</td><td>'+escapeHtml(s.branch || '—')+'</td><td>'+escapeHtml(s.guardian_name || '—')+'</td><td><span style="display:inline-block;padding:4px 9px;border-radius:20px;font-weight:800;white-space:nowrap;'+statusStyle+'">'+statusLabel+'</span></td><td>'+escapeHtml(date)+'</td><td><div class="actions"><button class="btn btn-warning btn-sm" onclick="dismissedStudentRestorePrompt(\''+id+'\')">⚖️ قرار تظلم / استعادة</button><button class="btn btn-danger btn-sm" onclick="finalizeStudentDismissal(\''+id+'\')">🔴 فصل نهائي</button><button class="btn btn-outline btn-sm" onclick="openProfile(\''+id+'\')">👤 الملف</button></div></td></tr>';
   }).join('') : '<tr><td colspan="10" style="text-align:center;padding:22px;">لا توجد نتائج مطابقة.</td></tr>';
 }
-async function restoreDismissedStudentForAppeal(id) {
-  if (!currentUser || currentUser.role !== 'admin') { showToast('استعادة الطلاب للمدير فقط', 'error'); return; }
-  const s = dismissedStudentsAdminRows.find(x => String(x.id) === String(id));
-  if (!s) return;
-  const confirmed = confirm('تأكيد استعادة الطالب '+(s.name || id)+'؟ سيتم إلغاء حالة الفصل وإعادته إلى قائمة الطلاب النشطين.');
-  if (!confirmed) return;
-  const { error } = await sb.from('students').update({ student_status: 'active', dismissed_at: null, dismissed_by: null }).eq('id', id);
-  if (error) { showToast('تعذر استعادة الطالب: '+error.message, 'error'); return; }
-  showToast('تمت استعادة الطالب إلى قائمة الطلاب النشطين.');
+async function dismissedStudentRestorePrompt(id) {
+  if (!currentUser || currentUser.role !== 'admin') { showToast('الإجراء متاح للمدير فقط','error'); return; }
+  const student = dismissedStudentsAdminRows.find(s => String(s.id) === String(id));
+  if (!student) return;
+  const choice = prompt('قرار التظلم للطالب: '+(student.name || id)+'\nاكتب 1 لاستعادة الطالب وتفعيل حالته، أو اكتب 2 للإبقاء عليه في فترة التظلم.', '1');
+  if (choice === null) return;
+  if (choice.trim() === '2') { showToast('لم يتم تغيير حالة الطالب'); return; }
+  if (choice.trim() !== '1') { showToast('اختيار غير صحيح؛ لم يتم إجراء أي تغيير','error'); return; }
+  if (!confirm('تأكيد استعادة الطالب '+(student.name || id)+'؟ ستعود حالته إلى نشط.')) return;
+  const { error } = await sb.from('students').update({student_status:'active', dismissed_at:null}).eq('id', id);
+  if (error) { showToast('تعذر استعادة الطالب: '+error.message,'error'); return; }
+  await logActivity('edit','استعادة طالب بعد التظلم: '+(student.name || id));
+  await loadStudents();
   await loadDismissedStudentsAdmin();
+  showToast('تمت استعادة الطالب وتفعيل حالته');
 }
 async function finalizeStudentDismissal(id) {
-  if (!currentUser || currentUser.role !== 'admin') { showToast('تعديل قرار الفصل للمدير فقط', 'error'); return; }
-  const s = dismissedStudentsAdminRows.find(x => String(x.id) === String(id));
-  if (!s) return;
-  const confirmed = confirm('تأكيد تحويل قرار فصل '+(s.name || id)+' إلى فصل نهائي؟');
-  if (!confirmed) return;
-  const { error } = await sb.from('students').update({ student_status: 'final_dismissed' }).eq('id', id);
-  if (error) { showToast('تعذر تحديث قرار الفصل: '+error.message, 'error'); return; }
-  showToast('تم تسجيل الفصل النهائي.');
+  if (!currentUser || currentUser.role !== 'admin') { showToast('الإجراء متاح للمدير فقط','error'); return; }
+  const student = dismissedStudentsAdminRows.find(s => String(s.id) === String(id));
+  if (!student) return;
+  if (!confirm('تأكيد تحويل حالة '+(student.name || id)+' إلى فصل نهائي؟')) return;
+  const { error } = await sb.from('students').update({student_status:'final_dismissed'}).eq('id', id);
+  if (error) { showToast('تعذر تسجيل الفصل النهائي: '+error.message,'error'); return; }
+  await logActivity('edit','تحويل حالة الطالب إلى فصل نهائي: '+(student.name || id));
+  await loadStudents();
   await loadDismissedStudentsAdmin();
+  showToast('تم تسجيل الفصل النهائي');
 }
-function openDismissedStudentFile(id) {
-  if (!currentUser || currentUser.role !== 'admin') { showToast('ملف الطالب متاح للمدير فقط', 'error'); return; }
-  const student = (typeof allStudents !== 'undefined' ? allStudents : []).find(x => String(x.id) === String(id));
-  if (student) { editStudent(student.id); return; }
-  showToast('بيانات الطالب موجودة في سجل المفصولين. افتح صفحة الطلاب ثم حدّث القائمة لفتح ملفه.', 'error');
-}
+
 function cisOutcomeLabel(value) {
   const labels = { success:'ناجح', failure:'فشل', blocked:'تم المنع', pending:'قيد المراجعة', verified:'تم التحقق', passed:'ناجح', failed:'فشل' };
   return labels[String(value || '').toLowerCase()] || value || '—';
