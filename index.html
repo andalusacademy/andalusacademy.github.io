@@ -4859,7 +4859,7 @@ function updateTime() {
    ============================================================ */
 
 // الصفحات الإدارية المحمية دائمًا للمدير فقط، بصرف النظر عن أي تخصيص
-const ADMIN_ONLY_PAGES = new Set(['subjects', 'breakeven', 'court', 'dream', 'employees', 'logs', 'achievements', 'requests', 'competition-security']);
+const ADMIN_ONLY_PAGES = new Set(['subjects', 'breakeven', 'court', 'dream', 'employees', 'logs', 'achievements', 'requests', 'competition-security', 'dismissed-students']);
 
 function showPage(page) {
   // ✅ فحص أمني: منع الموظف من فتح صفحة إدارية أو غير مسموح له بها، حتى لو استُدعيت الدالة مباشرة
@@ -12970,7 +12970,7 @@ async function loadDismissedStudentsAdmin() {
   if (!currentUser || currentUser.role !== 'admin') { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#b91c1c;">هذه الصفحة متاحة للمدير فقط.</td></tr>'; return; }
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">جاري تحميل الطلاب المفصولين...</td></tr>';
   try {
-    const { data, error } = await sb.from('students').select('id,name,branch,program,system_name,student_status,dismissed_at,enrollment_date').is('deleted_at', null).in('student_status', ['dismissed','final_dismissed']).order('dismissed_at', { ascending: false });
+    const { data, error } = await sb.from('students').select('id,name,enrollment_number,branch,program,system_name,student_status,dismissed_at,enrollment_date').is('deleted_at', null).in('student_status', ['dismissed','final_dismissed']).order('dismissed_at', { ascending: false });
     if (error) throw error;
     dismissedStudentsAdminRows = data || [];
     renderDismissedStudentsAdmin();
