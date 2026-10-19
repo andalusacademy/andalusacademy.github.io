@@ -1726,8 +1726,8 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div style="overflow-x:auto;"><table><thead><tr><th>التاريخ والوقت</th><th>الطالب / رقم القيد</th><th>نوع التحقق</th><th>النتيجة</th><th>سبب الفشل</th><th>المسافة / الحد</th><th>صورة المحاولة</th></tr></thead><tbody id="cis-attempts-table"><tr><td colspan="7" style="text-align:center;padding:16px;">جاري انتظار تحميل السجل.</td></tr></tbody></table></div>
           </div>
           <div class="card" style="margin-bottom:16px;">
-            <div class="card-header"><h3>🪪 سجل تسجيل الهوية وبصمة الوجه <span id="cis-identity-count"></span></h3></div>
-            <div style="overflow-x:auto;"><table><thead><tr><th>الطالب</th><th>رقم القيد</th><th>الحالة</th><th>مزود التحقق</th><th>تاريخ الموافقة</th><th>إصدار النموذج</th><th>آخر تحديث</th></tr></thead><tbody id="cis-identity-table"><tr><td colspan="7" style="text-align:center;padding:16px;">جاري انتظار تحميل السجل.</td></tr></tbody></table></div>
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><h3>🪪 تسجيلات التحقق والهوية <span id="cis-identity-count"></span></h3><button class="btn btn-danger btn-sm" onclick="resetAllStudentFaceEnrollments()">⚠️ إعادة ضبط تسجيلات جميع الطلاب</button></div><div style="padding:8px 14px;color:var(--muted);font-size:12px;line-height:1.8;">إعادة الضبط تلغي تسجيل الوجه النشط وجلسات التحقق فقط، وتُلزم الطالب بإعادة التسجيل. سجل المحاولات والصور القديمة لا يُحذف، ولا تتغير كلمات المرور أو بيانات الطلاب.</div>
+            <div style="overflow-x:auto;"><table><thead><tr><th>الطالب</th><th>رقم القيد</th><th>الحالة</th><th>مزود التحقق</th><th>تاريخ الموافقة</th><th>إصدار النموذج</th><th>آخر تحديث</th><th>إجراء</th></tr></thead><tbody id="cis-identity-table"><tr><td colspan="8" style="text-align:center;padding:16px;">جاري انتظار تحميل السجل.</td></tr></tbody></table></div>
           </div>
           <div class="card">
             <div class="card-header"><h3>🔑 جلسات الهوية التي تم التحقق منها <span id="cis-sessions-count"></span></h3></div>
@@ -13060,11 +13060,41 @@ async function loadCompetitionIdentityAdmin() {
     const attemptsBody=document.getElementById('cis-attempts-table');
     if(attemptsBody) attemptsBody.innerHTML=attemptsWithImages.length ? attemptsWithImages.map(r=>'<tr><td>'+cisDate(r.at)+'</td><td><strong>'+escapeHtml(r.student_label || '—')+'</strong>'+(r.phone_masked?'<div style="font-size:11px;color:var(--muted);">'+escapeHtml(r.phone_masked)+'</div>':'')+'</td><td>'+escapeHtml(r.method || '—')+'</td><td>'+escapeHtml(cisOutcomeLabel(r.outcome))+'</td><td style="min-width:180px;white-space:normal;">'+escapeHtml(r.reason || '—')+'</td><td>'+escapeHtml(r.distance == null ? '—' : String(r.distance))+' / '+escapeHtml(r.threshold == null ? '—' : String(r.threshold))+'</td><td>'+(r.displayImage?'<a href="'+escapeHtml(r.displayImage)+'" target="_blank" rel="noopener"><img src="'+escapeHtml(r.displayImage)+'" alt="صورة التحقق" loading="lazy" style="width:76px;height:76px;object-fit:cover;border-radius:9px;"></a>':'<span style="color:var(--muted);font-size:11px;">لا توجد صورة متاحة</span>')+'</td></tr>').join('') : cisEmptyRow(7,'لا توجد محاولات تحقق مسجلة في البيانات المتاحة.');
     const identityBody=document.getElementById('cis-identity-table');
-    if(identityBody) identityBody.innerHTML=enrollments.length ? enrollments.map(r=>'<tr><td>'+escapeHtml(r.student_id || '—')+'</td><td>'+escapeHtml(r.enrollment_number || r.student_id || '—')+'</td><td><span style="color:'+(r.active?'#15803d':'#b91c1c')+';font-weight:800;">'+(r.active?'نشطة':'غير نشطة')+'</span></td><td>'+escapeHtml(r.provider || '—')+'</td><td>'+cisDate(r.consent_at)+'</td><td>'+escapeHtml(r.model_version || '—')+'</td><td>'+cisDate(r.updated_at || r.created_at)+'</td></tr>').join('') : cisEmptyRow(7,'لا توجد تسجيلات هوية في البيانات المتاحة.');
+    if(identityBody) identityBody.innerHTML=enrollments.length ? enrollments.map(r=>'<tr><td>'+escapeHtml(r.student_name || r.student_id || '—')+'</td><td>'+escapeHtml(r.enrollment_number || r.student_id || '—')+'</td><td><span style="color:'+(r.active?'#15803d':'#b91c1c')+';font-weight:800;">'+(r.active?'نشطة':'غير نشطة')+'</span></td><td>'+escapeHtml(r.provider || '—')+'</td><td>'+cisDate(r.consent_at)+'</td><td>'+escapeHtml(r.model_version || '—')+'</td><td>'+cisDate(r.updated_at || r.created_at)+'</td><td>'+(r.active?'<button class="btn btn-danger btn-sm" onclick="resetStudentFaceEnrollment(\''+String(r.student_id || '').replace(/'/g,'')+'\',\''+String(r.enrollment_number || r.student_id || '').replace(/'/g,'')+'\')">إعادة ضبط</button>':'<span style="color:var(--muted);">يلزم إعادة التسجيل</span>')+'</td></tr>').join('') : cisEmptyRow(8,'لا توجد تسجيلات هوية في البيانات المتاحة.');
     const sessionsBody=document.getElementById('cis-sessions-table');
     if(sessionsBody) sessionsBody.innerHTML=sessions.length ? sessions.map(r=>'<tr><td>'+escapeHtml(r.student_id || '—')+'</td><td>'+escapeHtml(cisTypeLabel(r.competition_type))+'</td><td>'+escapeHtml(r.competition_id || '—')+'</td><td>'+cisDate(r.created_at)+'</td><td>'+cisDate(r.expires_at)+'</td><td><span style="font-weight:800;color:'+(r.session_active?'#15803d':'#64748b')+';">'+(r.session_active?'سارية':'منتهية')+'</span></td></tr>').join('') : cisEmptyRow(6,'لا توجد جلسات تحقق محفوظة.');
     cisCount('cis-security-count',security); cisCount('cis-attempts-count',attempts); cisCount('cis-identity-count',enrollments); cisCount('cis-sessions-count',sessions);
-  } catch (e) { const msg='تعذر تحميل السجلات: '+(e?.message || 'خطأ غير معروف'); ids.forEach((id,i)=>{const el=document.getElementById(id);if(el)el.innerHTML=cisEmptyRow([7,7,7,6][i],msg);}); console.error('competition identity admin report failed',e); showToast(msg,'error'); }
+  } catch (e) { const msg='تعذر تحميل السجلات: '+(e?.message || 'خطأ غير معروف'); ids.forEach((id,i)=>{const el=document.getElementById(id);if(el)el.innerHTML=cisEmptyRow([7,7,8,6][i],msg);}); console.error('competition identity admin report failed',e); showToast(msg,'error'); }
+}
+
+async function resetStudentFaceEnrollment(studentId, enrollmentNumber) {
+  if (!currentUser || currentUser.role !== 'admin') { showToast('إعادة ضبط تسجيل الوجه متاحة للمدير فقط','error'); return; }
+  if (!studentId) { showToast('لا يوجد معرّف طالب صالح لإعادة الضبط','error'); return; }
+  if (!confirm('تأكيد إعادة ضبط تسجيل الوجه للطالب رقم '+(enrollmentNumber || studentId)+'؟\nسيتم إلغاء التسجيل النشط والجلسات فقط، مع الاحتفاظ بسجل المحاولات والصور القديمة.')) return;
+  try {
+    const { error: enrollError } = await sb.from('competition_face_enrollments').update({active:false, face_descriptor:null, updated_at:new Date().toISOString()}).eq('student_id', String(studentId));
+    if (enrollError) throw enrollError;
+    const { error: sessionsError } = await sb.from('competition_face_verified_sessions').delete().eq('student_id', String(studentId));
+    if (sessionsError) throw sessionsError;
+    await logActivity('edit','إعادة ضبط تسجيل الوجه للطالب رقم '+(enrollmentNumber || studentId));
+    await loadCompetitionIdentityAdmin();
+    showToast('تمت إعادة ضبط تسجيل الوجه؛ سيحتاج الطالب إلى التسجيل من جديد.');
+  } catch(e) { showToast('تعذرت إعادة الضبط: '+(e?.message || 'خطأ غير معروف'),'error'); }
+}
+async function resetAllStudentFaceEnrollments() {
+  if (!currentUser || currentUser.role !== 'admin') { showToast('إعادة الضبط الجماعي متاحة للمدير فقط','error'); return; }
+  const typed = prompt('⚠️ هذا الإجراء سيعيد ضبط تسجيل الوجه لجميع الطلاب.\nاكتب RESET ALL للتأكيد.','');
+  if (typed !== 'RESET ALL') { if (typed !== null) showToast('لم يتم إجراء أي تغيير'); return; }
+  if (!confirm('تأكيد نهائي: إلغاء كل تسجيلات الوجه النشطة وجلسات التحقق؟ لن تُحذف المحاولات أو الصور القديمة ولن تتغير كلمات المرور أو بيانات الطلاب.')) return;
+  try {
+    const { error: enrollError } = await sb.from('competition_face_enrollments').update({active:false, face_descriptor:null, updated_at:new Date().toISOString()}).eq('active', true);
+    if (enrollError) throw enrollError;
+    const { error: sessionsError } = await sb.from('competition_face_verified_sessions').delete().gte('created_at','1970-01-01T00:00:00Z');
+    if (sessionsError) throw sessionsError;
+    await logActivity('edit','إعادة ضبط تسجيلات الوجه لجميع الطلاب');
+    await loadCompetitionIdentityAdmin();
+    showToast('تمت إعادة ضبط تسجيلات الوجه النشطة وجلسات التحقق لجميع الطلاب.');
+  } catch(e) { showToast('تعذرت إعادة الضبط الجماعي: '+(e?.message || 'خطأ غير معروف'),'error'); }
 }
 
 async function loadWeeklyQuizAuditAdmin() {
