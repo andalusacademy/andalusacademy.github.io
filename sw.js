@@ -1,4 +1,4 @@
-/* Andalus Academy Service Worker — clean v9 */
+/* Andalus Academy Service Worker — security center v10 */
 const CACHE='andalus-v10-security-center';
 const ASSETS=['./','./index.html','./manifest.json','./face-camera-fix.js?v=4','./student-portal-logs-ui.js?v=4','./cache-reset.js?v=2'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).catch(()=>{}));self.skipWaiting();});
