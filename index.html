@@ -7255,7 +7255,7 @@ function closeDismissalDecisionTestForm() {
   const form = document.getElementById('dismissal-test-form');
   if (form) form.style.display = 'none';
 }
-async function createDismissalDecisionTest() {
+async async function createDismissalDecisionTest() {
   const student = allStudents.find(x => x.id === currentProfileId);
   if (!student) { showToast('افتح ملف الطالب أولاً', 'error'); return; }
   const fixed = 'عدم الألتزام ببنود العقد واللائحة الدخلية.';
