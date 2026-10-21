@@ -19,7 +19,7 @@ function inject(){
  '<div id="ss-ai-file-info" style="margin:8px 0;color:var(--muted);font-size:12px"></div>'+
  '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" id="ss-ai-generate-btn" type="button">⬆️ رفع الملف وإنشاء الأسئلة</button><button class="btn btn-outline" id="ss-ai-publish-btn" type="button" disabled>💾 حفظ وإتاحة للطلاب</button></div>'+
  '<div id="ss-ai-status" style="margin-top:12px"></div><div style="margin-top:8px;font-size:12px;color:var(--muted)">بعد التوليد راجع الأسئلة في قسم إدارة الأسئلة أسفل الصفحة، واعتمد كل سؤال مناسب قبل الإتاحة.</div></div>';
- const anchor=page.querySelector('.card');if(anchor)anchor.insertAdjacentElement('beforebegin',card);else page.prepend(card);
+ const anchor=page.querySelector('.card');if(anchor)anchor.insertAdjacentElement('beforebegin',card);else page.prepend(card);const legacy=document.getElementById('ss-title')?.closest('.card');if(legacy){legacy.id='ss-legacy-summary-form-card';legacy.style.display='none';}
  document.getElementById('ss-ai-pdf').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];document.getElementById('ss-ai-file-info').textContent=f?'📄 '+f.name+' — '+(f.size/1024/1024).toFixed(2)+' MB':'';});
  document.getElementById('ss-ai-generate-btn').addEventListener('click',generate);
  document.getElementById('ss-ai-publish-btn').addEventListener('click',publish);
@@ -68,6 +68,8 @@ async function publish(){
  }catch(e){showStatus(e?.message||String(e),false);}finally{btn.disabled=false;}
 }
 function wire(){
+ if(typeof window.editStudySummary==='function'&&!window.editStudySummary.__ssFlowWrapped){const oldEdit=window.editStudySummary;const wrappedEdit=function(...args){const legacy=document.getElementById('ss-legacy-summary-form-card');if(legacy)legacy.style.display='block';return oldEdit.apply(this,args);};wrappedEdit.__ssFlowWrapped=true;window.editStudySummary=wrappedEdit;}
+ if(typeof window.resetStudySummaryForm==='function'&&!window.resetStudySummaryForm.__ssFlowWrapped){const oldReset=window.resetStudySummaryForm;const wrappedReset=function(...args){const result=oldReset.apply(this,args);const legacy=document.getElementById('ss-legacy-summary-form-card');if(legacy)legacy.style.display='none';return result;};wrappedReset.__ssFlowWrapped=true;window.resetStudySummaryForm=wrappedReset;}
  if(typeof window.loadStudySummaryAdmin==='function'&&!window.loadStudySummaryAdmin.__ssFlowWrapped){const old=window.loadStudySummaryAdmin;const wrapped=async function(...args){const r=await old.apply(this,args);inject();return r;};wrapped.__ssFlowWrapped=true;window.loadStudySummaryAdmin=wrapped;}
  if(typeof window.showPage==='function'&&!window.showPage.__ssFlowWrapped){const old=window.showPage;const wrapped=function(page,...args){const r=old.call(this,page,...args);if(page==='study-summaries')setTimeout(inject,0);return r;};wrapped.__ssFlowWrapped=true;window.showPage=wrapped;}
  inject();
