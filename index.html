@@ -16011,6 +16011,11 @@ async function reviewStudySummaryOrder(orderId,nextStatus){
   const labels={paid:'تأكيد الدفع ومنح الطالب صلاحية الملخص',pending_payment:'تسجيل أن الدفع لم يتم بعد',cancelled:'إلغاء طلب الشراء',rejected:'رفض طلب الشراء'};
   if(!confirm(labels[nextStatus]+'؟'))return;
   const summary=studySummaryAdminRows.find(s=>s.id===order.summary_id);
+  if(nextStatus==='paid'){
+    const {data:reviewQuestions,error:reviewError}=await sb.from('study_summary_questions').select('id,is_approved').eq('summary_id',order.summary_id);
+    if(reviewError){showToast('تعذر فحص أسئلة الملخص: '+reviewError.message,'error');return;}
+    if(!reviewQuestions?.length||reviewQuestions.some(q=>!q.is_approved)){showToast('لا يمكن إتاحة الملخص قبل اعتماد جميع أسئلته.','error');return;}
+  }
   const reviewedBy=(typeof currentAuth!=='undefined'&&currentAuth?.id)?currentAuth.id:null;
   const {error:updateError}=await sb.from('study_summary_orders').update({status:nextStatus,reviewed_by:reviewedBy,reviewed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',orderId);
   if(updateError){showToast('تعذر تحديث الطلب: '+updateError.message,'error');return;}
