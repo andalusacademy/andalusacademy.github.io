@@ -16060,7 +16060,7 @@ async function goToPortalStudySummaries(){
         </div>
       </div>`).join(''):'<div style="text-align:center;padding:28px;color:var(--muted);border:1px dashed var(--border);border-radius:12px">لا توجد ملخصات متاحة حاليًا.</div>'}</div>
     <div style="margin-top:18px"><h3 style="font-size:14px;color:var(--navy);margin-bottom:8px">🧾 طلباتي</h3>
-    ${orders.length?orders.map(o=>'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding:9px 0;font-size:12px"><span>'+ssEsc(o.summary_title)+' · رقم '+ssOrderNumber(o.id)+'</span><strong>'+ssMoney(o.amount)+' — <span style="color:#b45309">في انتظار الدفع</span></strong></div>').join(''):'<div style="font-size:12px;color:var(--muted)">لا توجد طلبات حتى الآن.</div>'}</div>`;
+    ${orders.length?orders.map(o=>{const labels={pending_payment:'لم يتم الدفع — الطلب قيد المراجعة',paid:'تم الدفع — الملخص متاح لك',cancelled:'تم إلغاء الطلب',rejected:'تم رفض الطلب'};const color=o.status==='paid'?'#15803d':o.status==='rejected'?'#b91c1c':o.status==='cancelled'?'#64748b':'#b45309';return '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding:9px 0;font-size:12px"><span>'+ssEsc(o.summary_title)+' · رقم '+ssOrderNumber(o.id)+'</span><strong>'+ssMoney(o.amount)+' — <span style="color:'+color+'">'+ssEsc(labels[o.status]||o.status)+'</span></strong></div>';}).join(''):'<div style="font-size:12px;color:var(--muted)">لا توجد طلبات حتى الآن.</div>'}</div>`;
 }
 async function requestStudentStudySummary(id){
   const s=studySummaryStudentRows.find(x=>x.id===id);if(!s)return;
@@ -16070,7 +16070,7 @@ async function requestStudentStudySummary(id){
     const msg=data?.reason==='already_has_access'?'لديك صلاحية فعّالة لهذا الملخص.':data?.reason==='session_expired'?'انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.':error?.message||'تعذر إنشاء الطلب.';
     showToast(msg,'error');if(data?.reason==='session_expired')studentPortalFaceToken=null;return;
   }
-  showToast('تم إنشاء تم إنشاء طلب شراء بحالة «لم يتم الدفع»','success');
+  showToast('تم إنشاء طلب الشراء بنجاح، وحالته الآن «لم يتم الدفع»','success');
   await goToPortalStudySummaries();
 }
 async function openStudentStudySummary(id){
