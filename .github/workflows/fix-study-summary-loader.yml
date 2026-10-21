@@ -1,0 +1,40 @@
+name: Fix study summary AI loader
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix loader placement
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          tag = '<script src="study-summary-ai.js"></script>'
+          s = s.replace(tag, '')
+          pos = s.rfind('</body>')
+          if pos < 0:
+              raise SystemExit('body marker not found')
+          s = s[:pos] + tag + '\n' + s[pos:]
+          p.write_text(s, encoding='utf-8')
+      - name: Commit
+        run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name 'andalusacademy-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Fix study summary AI loader placement'
+          git push
+      - name: Remove workflow
+        if: always()
+        run: |
+          git rm .github/workflows/fix-study-summary-loader.yml || true
+          git config user.name 'andalusacademy-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Remove one-shot loader fix workflow' || true
+          git push || true
