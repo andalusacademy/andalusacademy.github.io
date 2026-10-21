@@ -12706,6 +12706,9 @@ let examFaceVerificationToken = null;
 let examStudentPhone = '';
 
 function showStudentPortalLoginStep() {
+  studentPortalFaceToken = null;
+  unifiedPortalStudent = null;
+  unifiedPortalPhone = '';
   stopStudentFaceCamera();
   document.getElementById('student-portal-content').innerHTML = `
     <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أدخل رقم القيد ورقم الهاتف المسجل، ثم تحقق من الوجه للدخول الآمن</p>
@@ -15763,6 +15766,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTraineeRanking(
    ============================================================ */
 let studySummaryAdminRows = [];
 let studySummaryQuestionRows = [];
+let studySummaryQuestionCounts = {};
 let studySummaryOrderRows = [];
 let studySummarySelectedId = null;
 let studySummaryStudentRows = [];
@@ -15779,6 +15783,9 @@ async function loadStudySummaryAdmin() {
   const {data, error} = await sb.from('study_summaries').select('*').order('created_at',{ascending:false});
   if (error) { if(list) list.innerHTML = '<tr><td colspan="7" style="color:#b91c1c;text-align:center">تعذر تحميل الملخصات: '+ssEsc(error.message)+'</td></tr>'; return; }
   studySummaryAdminRows = data || [];
+  const questionIndex = await sb.from('study_summary_questions').select('summary_id');
+  studySummaryQuestionCounts = {};
+  (questionIndex.data || []).forEach(q => { studySummaryQuestionCounts[q.summary_id] = (studySummaryQuestionCounts[q.summary_id] || 0) + 1; });
   renderStudySummaryAdminRows();
   await loadStudySummaryOrdersAdmin();
   if (studySummarySelectedId && studySummaryAdminRows.some(x=>x.id===studySummarySelectedId)) await loadStudySummaryQuestions(studySummarySelectedId);
@@ -15788,7 +15795,7 @@ function renderStudySummaryAdminRows() {
   if (!body) return;
   if (!studySummaryAdminRows.length) { body.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:18px">لم تتم إضافة ملخصات بعد.</td></tr>'; return; }
   body.innerHTML = studySummaryAdminRows.map(s => {
-    const count = studySummaryQuestionRows.filter(q=>q.summary_id===s.id).length;
+    const count = studySummaryQuestionCounts[s.id] ?? studySummaryQuestionRows.filter(q=>q.summary_id===s.id).length;
     return '<tr><td><strong>'+ssEsc(s.title)+'</strong><div style="font-size:11px;color:var(--muted)">'+ssEsc(s.description||'')+'</div></td><td>'+ssEsc(s.subject_name||'—')+'</td><td>'+ssMoney(s.price)+'</td><td>'+ssEsc(s.validity_days)+' يوم</td><td>'+count+'</td><td><span class="badge '+(s.is_published?'badge-success':'badge-gray')+'">'+(s.is_published?'متاح للطلاب':'مسودة')+'</span></td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="editStudySummary(\''+s.id+'\')">تعديل</button><button class="btn btn-primary btn-sm" onclick="selectStudySummaryForQuestions(\''+s.id+'\')">الأسئلة</button><button class="btn btn-danger btn-sm" onclick="deleteStudySummary(\''+s.id+'\')">حذف</button></div></td></tr>';
   }).join('');
 }
@@ -15859,6 +15866,7 @@ async function loadStudySummaryQuestions(id) {
   const {data,error}=await sb.from('study_summary_questions').select('*').eq('summary_id',id).order('order_num').order('created_at');
   if(error){if(body)body.innerHTML='<tr><td colspan="4" style="color:#b91c1c">تعذر تحميل الأسئلة: '+ssEsc(error.message)+'</td></tr>';return;}
   studySummaryQuestionRows=data||[];
+  studySummaryQuestionCounts[id] = studySummaryQuestionRows.length;
   if(body)body.innerHTML=studySummaryQuestionRows.length?studySummaryQuestionRows.map((q,i)=>'<tr><td>'+ssEsc(q.order_num)+'</td><td>'+ssEsc(q.question_text)+'</td><td>'+ssEsc(q.answer_text.slice(0,150))+(q.answer_text.length>150?'…':'')+'</td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="editStudySummaryQuestion(\''+q.id+'\')">تعديل</button><button class="btn btn-danger btn-sm" onclick="deleteStudySummaryQuestion(\''+q.id+'\')">حذف</button></div></td></tr>').join(''):'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:18px">لا توجد أسئلة لهذا الملخص.</td></tr>';
   renderStudySummaryAdminRows();
 }
@@ -15904,7 +15912,9 @@ async function loadStudySummaryOrdersAdmin(){
   const summaryMap=new Map(studySummaryAdminRows.map(s=>[s.id,s]));
   body.innerHTML=studySummaryOrderRows.length?studySummaryOrderRows.map(o=>{
     const st=studentMap.get(String(o.student_id));const sm=summaryMap.get(o.summary_id);
-    return '<tr><td><code>'+ssOrderNumber(o.id)+'</code></td><td>'+ssEsc(st?.name||'—')+'</td><td>'+ssEsc(st?.enrollment_number||o.student_id)+'</td><td>'+ssEsc(sm?.title||'ملخص محذوف')+'</td><td>'+ssMoney(o.amount)+'</td><td><span class="badge badge-warning">في انتظار الدفع</span></td><td>'+ssEsc(new Date(o.created_at).toLocaleString('ar-EG'))+'</td></tr>';
+    const statusLabel={pending_payment:'في انتظار الدفع',paid:'مدفوع',cancelled:'ملغي',rejected:'مرفوض'}[o.status]||o.status;
+    const statusClass=o.status==='paid'?'badge-success':o.status==='pending_payment'?'badge-warning':'badge-gray';
+    return '<tr><td><code>'+ssOrderNumber(o.id)+'</code></td><td>'+ssEsc(st?.name||'—')+'</td><td>'+ssEsc(st?.enrollment_number||o.student_id)+'</td><td>'+ssEsc(sm?.title||'ملخص محذوف')+'</td><td>'+ssMoney(o.amount)+'</td><td><span class="badge '+statusClass+'">'+ssEsc(statusLabel)+'</span></td><td>'+ssEsc(new Date(o.created_at).toLocaleString('ar-EG'))+'</td></tr>';
   }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:18px">لا توجد طلبات شراء حتى الآن.</td></tr>';
 }
 
