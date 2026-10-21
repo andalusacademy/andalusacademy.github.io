@@ -16023,7 +16023,7 @@ async function reviewStudySummaryOrder(orderId,nextStatus){
       const {error:grantError}=await sb.from('study_summary_entitlements').insert({student_id:order.student_id,summary_id:order.summary_id,order_id:orderId,starts_at:now.toISOString(),expires_at:expires.toISOString()});
       if(grantError){await sb.from('study_summary_orders').update({status:'pending_payment'}).eq('id',orderId);showToast('تم حفظ حالة الطلب جزئيًا لكن تعذر منح الصلاحية: '+grantError.message,'error');return;}
     }
-  }else if(nextStatus==='cancelled'||nextStatus==='rejected'){
+  }else if(nextStatus==='cancelled'||nextStatus==='rejected'||nextStatus==='pending_payment'){
     const {error:revokeError}=await sb.from('study_summary_entitlements').update({revoked_at:new Date().toISOString()}).eq('order_id',orderId).is('revoked_at',null);
     if(revokeError){showToast('تم تحديث الطلب لكن تعذر إلغاء الصلاحية السابقة: '+revokeError.message,'error');}
   }
@@ -16049,7 +16049,7 @@ async function goToPortalStudySummaries(){
   const orders=ordersResult.data?.ok?(ordersResult.data.orders||[]):[];
   box.innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><button class="btn btn-outline btn-sm" onclick="renderStudentPortalMenu()">← رجوع</button><strong style="color:var(--navy);font-size:17px">📚 ملخصات الامتحانات الشهرية</strong></div>
-    <p style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:14px">تصفح الملخصات المتاحة. طلب الشراء هنا تجريبي فقط؛ لا يوجد دفع إلكتروني مفعّل حاليًا ولا تُفتح الملخصات المدفوعة قبل تفعيل الدفع ومنح الصلاحية.</p>
+    <p style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:14px">تصفح الملخصات المتاحة واطلب شراء الملخص. الإدارة تراجع الدفع يدويًا، ولن يُفتح الملخص إلا بعد تأكيد الدفع ومنح الصلاحية.</p>
     <div style="display:grid;gap:12px">${studySummaryStudentRows.length?studySummaryStudentRows.map(s=>`
       <div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff">
         <div style="font-weight:900;color:var(--navy);font-size:15px">${ssEsc(s.title)}</div>
@@ -16117,7 +16117,7 @@ async function changeStudySummaryQuestion(delta){
 </script>
 
 
-<script src="study-summary-ai.js"></script>
+<script src="study-summary-ai.js?v=2"></script>
 <script src="login-runtime-guard.js?v=1"></script>
 </body>
 </html>
