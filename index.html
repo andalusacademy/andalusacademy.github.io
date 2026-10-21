@@ -1821,19 +1821,20 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 
           <div class="profile-tab-content" id="tab-procedures">
             <div style="margin-bottom:16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;" class="no-print">
-              <button class="btn btn-outline" onclick="openDismissalDecisionTestForm()">🧪 تجربة قرار فصل PDF</button>
+              <button class="btn btn-outline" onclick="openDismissalDecisionTestForm()">📄 إصدار قرار فصل PDF</button>
               <button class="btn btn-gold" onclick="openAddProcedure()">+ إضافة إجراء</button>
             </div>
             <div id="dismissal-test-form" class="card no-print" style="display:none;margin-bottom:16px;border:2px solid #bfdbfe;">
-              <div class="card-header"><h3>🧪 نموذج تجربة قرار فصل PDF</h3><button class="btn btn-outline btn-sm" type="button" onclick="closeDismissalDecisionTestForm()">إغلاق ✕</button></div>
+              <div class="card-header"><h3>📄 إصدار قرار فصل PDF</h3><button class="btn btn-outline btn-sm" type="button" onclick="closeDismissalDecisionTestForm()">إغلاق ✕</button></div>
               <div style="padding:16px;display:grid;gap:14px;">
+                <div class="form-group2"><label for="dismissal-test-number">رقم القرار</label><input id="dismissal-test-number" type="text" placeholder="اكتب رقم القرار" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;"></div>
                 <div class="form-group2"><label>اسم المتدرب</label><input id="dismissal-test-student" type="text" readonly style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;"></div>
                 <div class="form-group2"><label>السبب الأول (ثابت في كل القرارات)</label><textarea rows="2" readonly style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;resize:vertical;">عدم الألتزام ببنود العقد واللائحة الدخلية.</textarea></div>
                 <div class="form-group2"><label for="dismissal-test-reason2">السبب الثاني</label><textarea id="dismissal-test-reason2" rows="2" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;resize:vertical;">غياب اكتر من 50% من اجمالى كل محاضرة.</textarea></div>
                 <div class="form-group2"><label for="dismissal-test-reason3">السبب الثالث</label><textarea id="dismissal-test-reason3" rows="2" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;resize:vertical;">عدم دفع البند المالى في المواعيد المحدده.</textarea></div>
                 <div class="form-group2"><label for="dismissal-test-reason4">السبب الرابع (اختياري)</label><textarea id="dismissal-test-reason4" rows="2" placeholder="اكتب سببًا إضافيًا إن وجد" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;resize:vertical;"></textarea></div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-start;"><button class="btn btn-gold" type="button" onclick="createDismissalDecisionTest()">حفظ التجربة وفتح PDF</button><button class="btn btn-outline" type="button" onclick="closeDismissalDecisionTestForm()">إلغاء</button></div>
-                <div style="font-size:12px;color:var(--muted);">هذه تجربة فقط؛ لن تغيّر حالة الطالب ولن تُسجَّل كقرار فصل رسمي.</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-start;"><button class="btn btn-gold" type="button" onclick="createDismissalDecisionTest()">حفظ القرار وفتح PDF</button><button class="btn btn-outline" type="button" onclick="closeDismissalDecisionTestForm()">إلغاء</button></div>
+                <div style="font-size:12px;color:var(--muted);">سيُحفظ المستند في سجل إجراءات الطالب. إصدار المستند لا يغيّر حالة الطالب تلقائيًا.</div>
               </div>
             </div>
             <div id="procedures-list"></div>
@@ -7303,38 +7304,38 @@ async function createDismissalDecisionTest() {
   const r2 = document.getElementById('dismissal-test-reason2').value.trim();
   const r3 = document.getElementById('dismissal-test-reason3').value.trim();
   const r4 = document.getElementById('dismissal-test-reason4').value.trim();
+  const enteredNo = document.getElementById('dismissal-test-number').value.trim();
+  if (!enteredNo) { showToast('اكتب رقم القرار قبل الحفظ', 'error'); return; }
   if (!r2 || !r3) { showToast('اكتب السبب الثاني والثالث قبل الحفظ', 'error'); return; }
   const reasons = [fixed,r2,r3,r4].filter(Boolean);
   const now = new Date();
   const date = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
-  const dateText = new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).format(now);
-  const no = 'تجريبي-' + now.getFullYear() + '-' + String(now.getTime()).slice(-5);
-  const details = 'قرار فصل تجريبي — لا يغيّر حالة الطالب.\n' + reasons.map((x,i)=>(i+1)+'. '+x).join('\n');
+  const dateText = new Intl.DateTimeFormat('ar-EG',{day:'numeric',month:'long',year:'numeric'}).format(now);
+  const no = enteredNo;
+  const details = 'قرار فصل للمتدرب: ' + (student.name || '') + '\\n' + reasons.map((x,i)=>(i+1)+'. '+x).join('\\n');
   const esc = x => String(x ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const reasonHtml = reasons.map(x => '<p style="font-weight:bold;margin:15px 0">➢ ' + esc(x) + '</p>').join('');
+  const reasonHtml = reasons.map((x,i) => '<div class="reason"><span class="arrow">➢</span><span>' + esc(x) + '</span></div>').join('');
   const w = window.open('', '_blank');
-  if (!w) { showToast('المتصفح منع نافذة PDF؛ اسمح بالنوافذ المنبثقة لهذا الموقع ثم حاول مجددًا.', 'error'); return; }
-  const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قرار فصل تجريبي</title><style>@page{size:A4;margin:20mm}body{font-family:Tahoma,Arial,sans-serif;color:#17243b;line-height:1.9;font-size:15px}.doc{border:3px double #1f3562;padding:24px;min-height:250mm}.title{text-align:center;font-size:20px;font-weight:bold;margin:10px 0 25px}.date{text-align:center;margin-bottom:20px}.section{text-align:center;font-weight:bold;font-size:18px;margin:22px 0}.student{text-align:center;font-size:19px;font-weight:bold;margin:8px 0 25px}.sign{text-align:center;font-weight:bold;margin-top:55px}.note{text-align:center;font-size:10px;color:#777;margin-top:25px}</style></head><body><div class="doc"><div class="title">قرار إداري رقم (' + esc(no) + ') لسنة ' + now.getFullYear() + '</div><div class="date">التاريخ: ' + esc(dateText) + '</div><b>بعد الاطلاع على:</b><p>- النظام الداخلي للمركز المعتمد من مجلس الإدارة.</p><p>- قرار مجلس الإدارة رقم 1 لسنة 2024 الصادر بشأن اللائحة التنفيذية وتنظيم سير العملية التدريبية.</p><p>- قرار مجلس الإدارة رقم 15 لسنة 2024 الصادر بشأن اللائحة العامة للتدريب والتأهيل.</p><p>- اللائحة التنفيذية والمنظمة لسير العملية التدريبية.</p><p>- العقد وبنوده الموقع بين مركز الأندلس والمتدرب.</p><p>- الجانب القانوني.</p><div class="section">تقرر الآتي:</div><div class="section">فصل المتدربين /</div><div class="student">' + esc(student.name || '') + '</div><b>وذلك للآتي ذكره:</b>' + reasonHtml + '<div class="sign">المدير العام<br>د / اسلام صبري العشري</div></div><script>window.onload=()=>setTimeout(()=>window.print(),300);<\/script></body></html>';
+  if (!w) { showToast('المتصفح منع نافذة المستند؛ اسمح بالنوافذ المنبثقة لهذا الموقع ثم حاول مجددًا.', 'error'); return; }
+  const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قرار إداري رقم ' + esc(no) + '</title><style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#142c54;line-height:1.75;font-size:14px;margin:0;background:white}.page{min-height:270mm;border:5px double #244a83;padding:18mm 16mm 14mm;position:relative}.top{text-align:center;border-bottom:2px solid #c49a42;padding-bottom:10px;margin-bottom:14px}.brand{font-size:26px;font-weight:bold;color:#173b70}.sub{font-size:12px;color:#9b7628}.title{text-align:center;font-size:20px;font-weight:bold;text-decoration:underline;text-underline-offset:5px;margin:15px 0 20px}.intro{color:#222}.intro p{margin:5px 0}.section{text-align:center;font-weight:bold;font-size:18px;margin:17px 0 8px}.student{text-align:center;font-size:21px;font-weight:bold;color:#164782;margin:12px 0 20px}.reason{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:bold;color:#163a70}.arrow{color:#b18a37;font-size:18px}.sign{display:flex;justify-content:space-between;align-items:flex-end;margin-top:45px;font-weight:bold;text-align:center}.seal{border:3px double #b28b3e;border-radius:50%;width:85px;height:85px;display:flex;align-items:center;justify-content:center;color:#a17a2c;font-size:11px;padding:10px}.footer{position:absolute;bottom:5mm;left:12mm;right:12mm;text-align:center;border-top:1px solid #c6a35b;padding-top:5px;font-size:10px;color:#5c6680}.date{text-align:left;color:#333;margin:0 0 12px}</style></head><body><div class="page"><div class="top"><div class="brand">الأندلس</div><div class="sub">مركز الأندلس للتدريب</div></div><div class="title">قرار إداري رقم (' + esc(no) + ') لسنة ' + now.getFullYear() + '</div><div class="date">التاريخ: ' + esc(dateText) + '</div><div class="intro"><b>بعد الاطلاع على:</b><p>• النظام الداخلي للمركز المعتمد من مجلس الإدارة.</p><p>• قرار مجلس الإدارة بشأن اللائحة التنفيذية وتنظيم سير العملية التدريبية.</p><p>• اللائحة العامة للتدريب والتأهيل.</p><p>• العقد وبنوده الموقع بين مركز الأندلس والمتدرب.</p><p>• مقتضيات مصلحة العملية التدريبية.</p></div><div class="section">تقرر الآتي:</div><div class="section">فصل المتدرب /</div><div class="student">' + esc(student.name || '') + '</div><b>وذلك للآتي ذكره:</b>' + reasonHtml + '<div class="sign"><div>مدير مركز الأندلس<br><br>د / إسلام صبري العشري</div><div class="seal">ختم<br>مركز الأندلس</div></div><div class="footer">مركز الأندلس للتدريب — قرار إداري داخلي</div></div><script>window.onload=()=>setTimeout(()=>window.print(),400);<\\/script></body></html>';
   w.document.open(); w.document.write(html); w.document.close();
-  // لا نضع created_by هنا: قيمة auth.uid لا تطابق بالضرورة مفتاح جدول المستخدمين المشار إليه بالمفتاح الأجنبي.
-  // النوع التجريبي منفصل عن النوع الرسمي لتجنب احتسابه قرار فصل حقيقيًا.
   const { error } = await sb.from('procedures').insert({
     student_id: currentProfileId,
-    type: 'فصل تجريبي',
+    type: 'فصل',
     reference_number: no,
     date: date,
     details: details,
-    result: 'تجربة PDF فقط — لم يتم فصل الطالب'
+    result: 'تم إنشاء مستند قرار الفصل PDF'
   });
   if (error) {
     w.close();
-    showToast('فشل حفظ التجربة: ' + error.message, 'error');
+    showToast('فشل حفظ القرار في سجل الإجراءات: ' + error.message, 'error');
     return;
   }
-  await logActivity('add', 'حفظ تجربة قرار فصل PDF للطالب: ' + (student.name || currentProfileId) + ' — ' + no);
+  await logActivity('add', 'إصدار مستند قرار فصل للطالب: ' + (student.name || currentProfileId) + ' — ' + no);
   await loadProcedures();
   closeDismissalDecisionTestForm();
-  showToast('تم حفظ سجل التجربة وفتح الطباعة. اختر حفظ كـ PDF.', 'success');
+  showToast('تم حفظ القرار وفتح نافذة الطباعة؛ اختر حفظ كـ PDF.', 'success');
 }
 
 function openAddProcedure() {
