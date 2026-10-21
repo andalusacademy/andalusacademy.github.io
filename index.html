@@ -795,6 +795,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
         <div id="page-dashboard" class="page active">
           <div class="nav-cards-grid no-print" id="nav-cards-grid">
             <div class="nav-card c4" onclick="showPage('students')"><span class="nav-card-icon">👨‍🎓</span><span>الطلاب</span></div>
+            <div class="nav-card c5 admin-only" onclick="showPage('study-summaries')" style="background:linear-gradient(135deg,#0f766e,#164e63);"><span class="nav-card-icon">📚</span><span>مكتبة ملخصات الامتحانات</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('achievements');loadAchievementsAdmin()"><span class="nav-card-icon">🏅</span><span>إنجازات وترتيب المتدربين</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('requests');loadStudentRequestsAdmin()"><span class="nav-card-icon">🎫</span><span>الشكاوى والطلبات</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('notifications');loadNotificationsAdmin()"><span class="nav-card-icon">🔔</span><span>مركز التنبيهات</span></div>
@@ -1020,6 +1021,44 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           <div class="card">
             <div class="card-header"><h3>📋 الإنجازات المسجلة</h3><span id="ach-count" style="font-size:12px;color:var(--muted)">0 إنجاز</span></div>
             <div style="overflow-x:auto;"><table><thead><tr><th>المتدرب</th><th>نوع الإنجاز</th><th>العنوان</th><th>التاريخ</th><th>النقاط</th><th>نقاط الأنشطة</th><th>الوصف</th><th>إجراء</th></tr></thead><tbody id="ach-records-table"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px;">جاري التحميل...</td></tr></tbody></table></div>
+          </div>
+        </div>
+
+        <!-- STUDY SUMMARIES ADMIN -->
+        <div id="page-study-summaries" class="page">
+          <div class="card">
+            <div class="card-header"><h3>📚 إعداد ملخص امتحان</h3><span style="font-size:12px;color:var(--muted)">الإدارة فقط</span></div>
+            <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+              <input type="hidden" id="ss-edit-id">
+              <div class="form-group"><label>عنوان الملخص</label><input id="ss-title" class="search-input" maxlength="180" style="width:100%;max-width:none" placeholder="مثال: ملخص أساسيات التمريض"></div>
+              <div class="form-group"><label>المادة</label><input id="ss-subject" class="search-input" maxlength="160" style="width:100%;max-width:none" placeholder="اسم المادة الدراسية"></div>
+              <div class="form-group"><label>السعر بالجنيه</label><input id="ss-price" type="number" min="0" step="0.01" value="0" class="search-input" style="width:100%;max-width:none"></div>
+              <div class="form-group"><label>مدة الصلاحية (بالأيام)</label><input id="ss-validity" type="number" min="1" max="3650" value="30" class="search-input" style="width:100%;max-width:none"></div>
+              <div class="form-group" style="grid-column:1/-1"><label>وصف مختصر</label><textarea id="ss-description" class="search-input" maxlength="3000" style="width:100%;max-width:none;min-height:75px" placeholder="محتويات الملخص والفئة المستهدفة"></textarea></div>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800"><input id="ss-published" type="checkbox"> إتاحة الملخص للطلاب</label>
+            </div>
+            <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" onclick="saveStudySummary()">💾 حفظ الملخص</button><button class="btn btn-outline" onclick="resetStudySummaryForm()">إلغاء / ملخص جديد</button></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>📖 الملخصات المسجلة</h3><button class="btn btn-outline btn-sm" onclick="loadStudySummaryAdmin()">تحديث</button></div>
+            <div style="overflow-x:auto"><table><thead><tr><th>الملخص</th><th>المادة</th><th>السعر</th><th>الصلاحية</th><th>الأسئلة</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody id="ss-admin-list"><tr><td colspan="7" style="text-align:center">جاري التحميل...</td></tr></tbody></table></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>❓ إدارة الأسئلة والإجابات</h3><span id="ss-selected-title" style="font-size:12px;color:var(--muted)">اختر ملخصًا من الجدول أولًا</span></div>
+            <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+              <input type="hidden" id="ssq-edit-id">
+              <div class="form-group" style="grid-column:1/-1"><label>السؤال</label><textarea id="ssq-question" class="search-input" style="width:100%;max-width:none;min-height:85px" maxlength="12000" placeholder="اكتب سؤالًا واحدًا"></textarea></div>
+              <div class="form-group" style="grid-column:1/-1"><label>الإجابة</label><textarea id="ssq-answer" class="search-input" style="width:100%;max-width:none;min-height:100px" maxlength="20000" placeholder="الإجابة النموذجية"></textarea></div>
+              <div class="form-group" style="grid-column:1/-1"><label>شرح إضافي (اختياري)</label><textarea id="ssq-explanation" class="search-input" style="width:100%;max-width:none;min-height:65px" maxlength="5000" placeholder="توضيح أو ملاحظة للطالب"></textarea></div>
+              <div class="form-group"><label>ترتيب السؤال</label><input id="ssq-order" type="number" min="1" value="1" class="search-input" style="width:100%;max-width:none"></div>
+            </div>
+            <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" onclick="saveStudySummaryQuestion()">💾 حفظ السؤال</button><button class="btn btn-outline" onclick="resetStudySummaryQuestionForm()">سؤال جديد</button></div>
+            <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>السؤال</th><th>الإجابة (معاينة)</th><th>إجراءات</th></tr></thead><tbody id="ss-questions-list"><tr><td colspan="4" style="text-align:center;color:var(--muted)">اختر ملخصًا لعرض أسئلته</td></tr></tbody></table></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>🧾 طلبات شراء الملخصات</h3><button class="btn btn-outline btn-sm" onclick="loadStudySummaryOrdersAdmin()">تحديث الطلبات</button></div>
+            <p style="padding:0 16px 12px;color:var(--muted);font-size:12px;line-height:1.8">الطلبات التجريبية تظل «في انتظار الدفع». لا يتم تحصيل أي مبلغ ولا تُمنح صلاحية مدفوعة تلقائيًا.</p>
+            <div style="overflow-x:auto"><table><thead><tr><th>رقم الطلب</th><th>الطالب</th><th>رقم القيد</th><th>الملخص</th><th>المبلغ</th><th>الحالة</th><th>تاريخ الطلب</th></tr></thead><tbody id="ss-orders-list"><tr><td colspan="7" style="text-align:center">جاري التحميل...</td></tr></tbody></table></div>
           </div>
         </div>
 
@@ -4914,7 +4953,7 @@ function updateTime() {
    ============================================================ */
 
 // الصفحات الإدارية المحمية دائمًا للمدير فقط، بصرف النظر عن أي تخصيص
-const ADMIN_ONLY_PAGES = new Set(['subjects', 'breakeven', 'court', 'dream', 'employees', 'logs', 'achievements', 'requests', 'competition-security', 'dismissed-students']);
+const ADMIN_ONLY_PAGES = new Set(['subjects', 'breakeven', 'court', 'dream', 'employees', 'logs', 'achievements', 'requests', 'competition-security', 'dismissed-students', 'study-summaries']);
 
 function showPage(page) {
   // ✅ فحص أمني: منع الموظف من فتح صفحة إدارية أو غير مسموح له بها، حتى لو استُدعيت الدالة مباشرة
@@ -4942,7 +4981,7 @@ function showPage(page) {
     attendance: 'الحضور والغياب', leads: 'الحجوزات والاستفسارات', payments: 'المدفوعات',
     expenses: 'المصروفات',
     reports: 'التقارير',
-    subjects: 'المواد الدراسية', employees: 'الموظفين', logs: 'سجل النشاط', profile: 'بروفايل الطالب', exams: 'الامتحانات الإلكترونية', 'exam-grades': 'درجات الامتحانات', breakeven: 'نقطة التعادل', court: 'محكمة الأداء', dream: 'النظام يحلم', campaigns: 'الحملات التسويقية', achievements: 'إنجازات وترتيب المتدربين', requests: 'الشكاوى والطلبات', 'competition-security': 'أمان المسابقات والتحقق والهوية', 'dismissed-students': 'الطلاب المفصولون'
+    subjects: 'المواد الدراسية', employees: 'الموظفين', logs: 'سجل النشاط', profile: 'بروفايل الطالب', exams: 'الامتحانات الإلكترونية', 'exam-grades': 'درجات الامتحانات', breakeven: 'نقطة التعادل', court: 'محكمة الأداء', dream: 'النظام يحلم', campaigns: 'الحملات التسويقية', achievements: 'إنجازات وترتيب المتدربين', requests: 'الشكاوى والطلبات', 'competition-security': 'أمان المسابقات والتحقق والهوية', 'dismissed-students': 'الطلاب المفصولون', 'study-summaries': 'مكتبة ملخصات الامتحانات'
   };
   document.getElementById('page-title').textContent = titles[page] || '';
   if (page === 'leads') { loadLeads(); loadCampaigns(); }
@@ -4953,6 +4992,7 @@ function showPage(page) {
   if (page === 'logs') loadLogs();
   if (page === 'competition-security') loadCompetitionIdentityAdmin();
   if (page === 'dismissed-students') loadDismissedStudentsAdmin();
+  if (page === 'study-summaries') loadStudySummaryAdmin();
   if (page === 'trainers') renderTrainersPerformance();
   if (page === 'alumni') loadAlumni();
   if (page === 'cashregister') {
@@ -12654,6 +12694,7 @@ async function deleteAlumni(id) {
 let unifiedPortalStudent = null;
 
 let unifiedPortalPhone = '';
+let studentPortalFaceToken = null;
 let studentFaceStream = null;
 let studentFaceModelsReady = false;
 let studentFaceModelsPromise = null;
@@ -12889,6 +12930,7 @@ async function finishStudentFaceVerification(descriptor, contextType, contextId)
     showWeeklyQuizEntryLogin();
     return;
   }
+  if (contextType === 'student_portal') studentPortalFaceToken = data.token || null;
   renderStudentPortalMenu();
 }
 
@@ -12906,6 +12948,7 @@ function renderStudentPortalMenu() {
     <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أهلاً ${escapeHtml(unifiedPortalStudent.name)} 👋</p>
     <div style="display:flex;flex-direction:column;gap:10px;">
       <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;" onclick="goToPortalExams()">📝 الامتحانات الإلكترونية</button>
+      <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;background:linear-gradient(135deg,#0f766e,#164e63);" onclick="goToPortalStudySummaries()">📚 ملخصات الامتحانات الشهرية</button>
       <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;" onclick="loadPortalNotifications('student')">🔔 الإشعارات والتنبيهات</button>
       <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;background:linear-gradient(135deg,#b45309,#78350f);" onclick="goToPortalWeeklyQuiz()">🏆 المسابقة الأسبوعية</button>
       <button class="btn btn-outline" style="width:100%;padding:14px;text-align:right;" onclick="openStudentRequestForm()">🎫 الشكاوى والطلبات</button>
@@ -15713,7 +15756,242 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTraineeRanking(
 <script src="competition-security-admin.js"></script>
 <script src="student-achievements.js"></script>
 <script src="student-requests.js"></script>
-<script src="identity-verification-admin.js"></script>
+<script src="identity-verification-admin.js">
+/* ============================================================
+   مكتبة ملخصات الامتحانات — واجهة الإدارة وبوابة الطالب
+   الدفع غير مفعّل: كل طلب شراء ينشأ بحالة انتظار فقط.
+   ============================================================ */
+let studySummaryAdminRows = [];
+let studySummaryQuestionRows = [];
+let studySummaryOrderRows = [];
+let studySummarySelectedId = null;
+let studySummaryStudentRows = [];
+let studySummaryActive = null;
+let studySummaryQuestionNumber = 1;
+
+function ssEsc(value) { return escapeHtml(String(value ?? '')); }
+function ssMoney(value) { return Number(value || 0).toLocaleString('ar-EG', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ج.م'; }
+function ssOrderNumber(id) { return String(id || '').replace(/-/g,'').slice(0,12).toUpperCase(); }
+
+async function loadStudySummaryAdmin() {
+  const list = document.getElementById('ss-admin-list');
+  if (list) list.innerHTML = '<tr><td colspan="7" style="text-align:center">جاري تحميل الملخصات...</td></tr>';
+  const {data, error} = await sb.from('study_summaries').select('*').order('created_at',{ascending:false});
+  if (error) { if(list) list.innerHTML = '<tr><td colspan="7" style="color:#b91c1c;text-align:center">تعذر تحميل الملخصات: '+ssEsc(error.message)+'</td></tr>'; return; }
+  studySummaryAdminRows = data || [];
+  renderStudySummaryAdminRows();
+  await loadStudySummaryOrdersAdmin();
+  if (studySummarySelectedId && studySummaryAdminRows.some(x=>x.id===studySummarySelectedId)) await loadStudySummaryQuestions(studySummarySelectedId);
+}
+function renderStudySummaryAdminRows() {
+  const body = document.getElementById('ss-admin-list');
+  if (!body) return;
+  if (!studySummaryAdminRows.length) { body.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:18px">لم تتم إضافة ملخصات بعد.</td></tr>'; return; }
+  body.innerHTML = studySummaryAdminRows.map(s => {
+    const count = studySummaryQuestionRows.filter(q=>q.summary_id===s.id).length;
+    return '<tr><td><strong>'+ssEsc(s.title)+'</strong><div style="font-size:11px;color:var(--muted)">'+ssEsc(s.description||'')+'</div></td><td>'+ssEsc(s.subject_name||'—')+'</td><td>'+ssMoney(s.price)+'</td><td>'+ssEsc(s.validity_days)+' يوم</td><td>'+count+'</td><td><span class="badge '+(s.is_published?'badge-success':'badge-gray')+'">'+(s.is_published?'متاح للطلاب':'مسودة')+'</span></td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="editStudySummary(\''+s.id+'\')">تعديل</button><button class="btn btn-primary btn-sm" onclick="selectStudySummaryForQuestions(\''+s.id+'\')">الأسئلة</button><button class="btn btn-danger btn-sm" onclick="deleteStudySummary(\''+s.id+'\')">حذف</button></div></td></tr>';
+  }).join('');
+}
+function resetStudySummaryForm() {
+  ['ss-edit-id','ss-title','ss-subject','ss-description'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const price=document.getElementById('ss-price'); if(price)price.value='0';
+  const validity=document.getElementById('ss-validity'); if(validity)validity.value='30';
+  const published=document.getElementById('ss-published'); if(published)published.checked=false;
+}
+function editStudySummary(id) {
+  const s=studySummaryAdminRows.find(x=>x.id===id); if(!s)return;
+  document.getElementById('ss-edit-id').value=s.id;
+  document.getElementById('ss-title').value=s.title||'';
+  document.getElementById('ss-subject').value=s.subject_name||'';
+  document.getElementById('ss-description').value=s.description||'';
+  document.getElementById('ss-price').value=s.price??0;
+  document.getElementById('ss-validity').value=s.validity_days??30;
+  document.getElementById('ss-published').checked=!!s.is_published;
+  document.getElementById('ss-title').focus();
+}
+async function saveStudySummary() {
+  const title=document.getElementById('ss-title').value.trim();
+  const subject=document.getElementById('ss-subject').value.trim();
+  const description=document.getElementById('ss-description').value.trim();
+  const price=Number(document.getElementById('ss-price').value);
+  const validity=Number(document.getElementById('ss-validity').value);
+  const is_published=document.getElementById('ss-published').checked;
+  const id=document.getElementById('ss-edit-id').value;
+  if(title.length<2){showToast('اكتب عنوان الملخص بشكل صحيح','error');return;}
+  if(!Number.isFinite(price)||price<0){showToast('السعر يجب أن يكون صفرًا أو أكثر','error');return;}
+  if(!Number.isInteger(validity)||validity<1||validity>3650){showToast('مدة الصلاحية من يوم إلى 3650 يومًا','error');return;}
+  const payload={title,subject_name:subject,description,price,validity_days:validity,is_published,updated_at:new Date().toISOString()};
+  let result;
+  if(id) result=await sb.from('study_summaries').update(payload).eq('id',id);
+  else result=await sb.from('study_summaries').insert({...payload,created_by:currentAuth?.id||null});
+  if(result.error){showToast('تعذر حفظ الملخص: '+result.error.message,'error');return;}
+  showToast('تم حفظ الملخص بنجاح','success'); resetStudySummaryForm(); await loadStudySummaryAdmin();
+}
+async function deleteStudySummary(id) {
+  const s=studySummaryAdminRows.find(x=>x.id===id); if(!s)return;
+  const {count,error:countError}=await sb.from('study_summary_orders').select('id',{count:'exact',head:true}).eq('summary_id',id);
+  if(countError){showToast('تعذر فحص الطلبات المرتبطة: '+countError.message,'error');return;}
+  if((count||0)>0){
+    const {error}=await sb.from('study_summaries').update({is_published:false,updated_at:new Date().toISOString()}).eq('id',id);
+    if(error){showToast('تعذر إخفاء الملخص: '+error.message,'error');return;}
+    showToast('للملخص طلبات محفوظة؛ تم إخفاؤه بدل حذف سجل الطلبات','info');
+  } else {
+    if(!confirm('هل تريد حذف الملخص وأسئلته نهائيًا؟'))return;
+    const {error}=await sb.from('study_summaries').delete().eq('id',id);
+    if(error){showToast('تعذر حذف الملخص: '+error.message,'error');return;}
+    if(studySummarySelectedId===id){studySummarySelectedId=null;studySummaryQuestionRows=[];document.getElementById('ss-questions-list').innerHTML='<tr><td colspan="4">اختر ملخصًا لعرض أسئلته</td></tr>';document.getElementById('ss-selected-title').textContent='اختر ملخصًا من الجدول أولًا';}
+    showToast('تم حذف الملخص','success');
+  }
+  await loadStudySummaryAdmin();
+}
+async function selectStudySummaryForQuestions(id) {
+  studySummarySelectedId=id;
+  const s=studySummaryAdminRows.find(x=>x.id===id);
+  document.getElementById('ss-selected-title').textContent=s?s.title:'';
+  resetStudySummaryQuestionForm();
+  await loadStudySummaryQuestions(id);
+  document.getElementById('ssq-question')?.focus();
+}
+async function loadStudySummaryQuestions(id) {
+  if(!id)return;
+  const body=document.getElementById('ss-questions-list');
+  if(body)body.innerHTML='<tr><td colspan="4" style="text-align:center">جاري تحميل الأسئلة...</td></tr>';
+  const {data,error}=await sb.from('study_summary_questions').select('*').eq('summary_id',id).order('order_num').order('created_at');
+  if(error){if(body)body.innerHTML='<tr><td colspan="4" style="color:#b91c1c">تعذر تحميل الأسئلة: '+ssEsc(error.message)+'</td></tr>';return;}
+  studySummaryQuestionRows=data||[];
+  if(body)body.innerHTML=studySummaryQuestionRows.length?studySummaryQuestionRows.map((q,i)=>'<tr><td>'+ssEsc(q.order_num)+'</td><td>'+ssEsc(q.question_text)+'</td><td>'+ssEsc(q.answer_text.slice(0,150))+(q.answer_text.length>150?'…':'')+'</td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="editStudySummaryQuestion(\''+q.id+'\')">تعديل</button><button class="btn btn-danger btn-sm" onclick="deleteStudySummaryQuestion(\''+q.id+'\')">حذف</button></div></td></tr>').join(''):'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:18px">لا توجد أسئلة لهذا الملخص.</td></tr>';
+  renderStudySummaryAdminRows();
+}
+function resetStudySummaryQuestionForm(){
+  ['ssq-edit-id','ssq-question','ssq-answer','ssq-explanation'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const order=document.getElementById('ssq-order');if(order)order.value=String((studySummaryQuestionRows.reduce((m,q)=>Math.max(m,Number(q.order_num)||0),0))+1);
+}
+function editStudySummaryQuestion(id){
+  const q=studySummaryQuestionRows.find(x=>x.id===id);if(!q)return;
+  document.getElementById('ssq-edit-id').value=q.id;
+  document.getElementById('ssq-question').value=q.question_text||'';
+  document.getElementById('ssq-answer').value=q.answer_text||'';
+  document.getElementById('ssq-explanation').value=q.explanation||'';
+  document.getElementById('ssq-order').value=q.order_num||1;
+}
+async function saveStudySummaryQuestion(){
+  if(!studySummarySelectedId){showToast('اختر ملخصًا من الجدول أولًا','error');return;}
+  const question_text=document.getElementById('ssq-question').value.trim();
+  const answer_text=document.getElementById('ssq-answer').value.trim();
+  const explanation=document.getElementById('ssq-explanation').value.trim();
+  const order_num=Number(document.getElementById('ssq-order').value);
+  const id=document.getElementById('ssq-edit-id').value;
+  if(!question_text||!answer_text){showToast('السؤال والإجابة مطلوبان','error');return;}
+  if(!Number.isInteger(order_num)||order_num<1){showToast('ترتيب السؤال يجب أن يكون رقمًا موجبًا','error');return;}
+  const payload={summary_id:studySummarySelectedId,question_text,answer_text,explanation,order_num,updated_at:new Date().toISOString()};
+  let result=id?await sb.from('study_summary_questions').update(payload).eq('id',id):await sb.from('study_summary_questions').insert(payload);
+  if(result.error){showToast('تعذر حفظ السؤال: '+result.error.message,'error');return;}
+  showToast('تم حفظ السؤال والإجابة','success');resetStudySummaryQuestionForm();await loadStudySummaryQuestions(studySummarySelectedId);
+}
+async function deleteStudySummaryQuestion(id){
+  if(!confirm('حذف السؤال والإجابة؟'))return;
+  const {error}=await sb.from('study_summary_questions').delete().eq('id',id);
+  if(error){showToast('تعذر حذف السؤال: '+error.message,'error');return;}
+  showToast('تم حذف السؤال','success');await loadStudySummaryQuestions(studySummarySelectedId);
+}
+async function loadStudySummaryOrdersAdmin(){
+  const body=document.getElementById('ss-orders-list');if(!body)return;
+  body.innerHTML='<tr><td colspan="7" style="text-align:center">جاري تحميل الطلبات...</td></tr>';
+  const {data,error}=await sb.from('study_summary_orders').select('*').order('created_at',{ascending:false}).limit(500);
+  if(error){body.innerHTML='<tr><td colspan="7" style="color:#b91c1c;text-align:center">تعذر تحميل الطلبات: '+ssEsc(error.message)+'</td></tr>';return;}
+  studySummaryOrderRows=data||[];
+  const studentMap=new Map((allStudents||[]).map(s=>[String(s.id),s]));
+  const summaryMap=new Map(studySummaryAdminRows.map(s=>[s.id,s]));
+  body.innerHTML=studySummaryOrderRows.length?studySummaryOrderRows.map(o=>{
+    const st=studentMap.get(String(o.student_id));const sm=summaryMap.get(o.summary_id);
+    return '<tr><td><code>'+ssOrderNumber(o.id)+'</code></td><td>'+ssEsc(st?.name||'—')+'</td><td>'+ssEsc(st?.enrollment_number||o.student_id)+'</td><td>'+ssEsc(sm?.title||'ملخص محذوف')+'</td><td>'+ssMoney(o.amount)+'</td><td><span class="badge badge-warning">في انتظار الدفع</span></td><td>'+ssEsc(new Date(o.created_at).toLocaleString('ar-EG'))+'</td></tr>';
+  }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:18px">لا توجد طلبات شراء حتى الآن.</td></tr>';
+}
+
+async function goToPortalStudySummaries(){
+  if(!unifiedPortalStudent||!studentPortalFaceToken){
+    showToast('انتهت جلسة التحقق؛ سجّل الدخول وتحقق من الوجه مرة أخرى','error');
+    showStudentPortalLoginStep();return;
+  }
+  const box=document.getElementById('student-portal-content');
+  box.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted)">جاري تحميل مكتبة الملخصات...</div>';
+  const {data,error}=await sb.rpc('student_list_study_summaries',{p_session_token:studentPortalFaceToken});
+  if(error||!data?.ok){
+    box.innerHTML='<div style="padding:16px;text-align:center;color:#b91c1c">'+ssEsc(error?.message||(data?.reason==='session_expired'?'انتهت جلسة التحقق. ارجع وسجّل الدخول مرة أخرى.':'تعذر تحميل الملخصات.'))+'</div><button class="btn btn-outline" style="width:100%" onclick="renderStudentPortalMenu()">رجوع للقائمة الرئيسية</button>';
+    if(data?.reason==='session_expired')studentPortalFaceToken=null;
+    return;
+  }
+  studySummaryStudentRows=data.summaries||[];
+  const ordersResult=await sb.rpc('student_list_study_summary_orders',{p_session_token:studentPortalFaceToken});
+  const orders=ordersResult.data?.ok?(ordersResult.data.orders||[]):[];
+  box.innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><button class="btn btn-outline btn-sm" onclick="renderStudentPortalMenu()">← رجوع</button><strong style="color:var(--navy);font-size:17px">📚 ملخصات الامتحانات الشهرية</strong></div>
+    <p style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:14px">تصفح الملخصات المتاحة. طلب الشراء هنا تجريبي فقط؛ لا يوجد دفع إلكتروني مفعّل حاليًا ولا تُفتح الملخصات المدفوعة قبل تفعيل الدفع ومنح الصلاحية.</p>
+    <div style="display:grid;gap:12px">${studySummaryStudentRows.length?studySummaryStudentRows.map(s=>`
+      <div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff">
+        <div style="font-weight:900;color:var(--navy);font-size:15px">${ssEsc(s.title)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">${ssEsc(s.subject_name||'ملخص عام')} · ${ssEsc(s.question_count)} سؤال · صلاحية ${ssEsc(s.validity_days)} يومًا</div>
+        <p style="font-size:12px;line-height:1.8;margin:8px 0">${ssEsc(s.description||'')}</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong style="color:#0f766e">${ssMoney(s.price)}</strong>
+        ${s.has_access?'<button class="btn btn-success btn-sm" onclick="openStudentStudySummary(\''+s.id+'\')">فتح الملخص</button>':s.pending_order?'<span class="badge badge-warning">طلبك في انتظار الدفع</span>':'<button class="btn btn-gold btn-sm" onclick="requestStudentStudySummary(\''+s.id+'\')">طلب شراء تجريبي</button>'}
+        </div>
+      </div>`).join(''):'<div style="text-align:center;padding:28px;color:var(--muted);border:1px dashed var(--border);border-radius:12px">لا توجد ملخصات متاحة حاليًا.</div>'}</div>
+    <div style="margin-top:18px"><h3 style="font-size:14px;color:var(--navy);margin-bottom:8px">🧾 طلباتي</h3>
+    ${orders.length?orders.map(o=>'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding:9px 0;font-size:12px"><span>'+ssEsc(o.summary_title)+' · رقم '+ssOrderNumber(o.id)+'</span><strong>'+ssMoney(o.amount)+' — <span style="color:#b45309">في انتظار الدفع</span></strong></div>').join(''):'<div style="font-size:12px;color:var(--muted)">لا توجد طلبات حتى الآن.</div>'}</div>`;
+}
+async function requestStudentStudySummary(id){
+  const s=studySummaryStudentRows.find(x=>x.id===id);if(!s)return;
+  if(!confirm('إنشاء طلب شراء تجريبي للملخص «'+s.title+'» بقيمة '+ssMoney(s.price)+'؟ لن يتم خصم أي مبلغ ولن تُمنح صلاحية الآن.'))return;
+  const {data,error}=await sb.rpc('student_create_study_summary_order',{p_session_token:studentPortalFaceToken,p_summary_id:id});
+  if(error||!data?.ok){
+    const msg=data?.reason==='already_has_access'?'لديك صلاحية فعّالة لهذا الملخص.':data?.reason==='session_expired'?'انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.':error?.message||'تعذر إنشاء الطلب.';
+    showToast(msg,'error');if(data?.reason==='session_expired')studentPortalFaceToken=null;return;
+  }
+  showToast('تم إنشاء طلب تجريبي بحالة «في انتظار الدفع» — لم يتم تحصيل أي مبلغ','success');
+  await goToPortalStudySummaries();
+}
+async function openStudentStudySummary(id){
+  const s=studySummaryStudentRows.find(x=>x.id===id);
+  if(!s?.has_access){showToast('لا توجد صلاحية فعّالة لعرض محتوى هذا الملخص','error');return;}
+  studySummaryActive=s;studySummaryQuestionNumber=1;
+  await renderStudentStudySummaryQuestion();
+}
+async function renderStudentStudySummaryQuestion(){
+  const box=document.getElementById('student-portal-content');
+  if(!studySummaryActive||!studentPortalFaceToken)return;
+  box.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted)">جاري تحميل السؤال...</div>';
+  const {data,error}=await sb.rpc('student_get_study_summary_question',{p_session_token:studentPortalFaceToken,p_summary_id:studySummaryActive.id,p_question_number:studySummaryQuestionNumber});
+  if(error||!data?.ok){
+    const message=data?.reason==='not_purchased'?'لا توجد صلاحية فعّالة لفتح هذا الملخص.':data?.reason==='session_expired'?'انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.':error?.message||'تعذر تحميل السؤال.';
+    box.innerHTML='<div style="padding:18px;text-align:center;color:#b91c1c">'+ssEsc(message)+'</div><button class="btn btn-outline" onclick="goToPortalStudySummaries()">رجوع للمكتبة</button>';
+    if(data?.reason==='session_expired')studentPortalFaceToken=null;return;
+  }
+  const q=data.question;
+  box.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn btn-outline btn-sm" onclick="goToPortalStudySummaries()">← المكتبة</button><span style="font-size:12px;color:var(--muted)">${ssEsc(data.summary.subject_name||'ملخص دراسي')}</span></div>
+    <div style="border:1px solid var(--border);border-radius:14px;background:#fff;overflow:hidden">
+      <div style="padding:14px 16px;background:linear-gradient(135deg,#152238,#1f3562);color:#fff"><div style="font-size:11px;opacity:.8;margin-bottom:4px">${ssEsc(data.summary.title)}</div><div style="font-weight:800">السؤال ${ssEsc(data.question_number)} من ${ssEsc(data.total)}</div></div>
+      <div style="padding:18px;line-height:2;user-select:none;-webkit-user-select:none">
+        <div style="font-weight:900;color:var(--navy);font-size:16px;margin-bottom:14px;white-space:pre-wrap">${ssEsc(q.question_text)}</div>
+        <div style="border-top:1px dashed var(--border);padding-top:12px"><div style="font-size:12px;color:#0f766e;font-weight:900;margin-bottom:5px">الإجابة النموذجية</div><div style="font-size:14px;white-space:pre-wrap;line-height:2">${ssEsc(q.answer_text)}</div>
+        ${q.explanation?'<div style="margin-top:12px;background:#f8fafc;border-radius:8px;padding:10px;font-size:12px;line-height:1.8"><strong>توضيح:</strong> '+ssEsc(q.explanation)+'</div>':''}
+        </div>
+        <div style="margin-top:18px;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;text-align:center;font-size:10px;color:#64748b;pointer-events:none">نسخة مخصصة للطالب: ${ssEsc(unifiedPortalStudent?.name)} · رقم القيد: ${ssEsc(unifiedPortalStudent?.id)} — مركز الأندلس للتدريب</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-outline" style="flex:1" ${data.question_number<=1?'disabled':''} onclick="changeStudySummaryQuestion(-1)">السابق</button><button class="btn btn-gold" style="flex:1" ${data.question_number>=data.total?'disabled':''} onclick="changeStudySummaryQuestion(1)">التالي</button></div>
+    <p style="font-size:10px;color:var(--muted);line-height:1.7;margin-top:10px">تُعرض الأسئلة واحدًا تلو الآخر. قد لا تمنع إعدادات المتصفح التقاط الشاشة أو التصوير الخارجي.</p>`;
+}
+async function changeStudySummaryQuestion(delta){
+  if(!studySummaryActive)return;
+  const next=studySummaryQuestionNumber+delta;
+  const s=studySummaryStudentRows.find(x=>x.id===studySummaryActive.id);
+  const total=Number(s?.question_count||0);
+  if(next<1||(total&&next>total))return;
+  studySummaryQuestionNumber=next;await renderStudentStudySummaryQuestion();
+}
+
+</script>
 
 
 </body>
