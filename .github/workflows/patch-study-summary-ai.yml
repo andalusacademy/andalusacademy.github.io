@@ -1,0 +1,42 @@
+name: Load study summary AI module
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inject module
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          tag = '<script src="study-summary-ai.js"></script>'
+          if tag in s:
+              print('Already injected')
+          else:
+              marker = '</body>'
+              if marker not in s:
+                  raise SystemExit('body marker not found')
+              s = s.replace(marker, tag + '\n' + marker, 1)
+              p.write_text(s, encoding='utf-8')
+      - name: Commit patched index
+        run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name 'andalusacademy-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Load study summary AI module in academy system'
+          git push
+      - name: Remove one-shot workflow
+        if: success()
+        run: |
+          git rm .github/workflows/patch-study-summary-ai.yml || true
+          git config user.name 'andalusacademy-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Remove one-shot patch workflow' || true
+          git push || true
