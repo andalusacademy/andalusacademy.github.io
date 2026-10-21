@@ -7221,8 +7221,8 @@ async function loadProcedures() {
     container.innerHTML = '<div class="empty-state"><div class="emoji">📋</div><h4>لا توجد إجراءات</h4></div>';
     return;
   }
-  const typeColors = { 'تأخر_مصاريف': 'badge-warning', 'استدعاء': 'badge-navy', 'فصل': 'badge-danger', 'إنذار': 'badge-danger', 'أخرى': 'badge-gray' };
-  const typeLabels = { 'تأخر_مصاريف': 'تأخر في المصاريف', 'استدعاء': 'قرار استدعاء', 'فصل': 'قرار فصل', 'إنذار': 'إنذار', 'أخرى': 'أخرى' };
+  const typeColors = { 'تأخر_مصاريف': 'badge-warning', 'استدعاء': 'badge-navy', 'فصل': 'badge-danger', 'فصل تجريبي': 'badge-gray', 'إنذار': 'badge-danger', 'أخرى': 'badge-gray' };
+  const typeLabels = { 'تأخر_مصاريف': 'تأخر في المصاريف', 'استدعاء': 'قرار استدعاء', 'فصل': 'قرار فصل', 'فصل تجريبي': '🧪 تجربة قرار فصل (غير رسمي)', 'إنذار': 'إنذار', 'أخرى': 'أخرى' };
   container.innerHTML = data.map(p => `<div class="proc-item">
     <div class="proc-header">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -7304,7 +7304,7 @@ function openAddProcedure() {
 }
 
 function procedureTypeLabel(type) {
-  const labels = { 'تأخر_مصاريف': 'تأخر في المصاريف', 'استدعاء': 'قرار استدعاء', 'فصل': 'قرار فصل', 'إنذار': 'إنذار', 'أخرى': 'إجراء' };
+  const labels = { 'تأخر_مصاريف': 'تأخر في المصاريف', 'استدعاء': 'قرار استدعاء', 'فصل': 'قرار فصل', 'فصل تجريبي': '🧪 تجربة قرار فصل (غير رسمي)', 'إنذار': 'إنذار', 'أخرى': 'إجراء' };
   return labels[type] || type;
 }
 
