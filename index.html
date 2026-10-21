@@ -1676,12 +1676,16 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           <button class="btn btn-outline btn-sm" style="margin-bottom:14px;" onclick="showPage('gallery')">← رجوع للألبومات</button>
           <div class="card" style="margin-bottom:14px;">
             <div class="card-header"><h3 id="album-detail-title">—</h3></div>
-            <div style="padding:14px;">
+            <div style="padding:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
               <input type="file" id="album-photo-input" accept="image/*" multiple style="display:none" onchange="uploadAlbumPhotos(this)">
               <button class="btn btn-gold" onclick="document.getElementById('album-photo-input').click()">📤 رفع صور</button>
+              <button class="btn btn-outline" onclick="toggleSelectAllAlbumPhotos()">☑️ تحديد الكل / إلغاء التحديد</button>
+              <button class="btn btn-primary" onclick="downloadSelectedAlbumPhotos()">⬇️ تحميل الصور المحددة</button>
+              <button class="btn btn-primary" onclick="downloadAlbumAsZip()">🗂️ تحميل الألبوم كامل ZIP</button>
+              <span id="album-selection-count" style="font-size:12px;color:var(--muted)">لم يتم تحديد صور</span>
             </div>
           </div>
-          <div id="album-photos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;"></div>
+          <div id="album-photos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;"></div>
         </div>
 
         <!-- COMPETITIONS -->
@@ -13830,18 +13834,81 @@ async function openAlbumDetail(albumId) {
 }
 
 async function renderAlbumPhotos() {
-  const { data } = await sb.from('gallery_photos').select('*').eq('album_id', currentAlbumId).order('created_at', { ascending: false });
+  const { data, error } = await sb.from('gallery_photos').select('*').eq('album_id', currentAlbumId).order('created_at', { ascending: false });
   const photos = data || [];
   const gridEl = document.getElementById('album-photos-grid');
-  gridEl.innerHTML = photos.length ? photos.map(p => `<div style="position:relative;border-radius:10px;overflow:hidden;">
-    <img src="${escapeHtml(p.photo_url)}" style="width:100%;height:160px;object-fit:cover;display:block;">
-    <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(0deg,rgba(0,0,0,.6),transparent);padding:8px;display:flex;justify-content:space-between;align-items:center;">
-      <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(p.photo_url)}" target="_blank" rel="noopener" style="background:#1877f2;color:#fff;border-radius:6px;padding:5px 8px;font-size:11px;text-decoration:none;">📘 شارك</a>
-      <button class="btn btn-danger btn-sm" style="padding:4px 8px;" onclick="deleteAlbumPhoto('${p.id}')">🗑</button>
-    </div>
-  </div>`).join('') : '<div style="grid-column:1/-1;"><div class="empty-state"><div class="emoji">📷</div><h4>لا توجد صور فى الألبوم ده لسه — ارفع أول صورة</h4></div></div>';
+  if(error){gridEl.innerHTML='<div style="grid-column:1/-1;color:#b91c1c">تعذر تحميل الصور: '+escapeHtml(error.message)+'</div>';return;}
+  gridEl.innerHTML = photos.length ? photos.map((p,i) => {
+    const url=String(p.photo_url||'');
+    const safeUrl=escapeHtml(url);
+    const shareText=encodeURIComponent('صورة من ألبوم مركز الأندلس للتدريب');
+    return '<div class="card" style="position:relative;margin:0;overflow:hidden;padding:0;border-radius:12px;">'+
+      '<label style="display:flex;gap:7px;align-items:center;padding:8px 10px;font-size:12px;cursor:pointer"><input type="checkbox" class="album-photo-select" value="'+escapeHtml(p.id)+'" data-url="'+safeUrl+'" data-index="'+i+'" onchange="updateAlbumSelectionCount()"> تحديد الصورة</label>'+
+      '<a href="'+safeUrl+'" target="_blank" rel="noopener" title="فتح الصورة بالحجم الكامل"><img src="'+safeUrl+'" alt="صورة الألبوم" loading="lazy" style="width:100%;height:175px;object-fit:cover;display:block;"></a>'+
+      '<div style="padding:9px;display:flex;gap:5px;flex-wrap:wrap">'+
+      '<button class="btn btn-primary btn-sm" onclick="downloadAlbumPhoto(\''+escapeHtml(p.id)+'\',\''+safeUrl.replace(/'/g,'%27')+'\','+(i+1)+')">⬇️ تحميل</button>'+
+      '<button class="btn btn-outline btn-sm" onclick="shareAlbumPhoto(\''+safeUrl.replace(/'/g,'%27')+'\',\'facebook\')">📘 فيسبوك</button>'+
+      '<button class="btn btn-outline btn-sm" onclick="shareAlbumPhoto(\''+safeUrl.replace(/'/g,'%27')+'\',\'whatsapp\')">🟢 واتساب</button>'+
+      '<button class="btn btn-outline btn-sm" onclick="shareAlbumPhoto(\''+safeUrl.replace(/'/g,'%27')+'\',\'telegram\')">✈️ تيليجرام</button>'+
+      (currentUser?.role==='admin'?'<button class="btn btn-danger btn-sm" onclick="deleteAlbumPhoto(\''+escapeHtml(p.id)+'\')">🗑</button>':'')+
+      '</div></div>';
+  }).join('') : '<div style="grid-column:1/-1;"><div class="empty-state"><div class="emoji">📷</div><h4>لا توجد صور فى الألبوم ده لسه — ارفع أول صورة</h4></div></div>';
+  updateAlbumSelectionCount();
 }
-
+function updateAlbumSelectionCount(){
+  const n=document.querySelectorAll('#album-photos-grid .album-photo-select:checked').length;
+  const el=document.getElementById('album-selection-count');if(el)el.textContent=n?('تم تحديد '+n+' صورة'):'لم يتم تحديد صور';
+}
+function toggleSelectAllAlbumPhotos(){
+  const boxes=[...document.querySelectorAll('#album-photos-grid .album-photo-select')];
+  if(!boxes.length)return;
+  const all=boxes.every(x=>x.checked);boxes.forEach(x=>x.checked=!all);updateAlbumSelectionCount();
+}
+function shareAlbumPhoto(url,platform){
+  const text=encodeURIComponent('صورة من ألبوم مركز الأندلس للتدريب');
+  const u=encodeURIComponent(url);
+  let target='';
+  if(platform==='facebook')target='https://www.facebook.com/sharer/sharer.php?u='+u;
+  else if(platform==='whatsapp')target='https://wa.me/?text='+text+'%20'+u;
+  else if(platform==='telegram')target='https://t.me/share/url?url='+u+'&text='+text;
+  if(target)window.open(target,'_blank','noopener,noreferrer');
+}
+async function downloadAlbumPhoto(id,url,index){
+  try{
+    const response=await fetch(url);if(!response.ok)throw new Error('تعذر تنزيل الصورة');
+    const blob=await response.blob();const ext=(blob.type.split('/')[1]||'jpg').replace('jpeg','jpg');
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='andalus-photo-'+index+'.'+ext;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  }catch(e){window.open(url,'_blank','noopener');showToast('فتحنا الصورة في تبويب جديد؛ لو لم يبدأ التحميل احفظها من قائمة الصورة.','info');}
+}
+function getSelectedAlbumPhotoItems(){
+  const selected=[...document.querySelectorAll('#album-photos-grid .album-photo-select:checked')];
+  return selected.map(box=>({id:box.value,url:box.dataset.url,index:Number(box.dataset.index||0)+1}));
+}
+async function downloadSelectedAlbumPhotos(){
+  const items=getSelectedAlbumPhotoItems();if(!items.length){showToast('حدد صورة واحدة على الأقل أولًا','error');return;}
+  if(items.length===1){await downloadAlbumPhoto(items[0].id,items[0].url,items[0].index);return;}
+  await downloadAlbumItemsAsZip(items,'andalus-selected-photos.zip');
+}
+async function downloadAlbumAsZip(){
+  const items=[...document.querySelectorAll('#album-photos-grid .album-photo-select')].map(box=>({id:box.value,url:box.dataset.url,index:Number(box.dataset.index||0)+1}));
+  if(!items.length){showToast('الألبوم لا يحتوي على صور','error');return;}
+  await downloadAlbumItemsAsZip(items,'andalus-album-'+String(currentAlbumId||'photos').slice(0,8)+'.zip');
+}
+async function downloadAlbumItemsAsZip(items,filename){
+  if(typeof JSZip==='undefined'){showToast('مكتبة ضغط الملفات غير متاحة حاليًا؛ حمّل الصور المحددة كل صورة على حدة.','error');return;}
+  const btns=[...document.querySelectorAll('#page-album-detail button')];btns.forEach(b=>b.disabled=true);
+  try{
+    const zip=new JSZip();let success=0;
+    for(let i=0;i<items.length;i++){
+      const item=items[i];
+      try{const response=await fetch(item.url);if(!response.ok)continue;const blob=await response.blob();const ext=(blob.type.split('/')[1]||'jpg').replace('jpeg','jpg');zip.file('photo-'+String(item.index).padStart(3,'0')+'.'+ext,blob);success++;}catch(e){console.warn('Photo download failed',item.url,e);}
+    }
+    if(!success)throw new Error('تعذر تنزيل الصور. قد تكون إعدادات CORS في مخزن الصور تمنع تجميعها.');
+    const blob=await zip.generateAsync({type:'blob'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    showToast('تم تجهيز '+success+' صورة في ملف ZIP','success');
+  }catch(e){showToast(e.message||'تعذر ضغط الصور','error');}
+  finally{btns.forEach(b=>b.disabled=false);}
+}
 async function uploadAlbumPhotos(input) {
   const files = [...input.files];
   if (!files.length) return;
