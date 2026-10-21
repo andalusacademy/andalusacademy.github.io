@@ -1052,7 +1052,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
               <div class="form-group" style="grid-column:1/-1"><label>شرح إضافي (اختياري)</label><textarea id="ssq-explanation" class="search-input" style="width:100%;max-width:none;min-height:65px" maxlength="5000" placeholder="توضيح أو ملاحظة للطالب"></textarea></div>
               <div class="form-group"><label>ترتيب السؤال</label><input id="ssq-order" type="number" min="1" value="1" class="search-input" style="width:100%;max-width:none"></div>
             </div>
-            <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" onclick="saveStudySummaryQuestion()">💾 حفظ السؤال</button><button class="btn btn-outline" onclick="resetStudySummaryQuestionForm()">سؤال جديد</button></div>
+            <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" onclick="saveStudySummaryQuestion()">💾 حفظ السؤال</button><button class="btn btn-outline" onclick="resetStudySummaryQuestionForm()">سؤال جديد</button><button class="btn btn-primary" onclick="approveAllStudySummaryQuestions()">✅ اعتماد كل أسئلة الملخص</button></div>
             <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>السؤال</th><th>الإجابة (معاينة)</th><th>إجراءات</th></tr></thead><tbody id="ss-questions-list"><tr><td colspan="4" style="text-align:center;color:var(--muted)">اختر ملخصًا لعرض أسئلته</td></tr></tbody></table></div>
           </div>
           <div class="card">
@@ -15868,7 +15868,7 @@ async function loadStudySummaryQuestions(id) {
   if(error){if(body)body.innerHTML='<tr><td colspan="4" style="color:#b91c1c">تعذر تحميل الأسئلة: '+ssEsc(error.message)+'</td></tr>';return;}
   studySummaryQuestionRows=data||[];
   studySummaryQuestionCounts[id] = studySummaryQuestionRows.length;
-  if(body)body.innerHTML=studySummaryQuestionRows.length?studySummaryQuestionRows.map((q,i)=>'<tr><td>'+ssEsc(q.order_num)+'</td><td>'+ssEsc(q.question_text)+'</td><td>'+ssEsc(q.answer_text.slice(0,150))+(q.answer_text.length>150?'…':'')+'</td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="editStudySummaryQuestion(\''+q.id+'\')">تعديل</button><button class="btn btn-danger btn-sm" onclick="deleteStudySummaryQuestion(\''+q.id+'\')">حذف</button></div></td></tr>').join(''):'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:18px">لا توجد أسئلة لهذا الملخص.</td></tr>';
+  if(body)body.innerHTML=studySummaryQuestionRows.length?studySummaryQuestionRows.map((q,i)=>'<tr><td>'+ssEsc(q.order_num)+'</td><td>'+ssEsc(q.question_text)+'<div style="margin-top:5px"><span class="badge '+(q.is_approved?'badge-success':'badge-gray')+'">'+(q.is_approved?'معتمد لبنك الامتحانات':'بانتظار المراجعة')+'</span></div></td><td>'+ssEsc((q.answer_text||'').slice(0,150))+((q.answer_text||'').length>150?'…':'')+'</td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn '+(q.is_approved?'btn-outline':'btn-primary')+' btn-sm" onclick="toggleStudySummaryQuestionApproval(\''+q.id+'\','+(!q.is_approved)+')">'+(q.is_approved?'إلغاء الاعتماد':'اعتماد')+'</button><button class="btn btn-outline btn-sm" onclick="editStudySummaryQuestion(\''+q.id+'\')">تعديل</button><button class="btn btn-danger btn-sm" onclick="deleteStudySummaryQuestion(\''+q.id+'\')">حذف</button></div></td></tr>').join(''):'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:18px">لا توجد أسئلة لهذا الملخص.</td></tr>';
   renderStudySummaryAdminRows();
 }
 function resetStudySummaryQuestionForm(){
@@ -15896,6 +15896,21 @@ async function saveStudySummaryQuestion(){
   let result=id?await sb.from('study_summary_questions').update(payload).eq('id',id):await sb.from('study_summary_questions').insert(payload);
   if(result.error){showToast('تعذر حفظ السؤال: '+result.error.message,'error');return;}
   showToast('تم حفظ السؤال والإجابة','success');resetStudySummaryQuestionForm();await loadStudySummaryQuestions(studySummarySelectedId);
+}
+async function toggleStudySummaryQuestionApproval(id, approved){
+  const {error}=await sb.from('study_summary_questions').update({is_approved:!!approved,reviewed_at:approved?new Date().toISOString():null,reviewed_by:approved?(currentAuth?.id||null):null,updated_at:new Date().toISOString()}).eq('id',id);
+  if(error){showToast('تعذر تحديث اعتماد السؤال: '+error.message,'error');return;}
+  showToast(approved?'تم اعتماد السؤال لبنك الامتحانات':'تم إلغاء اعتماد السؤال','success');
+  await loadStudySummaryQuestions(studySummarySelectedId);
+}
+async function approveAllStudySummaryQuestions(){
+  if(!studySummarySelectedId){showToast('اختر ملخصًا أولًا','error');return;}
+  const pending=studySummaryQuestionRows.filter(q=>!q.is_approved);
+  if(!pending.length){showToast('كل أسئلة هذا الملخص معتمدة بالفعل','info');return;}
+  if(!confirm('اعتماد '+pending.length+' سؤالًا دفعة واحدة؟ تأكد من مراجعتها أولًا.'))return;
+  const {error}=await sb.from('study_summary_questions').update({is_approved:true,reviewed_at:new Date().toISOString(),reviewed_by:currentAuth?.id||null,updated_at:new Date().toISOString()}).eq('summary_id',studySummarySelectedId).eq('is_approved',false);
+  if(error){showToast('تعذر اعتماد الأسئلة: '+error.message,'error');return;}
+  showToast('تم اعتماد الأسئلة لبنك الامتحانات','success');await loadStudySummaryQuestions(studySummarySelectedId);
 }
 async function deleteStudySummaryQuestion(id){
   if(!confirm('حذف السؤال والإجابة؟'))return;
