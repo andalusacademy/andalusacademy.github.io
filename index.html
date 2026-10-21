@@ -1821,6 +1821,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 
           <div class="profile-tab-content" id="tab-procedures">
             <div style="margin-bottom:16px;display:flex;justify-content:flex-end;" class="no-print">
+              <button class="btn btn-outline" onclick="createDismissalDecisionTest()">🧪 تجربة قرار فصل PDF</button>
               <button class="btn btn-gold" onclick="openAddProcedure()">+ إضافة إجراء</button>
             </div>
             <div id="procedures-list"></div>
@@ -7225,6 +7226,36 @@ async function loadProcedures() {
     ${p.result ? `<div style="font-size:12px;color:var(--muted)">النتيجة: ${escapeHtml(p.result)}</div>` : ''}
     <div style="font-size:11px;color:var(--muted);margin-top:6px;">${new Date(p.created_at).toLocaleString('ar-EG')}</div>
   </div>`).join('');
+}
+
+
+async function createDismissalDecisionTest() {
+  const s = allStudents.find(x => x.id === currentProfileId);
+  if (!s) { showToast('افتح ملف الطالب أولاً', 'error'); return; }
+  const fixed = 'عدم الألتزام ببنود العقد واللائحة الدخلية.';
+  const r2 = prompt('السبب الثاني:', 'غياب اكتر من 50% من اجمالى كل محاضرة.');
+  if (r2 === null) return;
+  const r3 = prompt('السبب الثالث:', 'عدم دفع البند المالى في المواعيد المحدده.');
+  if (r3 === null) return;
+  const r4 = prompt('السبب الرابع (اختياري):', '');
+  if (r4 === null) return;
+  const now = new Date();
+  const date = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  const dateText = new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).format(now);
+  const no = 'تجريبي-' + now.getFullYear() + '-' + String(now.getTime()).slice(-5);
+  const reasons = [fixed,r2.trim(),r3.trim(),r4.trim()].filter(Boolean);
+  const details = 'قرار فصل تجريبي — لا يغيّر حالة الطالب.\\n' + reasons.map((x,i)=>(i+1)+'. '+x).join('\\n');
+  const { error } = await sb.from('procedures').insert({student_id:currentProfileId,type:'فصل',reference_number:no,date:date,details:details,result:'تجربة PDF فقط — لم يتم فصل الطالب',created_by:currentAuth?.id || null});
+  if (error) { showToast('فشل حفظ التجربة: ' + error.message, 'error'); return; }
+  await logActivity('add','حفظ قرار فصل تجريبي PDF للطالب: ' + (s.name || currentProfileId) + ' — ' + no);
+  await loadProcedures();
+  const esc = x => String(x ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const reasonHtml = reasons.map(x => '<p style="font-weight:bold;margin:15px 0">➢ ' + esc(x) + '</p>').join('');
+  const w = window.open('', '_blank');
+  if (!w) { showToast('تم حفظ التجربة، لكن المتصفح منع نافذة الطباعة.', 'warning'); return; }
+  const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قرار فصل تجريبي</title><style>@page{size:A4;margin:20mm}body{font-family:Tahoma,Arial,sans-serif;color:#17243b;line-height:1.9;font-size:15px}.doc{border:3px double #1f3562;padding:24px;min-height:250mm}.title{text-align:center;font-size:20px;font-weight:bold;margin:10px 0 25px}.date{text-align:center;margin-bottom:20px}.section{text-align:center;font-weight:bold;font-size:18px;margin:22px 0}.student{text-align:center;font-size:19px;font-weight:bold;margin:8px 0 25px}.sign{text-align:center;font-weight:bold;margin-top:55px}.note{text-align:center;font-size:10px;color:#777;margin-top:25px}</style></head><body><div class="doc"><div class="title">قرار إداري رقم (' + esc(no) + ') لسنة ' + now.getFullYear() + '</div><div class="date">التاريخ: ' + esc(dateText) + '</div><b>بعد الاطلاع على:</b><p>- النظام الداخلي للمركز المعتمد من مجلس الإدارة.</p><p>- قرار مجلس الإدارة رقم 1 لسنة 2024 الصادر بشأن اللائحة التنفيذية وتنظيم سير العملية التدريبية.</p><p>- قرار مجلس الإدارة رقم 15 لسنة 2024 الصادر بشأن اللائحة العامة للتدريب والتأهيل.</p><p>- اللائحة التنفيذية والمنظمة لسير العملية التدريبية.</p><p>- العقد وبنوده الموقع بين مركز الأندلس والمتدرب.</p><p>- الجانب القانوني.</p><div class="section">تقرر الآتي:</div><div class="section">فصل المتدربين /</div><div class="student">' + esc(s.name || '') + '</div><b>وذلك للآتي ذكره:</b>' + reasonHtml + '<div class="sign">المدير العام<br>د / اسلام صبري العشري</div><div class="note">نسخة تجريبية للطباعة — لم يتم تغيير الحالة الدراسية للطالب.</div></div><script>window.onload=()=>setTimeout(()=>window.print(),300);</script></body></html>';
+  w.document.open(); w.document.write(html); w.document.close();
+  showToast('تم حفظ سجل التجربة. من نافذة الطباعة اختر حفظ كـ PDF.', 'success');
 }
 
 function openAddProcedure() {
