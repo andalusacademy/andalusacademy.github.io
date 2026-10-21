@@ -11,7 +11,7 @@ function inject(){
  '<div style="padding:18px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">'+
  '<div class="form-group"><label>اسم الملخص (اكتبه بنفسك)</label><input id="ss-ai-title" class="search-input" maxlength="180" placeholder="مثال: ملخص التغذية العلاجية" style="width:100%"></div>'+
  '<div class="form-group"><label>اسم المادة</label><input id="ss-ai-subject" class="search-input" maxlength="160" placeholder="التغذية العلاجية" style="width:100%"></div>'+
- '<div class="form-group"><label>عدد الأسئلة المطلوبة</label><input id="ss-ai-count" class="search-input" type="number" min="5" max="50" value="30" style="width:100%"></div>'+
+ '<div class="form-group"><label>عدد الأسئلة المطلوبة</label><input id="ss-ai-count" class="search-input" type="number" min="1" max="50" value="30" style="width:100%"></div>'+
  '<div class="form-group"><label>السعر بالجنيه</label><input id="ss-ai-price" class="search-input" type="number" min="0" step="0.01" value="0" style="width:100%"></div>'+
  '<div class="form-group"><label>مدة الإتاحة (بالأيام)</label><input id="ss-ai-validity" class="search-input" type="number" min="1" max="3650" value="30" style="width:100%"></div>'+
  '<div class="form-group"><label>ملف المادة PDF</label><input id="ss-ai-pdf" class="search-input" type="file" accept="application/pdf,.pdf" style="width:100%"></div>'+
@@ -27,7 +27,7 @@ function inject(){
 function showStatus(message,ok){const el=document.getElementById('ss-ai-status');if(el)el.innerHTML='<div style="background:'+(ok?'#ecfdf5':'#fef2f2')+';color:'+(ok?'#166534':'#991b1b')+';padding:12px;border-radius:10px">'+(ok?'✅ ':'❌ ')+esc(message)+'</div>';}
 async function generate(){
  const sbc=client(),title=document.getElementById('ss-ai-title').value.trim(),subject=document.getElementById('ss-ai-subject').value.trim(),file=document.getElementById('ss-ai-pdf').files?.[0];
- const count=Math.min(50,Math.max(5,Number(document.getElementById('ss-ai-count').value||30))),price=Number(document.getElementById('ss-ai-price').value||0),validity=Number(document.getElementById('ss-ai-validity').value||30),description=document.getElementById('ss-ai-description').value.trim();
+ const count=Math.min(50,Math.max(1,Number(document.getElementById('ss-ai-count').value||30))),price=Number(document.getElementById('ss-ai-price').value||0),validity=Number(document.getElementById('ss-ai-validity').value||30),description=document.getElementById('ss-ai-description').value.trim();
  if(!sbc)return showStatus('اتصال قاعدة البيانات غير جاهز. أعد تحميل الصفحة.',false);
  if(title.length<2||!subject)return showStatus('اكتب اسم الملخص واسم المادة أولًا.',false);
  if(!file||(!file.type.includes('pdf')&&!file.name.toLowerCase().endsWith('.pdf')))return showStatus('اختر ملف PDF للمادة.',false);
