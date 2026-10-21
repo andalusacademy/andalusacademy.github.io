@@ -1,5 +1,5 @@
-/* Andalus Academy Service Worker — main icons only v14 */
-const CACHE='andalus-v16-login-recovery';
+/* Andalus Academy Service Worker — main icons only v15 */
+const CACHE='andalus-v17-study-summary-workflow';
 const ASSETS=['./','./index.html','./manifest.json','./face-camera-fix.js?v=4','./student-portal-logs-ui.js?v=4','./cache-reset.js?v=2'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).catch(()=>{}));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
