@@ -21,6 +21,7 @@ function inject(){
  '<div id="ss-ai-file-info" style="margin:8px 0;color:var(--muted);font-size:12px"></div>'+
  '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" id="ss-ai-generate-btn" type="button">⬆️ رفع الملف وإنشاء الأسئلة</button><button class="btn btn-outline" id="ss-ai-publish-btn" type="button" disabled>💾 حفظ وإتاحة للطلاب</button></div>'+
  '<div id="ss-ai-status" style="margin-top:12px"></div><div style="margin-top:8px;font-size:12px;color:var(--muted)">سيظهر السؤال مع إجابته. لا يلزم اعتماد كل سؤال على حدة؛ احذف غير المناسب ثم أتح الملخص للطلاب.</div></div>';
+ const oldApprove=[...page.querySelectorAll('button[onclick*="approveAllStudySummaryQuestions"]')];oldApprove.forEach(b=>b.style.display='none');
  const anchor=page.querySelector('.card');if(anchor)anchor.insertAdjacentElement('beforebegin',card);else page.prepend(card);const legacy=document.getElementById('ss-title')?.closest('.card');if(legacy){legacy.id='ss-legacy-summary-form-card';legacy.style.display='none';}
  document.getElementById('ss-ai-pdf').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];document.getElementById('ss-ai-file-info').textContent=f?'📄 '+f.name+' — '+(f.size/1024/1024).toFixed(2)+' MB':'';});
  document.getElementById('ss-ai-generate-btn').addEventListener('click',generate);
