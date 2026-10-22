@@ -49,7 +49,7 @@ async function generate(){
   const response=await fetch(sbc.supabaseUrl+'/functions/v1/generate-study-summary',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+auth.data.session.access_token,apikey:sbc.supabaseKey},body:JSON.stringify({summary_id:draftId,pdf_path:path,subject,true_false_count:tfCount,mcq_count:mcCount,essay_count:essayCount})});
   const result=await response.json().catch(()=>({}));if(!response.ok||!result.success)throw new Error(result.error||'تعذر إنشاء الأسئلة.');
   const save=await sbc.from('study_summaries').update({source_pdf_path:path,ai_generation_status:'ready',generated_question_count:result.generatedCount||count,is_published:false}).eq('id',draftId);if(save.error)throw save.error;
-  showStatus('تم إنشاء '+(result.generatedCount||count)+' سؤالًا للملخص «'+title+'». راجع الأسئلة واعتمد كل الأسئلة المناسبة، ثم احفظ وأتح الملخص.',true);
+  showStatus('تم إنشاء '+(result.generatedCount||count)+' سؤالًا للملخص «'+title+'». راجع الأسئلة والإجابات واحذف غير المناسب، ثم احفظ وأتح الملخص.',true);
   document.getElementById('ss-ai-publish-btn').disabled=false;
   if(typeof window.loadStudySummaryAdmin==='function')await window.loadStudySummaryAdmin();
   if(typeof window.selectStudySummaryForQuestions==='function')await window.selectStudySummaryForQuestions(draftId);
