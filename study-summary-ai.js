@@ -114,7 +114,22 @@ async function createExamFromApprovedSummaryBank(){
 function wire(){
  if(typeof window.editStudySummary==='function'&&!window.editStudySummary.__ssFlowWrapped){const oldEdit=window.editStudySummary;const wrappedEdit=function(...args){const legacy=document.getElementById('ss-legacy-summary-form-card');if(legacy)legacy.style.display='block';return oldEdit.apply(this,args);};wrappedEdit.__ssFlowWrapped=true;window.editStudySummary=wrappedEdit;}
  if(typeof window.resetStudySummaryForm==='function'&&!window.resetStudySummaryForm.__ssFlowWrapped){const oldReset=window.resetStudySummaryForm;const wrappedReset=function(...args){const result=oldReset.apply(this,args);const legacy=document.getElementById('ss-legacy-summary-form-card');if(legacy)legacy.style.display='none';return result;};wrappedReset.__ssFlowWrapped=true;window.resetStudySummaryForm=wrappedReset;}
- if(typeof window.loadStudySummaryQuestions==='function'&&!window.loadStudySummaryQuestions.__ssAnswersWrapped){const oldQuestions=window.loadStudySummaryQuestions;const wrappedQuestions=async function(id){const result=await oldQuestions.apply(this,arguments);const body=document.getElementById('ss-questions-list');if(body){const sbc=client();const fetched=await sbc.from('study_summary_questions').select('*').eq('summary_id',id).order('order_num').order('created_at');if(!fetched.error){const rows=fetched.data||[];body.innerHTML=rows.length?rows.map((q,i)=>'<tr><td>'+esc(q.order_num||i+1)+'</td><td>'+esc(q.question_text||'')+'<div style=\"margin-top:5px;color:#64748b;font-size:11px\">'+esc(q.question_type||'سؤال')+'</div>'+(Array.isArray(q.options)&&q.options.length?'<ol>'+q.options.map(o=>'<li>'+esc(o)+'</li>').join('')+'</ol>':'')+'</td><td style=\"white-space:pre-wrap;min-width:220px\"><strong>الإجابة:</strong><br>'+esc(q.answer_text||'لم تُسجل إجابة لهذا السؤال')+(q.explanation?'<div style=\"margin-top:6px;color:#64748b\">'+esc(q.explanation)+'</div>':'')+'</td><td><button class=\"btn btn-outline btn-sm\" onclick=\"editStudySummaryQuestion(\\''+q.id+'\\')\">تعديل</button> <button class=\"btn btn-danger btn-sm\" onclick=\"deleteStudySummaryQuestion(\\''+q.id+'\\')\">حذف</button></td></tr>').join(''):'<tr><td colspan=\"4\" style=\"text-align:center\">لا توجد أسئلة لهذا الملخص.</td></tr>'; }:'<tr><td colspan=\"4\" style=\"text-align:center\">لا توجد أسئلة لهذا الملخص.</td></tr>';}}return result;};wrappedQuestions.__ssAnswersWrapped=true;window.loadStudySummaryQuestions=wrappedQuestions;}
+ if(typeof window.loadStudySummaryQuestions==='function'&&!window.loadStudySummaryQuestions.__ssAnswersWrapped){
+  const oldQuestions=window.loadStudySummaryQuestions;
+  const wrappedQuestions=async function(id){
+   const result=await oldQuestions.apply(this,arguments);
+   const body=document.getElementById('ss-questions-list'),sbc=client();
+   if(body&&sbc){
+    const fetched=await sbc.from('study_summary_questions').select('*').eq('summary_id',id).order('order_num').order('created_at');
+    if(!fetched.error){
+     const rows=fetched.data||[];
+     body.innerHTML=rows.length?rows.map((q,i)=>'<tr><td>'+esc(q.order_num||i+1)+'</td><td>'+esc(q.question_text||'')+'<div style="margin-top:5px;color:#64748b;font-size:11px">'+esc(q.question_type||'سؤال')+'</div>'+(Array.isArray(q.options)&&q.options.length?'<ol>'+q.options.map(o=>'<li>'+esc(o)+'</li>').join('')+'</ol>':'')+'</td><td style="white-space:pre-wrap;min-width:220px"><strong>الإجابة:</strong><br>'+esc(q.answer_text||'لم تُسجل إجابة لهذا السؤال')+(q.explanation?'<div style="margin-top:6px;color:#64748b">'+esc(q.explanation)+'</div>':'')+'</td><td><button class="btn btn-outline btn-sm" onclick="editStudySummaryQuestion(\''+q.id+'\')">تعديل</button> <button class="btn btn-danger btn-sm" onclick="deleteStudySummaryQuestion(\''+q.id+'\')">حذف</button></td></tr>').join(''):'<tr><td colspan="4" style="text-align:center">لا توجد أسئلة لهذا الملخص.</td></tr>';
+    }
+   }
+   return result;
+  };
+  wrappedQuestions.__ssAnswersWrapped=true;window.loadStudySummaryQuestions=wrappedQuestions;
+ }
  if(typeof window.loadStudySummaryAdmin==='function'&&!window.loadStudySummaryAdmin.__ssFlowWrapped){const old=window.loadStudySummaryAdmin;const wrapped=async function(...args){const r=await old.apply(this,args);inject();injectApprovedBankPanel();populateBankSummarySelect();return r;};wrapped.__ssFlowWrapped=true;window.loadStudySummaryAdmin=wrapped;}
  if(typeof window.showPage==='function'&&!window.showPage.__ssFlowWrapped){const old=window.showPage;const wrapped=function(page,...args){const r=old.call(this,page,...args);if(page==='study-summaries')setTimeout(inject,0);return r;};wrapped.__ssFlowWrapped=true;window.showPage=wrapped;}
  inject();injectApprovedBankPanel();populateBankSummarySelect();
