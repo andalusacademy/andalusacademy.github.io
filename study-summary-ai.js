@@ -9,6 +9,7 @@ function localDateTime(d){const x=new Date(d.getTime()-d.getTimezoneOffset()*600
 function status(msg,ok=false){const el=document.getElementById('ss-ai-status');if(el)el.innerHTML='<div style="background:'+(ok?'#ecfdf5':'#fef2f2')+';color:'+(ok?'#166534':'#991b1b')+';padding:12px;border-radius:10px;line-height:1.8">'+(ok?'✅ ':'❌ ')+esc(msg)+'</div>';}
 function hideLegacy(){
  ['ss-legacy-summary-form-card','ss-approved-bank-card'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
+ const oldForm=document.getElementById('ss-title')?.closest('.card');if(oldForm)oldForm.style.display='none';
  const page=document.getElementById('page-study-summaries');if(!page)return;
  const cards=[...page.querySelectorAll(':scope > .card')];
  cards.forEach(card=>{
