@@ -7,18 +7,20 @@ function inject(){
  const page=document.getElementById('page-study-summaries');
  if(!page||document.getElementById('ss-ai-generator-card'))return;
  const card=document.createElement('div');card.id='ss-ai-generator-card';card.className='card';
- card.innerHTML='<div class="card-header"><h3>📚 إنشاء ملخص وتوليد أسئلته</h3><span style="font-size:12px;color:var(--muted)">لن يُتاح للطلاب قبل اعتماد الأسئلة</span></div>'+
+ card.innerHTML='<div class="card-header"><h3>📚 إنشاء ملخص وتوليد أسئلته</h3><span style="font-size:12px;color:var(--muted)">توليد الأسئلة بالإجابات ثم مراجعتها وحذف غير المناسب</span></div>'+
  '<div style="padding:18px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">'+
  '<div class="form-group"><label>اسم الملخص (اكتبه بنفسك)</label><input id="ss-ai-title" class="search-input" maxlength="180" placeholder="مثال: ملخص التغذية العلاجية" style="width:100%"></div>'+
  '<div class="form-group"><label>اسم المادة</label><input id="ss-ai-subject" class="search-input" maxlength="160" placeholder="التغذية العلاجية" style="width:100%"></div>'+
- '<div class="form-group"><label>عدد الأسئلة المطلوبة</label><input id="ss-ai-count" class="search-input" type="number" min="1" max="50" value="30" style="width:100%"></div>'+
+ '<div class="form-group"><label>عدد صح / خطأ</label><input id="ss-ai-tf-count" class="search-input" type="number" min="0" max="50" value="10" style="width:100%"></div>'+
+ '<div class="form-group"><label>عدد اختيار من متعدد</label><input id="ss-ai-mc-count" class="search-input" type="number" min="0" max="50" value="10" style="width:100%"></div>'+
+ '<div class="form-group"><label>عدد الأسئلة المقالية</label><input id="ss-ai-essay-count" class="search-input" type="number" min="0" max="30" value="5" style="width:100%"></div>'+
  '<div class="form-group"><label>السعر بالجنيه</label><input id="ss-ai-price" class="search-input" type="number" min="0" step="0.01" value="0" style="width:100%"></div>'+
  '<div class="form-group"><label>مدة الإتاحة (بالأيام)</label><input id="ss-ai-validity" class="search-input" type="number" min="1" max="3650" value="30" style="width:100%"></div>'+
  '<div class="form-group"><label>ملف المادة PDF</label><input id="ss-ai-pdf" class="search-input" type="file" accept="application/pdf,.pdf" style="width:100%"></div>'+
  '<div class="form-group" style="grid-column:1/-1"><label>وصف الملخص (اختياري)</label><textarea id="ss-ai-description" class="search-input" maxlength="3000" placeholder="وصف مختصر لمحتوى الملخص" style="width:100%;min-height:65px"></textarea></div></div>'+
  '<div id="ss-ai-file-info" style="margin:8px 0;color:var(--muted);font-size:12px"></div>'+
  '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" id="ss-ai-generate-btn" type="button">⬆️ رفع الملف وإنشاء الأسئلة</button><button class="btn btn-outline" id="ss-ai-publish-btn" type="button" disabled>💾 حفظ وإتاحة للطلاب</button></div>'+
- '<div id="ss-ai-status" style="margin-top:12px"></div><div style="margin-top:8px;font-size:12px;color:var(--muted)">بعد التوليد راجع الأسئلة في قسم إدارة الأسئلة أسفل الصفحة، واعتمد كل سؤال مناسب قبل الإتاحة.</div></div>';
+ '<div id="ss-ai-status" style="margin-top:12px"></div><div style="margin-top:8px;font-size:12px;color:var(--muted)">سيظهر السؤال مع إجابته. لا يلزم اعتماد كل سؤال على حدة؛ احذف غير المناسب ثم أتح الملخص للطلاب.</div></div>';
  const anchor=page.querySelector('.card');if(anchor)anchor.insertAdjacentElement('beforebegin',card);else page.prepend(card);const legacy=document.getElementById('ss-title')?.closest('.card');if(legacy){legacy.id='ss-legacy-summary-form-card';legacy.style.display='none';}
  document.getElementById('ss-ai-pdf').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];document.getElementById('ss-ai-file-info').textContent=f?'📄 '+f.name+' — '+(f.size/1024/1024).toFixed(2)+' MB':'';});
  document.getElementById('ss-ai-generate-btn').addEventListener('click',generate);
@@ -27,9 +29,10 @@ function inject(){
 function showStatus(message,ok){const el=document.getElementById('ss-ai-status');if(el)el.innerHTML='<div style="background:'+(ok?'#ecfdf5':'#fef2f2')+';color:'+(ok?'#166534':'#991b1b')+';padding:12px;border-radius:10px">'+(ok?'✅ ':'❌ ')+esc(message)+'</div>';}
 async function generate(){
  const sbc=client(),title=document.getElementById('ss-ai-title').value.trim(),subject=document.getElementById('ss-ai-subject').value.trim(),file=document.getElementById('ss-ai-pdf').files?.[0];
- const count=Math.min(50,Math.max(1,Number(document.getElementById('ss-ai-count').value||30))),price=Number(document.getElementById('ss-ai-price').value||0),validity=Number(document.getElementById('ss-ai-validity').value||30),description=document.getElementById('ss-ai-description').value.trim();
+ const tfCount=Math.max(0,Math.min(50,Number(document.getElementById('ss-ai-tf-count').value||0))),mcCount=Math.max(0,Math.min(50,Number(document.getElementById('ss-ai-mc-count').value||0))),essayCount=Math.max(0,Math.min(30,Number(document.getElementById('ss-ai-essay-count').value||0))),count=tfCount+mcCount+essayCount,price=Number(document.getElementById('ss-ai-price').value||0),validity=Number(document.getElementById('ss-ai-validity').value||30),description=document.getElementById('ss-ai-description').value.trim();
  if(!sbc)return showStatus('اتصال قاعدة البيانات غير جاهز. أعد تحميل الصفحة.',false);
  if(title.length<2||!subject)return showStatus('اكتب اسم الملخص واسم المادة أولًا.',false);
+ if(count<1||count>100)return showStatus('حدد عددًا إجماليًا من سؤال إلى 100 سؤال.',false);
  if(!file||(!file.type.includes('pdf')&&!file.name.toLowerCase().endsWith('.pdf')))return showStatus('اختر ملف PDF للمادة.',false);
  if(file.size>15*1024*1024)return showStatus('حجم الملف يجب ألا يتجاوز 15 ميجابايت.',false);
  if(!Number.isFinite(price)||price<0||!Number.isInteger(validity)||validity<1||validity>3650)return showStatus('راجع السعر ومدة الإتاحة.',false);
@@ -42,7 +45,7 @@ async function generate(){
   // Use ASCII-only filename to avoid storage Invalid key errors.
   const path='summary-'+draftId+'/'+Date.now()+'-source.pdf';
   const upload=await sbc.storage.from('study-summary-pdfs').upload(path,file,{contentType:'application/pdf',upsert:false});if(upload.error)throw upload.error;
-  const response=await fetch(sbc.supabaseUrl+'/functions/v1/generate-study-summary',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+auth.data.session.access_token,apikey:sbc.supabaseKey},body:JSON.stringify({summary_id:draftId,pdf_path:path,subject,count})});
+  const response=await fetch(sbc.supabaseUrl+'/functions/v1/generate-study-summary',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+auth.data.session.access_token,apikey:sbc.supabaseKey},body:JSON.stringify({summary_id:draftId,pdf_path:path,subject,count,tf_count:tfCount,mcq_count:mcCount,essay_count:essayCount})});
   const result=await response.json().catch(()=>({}));if(!response.ok||!result.success)throw new Error(result.error||'تعذر إنشاء الأسئلة.');
   const save=await sbc.from('study_summaries').update({source_pdf_path:path,ai_generation_status:'ready',generated_question_count:result.generatedCount||count,is_published:false}).eq('id',draftId);if(save.error)throw save.error;
   showStatus('تم إنشاء '+(result.generatedCount||count)+' سؤالًا للملخص «'+title+'». راجع الأسئلة واعتمد كل الأسئلة المناسبة، ثم احفظ وأتح الملخص.',true);
@@ -58,7 +61,7 @@ async function publish(){
   const results=await Promise.all([sbc.from('study_summaries').select('*').eq('id',draftId).single(),sbc.from('study_summary_questions').select('id,is_approved').eq('summary_id',draftId)]);
   if(results[0].error)throw results[0].error;if(results[1].error)throw results[1].error;
   const qs=results[1].data||[];if(!qs.length)throw new Error('لا توجد أسئلة لهذا الملخص.');
-  const pending=qs.filter(q=>!q.is_approved).length;if(pending)throw new Error('اعتمد الأسئلة أولًا. ما زال '+pending+' سؤالًا غير معتمد.');
+  
   const upd=await sbc.from('study_summaries').update({is_published:true,updated_at:new Date().toISOString()}).eq('id',draftId);if(upd.error)throw upd.error;
   showStatus('تم حفظ السعر وإتاحة الملخص للطلاب. طلبات الشراء ستظهر في القسم المخصص لها.',true);
   if(typeof window.loadStudySummaryAdmin==='function')await window.loadStudySummaryAdmin();
@@ -111,6 +114,7 @@ async function createExamFromApprovedSummaryBank(){
 function wire(){
  if(typeof window.editStudySummary==='function'&&!window.editStudySummary.__ssFlowWrapped){const oldEdit=window.editStudySummary;const wrappedEdit=function(...args){const legacy=document.getElementById('ss-legacy-summary-form-card');if(legacy)legacy.style.display='block';return oldEdit.apply(this,args);};wrappedEdit.__ssFlowWrapped=true;window.editStudySummary=wrappedEdit;}
  if(typeof window.resetStudySummaryForm==='function'&&!window.resetStudySummaryForm.__ssFlowWrapped){const oldReset=window.resetStudySummaryForm;const wrappedReset=function(...args){const result=oldReset.apply(this,args);const legacy=document.getElementById('ss-legacy-summary-form-card');if(legacy)legacy.style.display='none';return result;};wrappedReset.__ssFlowWrapped=true;window.resetStudySummaryForm=wrappedReset;}
+ if(typeof window.loadStudySummaryQuestions==='function'&&!window.loadStudySummaryQuestions.__ssAnswersWrapped){const oldQuestions=window.loadStudySummaryQuestions;const wrappedQuestions=async function(id){const result=await oldQuestions.apply(this,arguments);const body=document.getElementById('ss-questions-list');if(body&&Array.isArray(window.studySummaryQuestionRows)){body.innerHTML=window.studySummaryQuestionRows.length?window.studySummaryQuestionRows.map((q,i)=>'<tr><td>'+esc(q.order_num||i+1)+'</td><td>'+esc(q.question_text||'')+'<div style=\"margin-top:5px;color:#64748b;font-size:11px\">'+esc(q.question_type||'سؤال')+'</div>'+(Array.isArray(q.options)&&q.options.length?'<ol>'+q.options.map(o=>'<li>'+esc(o)+'</li>').join('')+'</ol>':'')+'</td><td style=\"white-space:pre-wrap;min-width:220px\"><strong>الإجابة:</strong><br>'+esc(q.answer_text||'لم تُسجل إجابة لهذا السؤال')+(q.explanation?'<div style=\"margin-top:6px;color:#64748b\">'+esc(q.explanation)+'</div>':'')+'</td><td><button class=\"btn btn-outline btn-sm\" onclick=\"editStudySummaryQuestion(\\''+q.id+'\\')\">تعديل</button> <button class=\"btn btn-danger btn-sm\" onclick=\"deleteStudySummaryQuestion(\\''+q.id+'\\')\">حذف</button></td></tr>').join(''):'<tr><td colspan=\"4\" style=\"text-align:center\">لا توجد أسئلة لهذا الملخص.</td></tr>'; }return result;};wrappedQuestions.__ssAnswersWrapped=true;window.loadStudySummaryQuestions=wrappedQuestions;}
  if(typeof window.loadStudySummaryAdmin==='function'&&!window.loadStudySummaryAdmin.__ssFlowWrapped){const old=window.loadStudySummaryAdmin;const wrapped=async function(...args){const r=await old.apply(this,args);inject();injectApprovedBankPanel();populateBankSummarySelect();return r;};wrapped.__ssFlowWrapped=true;window.loadStudySummaryAdmin=wrapped;}
  if(typeof window.showPage==='function'&&!window.showPage.__ssFlowWrapped){const old=window.showPage;const wrapped=function(page,...args){const r=old.call(this,page,...args);if(page==='study-summaries')setTimeout(inject,0);return r;};wrapped.__ssFlowWrapped=true;window.showPage=wrapped;}
  inject();injectApprovedBankPanel();populateBankSummarySelect();
