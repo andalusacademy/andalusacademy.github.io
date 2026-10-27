@@ -12817,7 +12817,8 @@ async function completeStudentDeviceLogin(studentCode = '', nationalId = '') {
   }
   unifiedPortalStudent = data.student;
   unifiedPortalPhone = String(data.student?.phone || '');
-  studentPortalFaceToken = null;
+  studentPortalFaceToken = data.token || null;
+  if (!studentPortalFaceToken) throw new Error('تعذر إنشاء جلسة بوابة الطالب. حاول مرة أخرى.');
   renderStudentPortalMenu();
   return true;
 }
