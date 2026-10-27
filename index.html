@@ -14082,7 +14082,7 @@ async function loadNotificationsAdmin() {
   const priorityNames={low:'منخفضة',normal:'عادية',high:'عالية',urgent:'عاجلة'};
   tbody.innerHTML=(data||[]).map(n=>{
     const state=n.is_published ? ((n.scheduled_for && new Date(n.scheduled_for)>new Date())?'مجدول':'منشور') : 'مسودة';
-    return `<tr><td><strong>${escapeHtml(n.title)}</strong><div style="font-size:11px;color:var(--muted);max-width:320px;">${escapeHtml(n.body)}</div>${n.show_on_login?'<div style="margin-top:5px;"><span style="display:inline-block;border-radius:5px;padding:2px 7px;background:#fff7ed;color:#9a3412;font-size:11px;font-weight:800;">🔔 نافذة عند الدخول</span></div>':''}</td>
+    return `<tr><td><strong>${escapeHtml(n.title)}</strong><div style="font-size:11px;color:var(--muted);max-width:320px;">${escapeHtml(n.body)}</div>${(n.show_on_login || n.priority === 'urgent')?'<div style="margin-top:5px;"><span style="display:inline-block;border-radius:5px;padding:2px 7px;background:#fff7ed;color:#9a3412;font-size:11px;font-weight:800;">🔔 نافذة عند الدخول</span></div>':''}</td>
       <td>${escapeHtml(audienceNames[n.audience]||n.audience)}${n.branch?' · '+escapeHtml(n.branch):''}${n.program?' · '+escapeHtml(n.program):''}${n.student_id?' · '+escapeHtml(n.student_id):''}</td>
       <td>${escapeHtml(priorityNames[n.priority]||n.priority)}</td><td>${escapeHtml(state)}</td>
       <td>${n.published_at?new Date(n.published_at).toLocaleString('ar-EG'):(n.scheduled_for?new Date(n.scheduled_for).toLocaleString('ar-EG'):'—')}</td>
