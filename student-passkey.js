@@ -198,4 +198,16 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true });
   else install();
+
+  // Load the shared navigation control after the main app scripts are ready.
+  function loadGlobalBackNavigation() {
+    if (document.querySelector('script[data-andalus-global-back]')) return;
+    const script = document.createElement('script');
+    script.src = './global-back-navigation.js?v=1';
+    script.dataset.andalusGlobalBack = '1';
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadGlobalBackNavigation, { once: true });
+  else loadGlobalBackNavigation();
 })();
