@@ -94,7 +94,6 @@
       event.stopImmediatePropagation();
       recoveryLogin();
     }, true);
-    // If the main script failed before defining the handler, the button remains usable.
     if (typeof window.doLogin !== 'function') {
       btn.title = 'استرداد تسجيل الدخول مفعّل';
       console.warn('Main login handler missing; recovery handler is active.');
@@ -103,4 +102,16 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach, { once: true });
   else attach();
+})();
+
+// Load the conditional passkey/biometric gate after the main application script.
+(function loadStudentPasskeyGate() {
+  if (document.querySelector('script[data-andalus-student-passkey]')) return;
+  const script = document.createElement('script');
+  script.src = './student-passkey.js?v=1';
+  script.async = false;
+  script.dataset.andalusStudentPasskey = '1';
+  script.onload = () => console.info('Andalus student passkey gate loaded.');
+  script.onerror = () => console.warn('Student passkey gate could not be loaded; device-bound fallback remains available.');
+  document.head.appendChild(script);
 })();
