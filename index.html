@@ -12970,10 +12970,11 @@ async function checkStudentLoginNotifications() {
     const { data, error } = await sb.rpc('get_portal_notifications', {
       p_student_id: studentId, p_phone: phone, p_portal_type: 'student'
     });
-    if (error || !data?.verified) return;
+    if (error || !data?.verified) { studentLoginNotificationSessionKey = ''; return; }
     const unread = (data.notifications || []).filter(n => n.show_on_login === true && n.is_read !== true);
     if (unread.length) showStudentLoginNotificationQueue(unread);
   } catch (e) {
+    studentLoginNotificationSessionKey = '';
     console.warn('Student login notifications unavailable:', e);
   }
 }
