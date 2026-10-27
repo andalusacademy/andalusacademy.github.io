@@ -38,9 +38,10 @@ begin
   end if;
   v_hash := encode(extensions.digest(convert_to(p_device_token, 'UTF8'), 'sha256'), 'hex');
   v_is_resume := coalesce(btrim(p_student_code), '') = '' and coalesce(btrim(p_national_id), '') = '';
+  delete from public.student_device_auth_attempts where attempted_at < now() - interval '1 day';
   v_credential_hash := encode(
     extensions.digest(convert_to(
-      lower(btrim(coalesce(p_student_code, ''))) || ':' || btrim(coalesce(p_national_id, '')),
+      lower(btrim(coalesce(p_student_code, ''))),
       'UTF8'
     ), 'sha256'), 'hex');
 
