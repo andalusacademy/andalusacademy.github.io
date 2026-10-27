@@ -12830,25 +12830,38 @@ async function resetStudentDeviceBinding() {
   showToast('تم إلغاء ربط الجهاز بنجاح. يمكن للطالب التسجيل على جهازه الجديد.');
 }
 
-function getStudentDeviceToken() {
-  const key = 'andalus_student_device_token_v1';
+async function getStudentDeviceToken(nationalId = '') {
+  const baseKey = 'andalus_student_device_token_v1:';
+  const lastKeyName = 'andalus_student_device_last_key_v1';
   try {
-    let token = localStorage.getItem(key);
-    if (!token) {
-      const bytes = new Uint8Array(32);
-      if (!window.crypto?.getRandomValues) throw new Error('هذا المتصفح لا يدعم إنشاء رمز جهاز آمن');
-      window.crypto.getRandomValues(bytes);
-      token = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-      localStorage.setItem(key, token);
+    let tokenKey = '';
+    if (String(nationalId || '').trim()) {
+      if (!window.crypto?.subtle || !window.crypto?.getRandomValues) throw new Error('secure crypto unavailable');
+      const bytes = new TextEncoder().encode(String(nationalId).trim());
+      const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+      const nationalIdKey = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+      tokenKey = baseKey + nationalIdKey;
+    } else {
+      tokenKey = localStorage.getItem(lastKeyName) || '';
+      if (!tokenKey.startsWith(baseKey)) return null;
     }
-    return token;
+    let token = localStorage.getItem(tokenKey);
+    if (!token && String(nationalId || '').trim()) {
+      const random = new Uint8Array(32);
+      window.crypto.getRandomValues(random);
+      token = Array.from(random, b => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem(tokenKey, token);
+    }
+    if (token && String(nationalId || '').trim()) localStorage.setItem(lastKeyName, tokenKey);
+    return token || null;
   } catch (e) {
-    throw new Error('تعذر حفظ رمز الجهاز. تأكد من السماح ببيانات الموقع ثم أعد المحاولة.');
+    throw new Error('تعذر إنشاء أو حفظ رمز الجهاز الآمن. تأكد من السماح ببيانات الموقع ثم أعد المحاولة.');
   }
 }
 
 async function completeStudentDeviceLogin(studentCode = '', nationalId = '') {
-  const token = getStudentDeviceToken();
+  const token = await getStudentDeviceToken(nationalId);
+  if (!token) return false;
   const { data, error } = await sb.rpc('student_device_auth', {
     p_student_code: studentCode,
     p_national_id: nationalId,
