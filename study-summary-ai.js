@@ -89,7 +89,8 @@ async function generate(){
   if(loaded.error)throw loaded.error;
   allQuestions=loaded.data||[];selectedIds=new Set();selectedSummaryId=draftId;
   document.getElementById('ss-question-counts').textContent='تم إنشاء '+allQuestions.length+' سؤالًا: '+allQuestions.filter(q=>q.question_type==='mcq').length+' اختياري، '+allQuestions.filter(q=>q.question_type==='true_false').length+' صح/خطأ، '+allQuestions.filter(q=>q.question_type==='essay').length+' مقالي';
-  renderQuestionLists();document.getElementById('ss-approve-summary-btn').disabled=false;\n  document.getElementById('ss-export-questions-pdf-btn').disabled=!allQuestions.length;
+  renderQuestionLists();document.getElementById('ss-approve-summary-btn').disabled=false;
+  document.getElementById('ss-export-questions-pdf-btn').disabled=!allQuestions.length;
   status('تم حفظ المادة كمسودة وتوليد الأسئلة. لم يتم نشرها للطلاب. علّم على الأسئلة التي تريدها ثم اضغط اعتماد.',true);
   await refreshSummaries();
  }catch(e){status(e?.message||String(e));}finally{btn.disabled=false;}
