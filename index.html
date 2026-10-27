@@ -12784,6 +12784,44 @@ let examFaceVerifiedStudentId = null;
 let examFaceVerificationToken = null;
 let examStudentPhone = '';
 
+function getStudentDeviceToken() {
+  const key = 'andalus_student_device_token_v1';
+  try {
+    let token = localStorage.getItem(key);
+    if (!token) {
+      const bytes = new Uint8Array(32);
+      if (!window.crypto?.getRandomValues) throw new Error('هذا المتصفح لا يدعم إنشاء رمز جهاز آمن');
+      window.crypto.getRandomValues(bytes);
+      token = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem(key, token);
+    }
+    return token;
+  } catch (e) {
+    throw new Error('تعذر حفظ رمز الجهاز. تأكد من السماح ببيانات الموقع ثم أعد المحاولة.');
+  }
+}
+
+async function completeStudentDeviceLogin(studentCode = '', nationalId = '') {
+  const token = getStudentDeviceToken();
+  const { data, error } = await sb.rpc('student_device_auth', {
+    p_student_code: studentCode,
+    p_national_id: nationalId,
+    p_device_token: token
+  });
+  if (error) throw new Error('خدمة تسجيل الجهاز غير مفعلة بعد أو تعذر الاتصال. حاول لاحقًا.');
+  if (!data?.ok) {
+    if (data?.reason === 'device_mismatch') throw new Error('هذا الحساب مربوط بجهاز آخر. تواصل مع إدارة المركز لإعادة ربط الجهاز.');
+    if (data?.reason === 'session_not_found') return false;
+    if (data?.reason === 'invalid_device') throw new Error('رمز الجهاز غير صالح. امسح بيانات الدخول وحاول مرة أخرى.');
+    throw new Error('بيانات الدخول غير صحيحة، راجع كود الطالب والرقم القومي.');
+  }
+  unifiedPortalStudent = data.student;
+  unifiedPortalPhone = String(data.student?.phone || '');
+  studentPortalFaceToken = null;
+  renderStudentPortalMenu();
+  return true;
+}
+
 function showStudentPortalLoginStep() {
   studentPortalFaceToken = null;
   unifiedPortalStudent = null;
@@ -12791,40 +12829,62 @@ function showStudentPortalLoginStep() {
   studentLoginNotificationSessionKey = '';
   studentLoginNotificationSnoozedForSession = false;
   stopStudentFaceCamera();
-  document.getElementById('student-portal-content').innerHTML = `
-    <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أدخل رقم القيد ورقم الهاتف المسجل، ثم تحقق من الوجه للدخول الآمن</p>
+  const weeklyEntry = new URLSearchParams(window.location.search).get('weekly-quiz') === '1';
+  document.getElementById('student-portal-content').innerHTML = weeklyEntry ? `
+    <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أدخل رقم القيد ورقم الهاتف المسجل، ثم تحقق من الوجه للمسابقة الأسبوعية</p>
     <div class="form-group"><label>رقم القيد</label><input type="text" id="student-portal-id-input" autocomplete="username" placeholder="رقم القيد" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
     <div class="form-group"><label>رقم الهاتف المسجل لدى المركز</label><input type="tel" inputmode="tel" autocomplete="tel" id="student-portal-phone-input" placeholder="01xxxxxxxxx" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
     <div id="student-portal-login-err" role="alert" style="color:#dc2626;font-size:12px;margin-top:6px;display:none;"></div>
-    <button class="btn btn-gold" style="width:100%;padding:13px;margin-top:12px;" onclick="enterStudentPortal()">متابعة والتحقق من الوجه</button>
+    <button class="btn btn-gold" style="width:100%;padding:13px;margin-top:12px;" onclick="enterStudentPortal()">متابعة</button>
+  ` : `
+    <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أول دخول يربط الحساب بهذا الجهاز. بعد ذلك يمكنك فتح البوابة من الجهاز نفسه دون إعادة إدخال البيانات.</p>
+    <div class="form-group"><label>كود الطالب / رقم القيد</label><input type="text" id="student-portal-id-input" autocomplete="username" placeholder="كود الطالب أو رقم القيد" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
+    <div class="form-group"><label>الرقم القومي للطالب</label><input type="password" inputmode="numeric" autocomplete="off" id="student-portal-phone-input" placeholder="أدخل الرقم القومي" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
+    <div id="student-portal-login-err" role="alert" style="color:#dc2626;font-size:12px;margin-top:6px;display:none;"></div>
+    <button class="btn btn-gold" style="width:100%;padding:13px;margin-top:12px;" onclick="enterStudentPortal()">تسجيل الدخول وربط الجهاز</button>
   `;
   document.getElementById('student-portal-phone-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') enterStudentPortal(); });
   document.getElementById('student-portal-id-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') enterStudentPortal(); });
+  // Resume the saved installation session after reopening the app; no camera is needed.
+  if (!weeklyEntry) {
+    completeStudentDeviceLogin('', '').catch(e => console.warn('Student device session resume:', e));
+  }
 }
 
 async function enterStudentPortal() {
   const idInput = document.getElementById('student-portal-id-input');
-  const phoneInput = document.getElementById('student-portal-phone-input');
+  const identityInput = document.getElementById('student-portal-phone-input');
   const errEl = document.getElementById('student-portal-login-err');
-  const studentId = idInput?.value.trim();
-  const phone = phoneInput?.value.trim();
-  if (!studentId || !phone) { if(errEl){errEl.textContent='اكتب رقم القيد ورقم الهاتف المسجل';errEl.style.display='block';} return; }
+  const studentCode = idInput?.value.trim();
+  const identity = identityInput?.value.trim();
+  const weeklyEntry = new URLSearchParams(window.location.search).get('weekly-quiz') === '1';
+  if (!studentCode || !identity) {
+    if(errEl){errEl.textContent=weeklyEntry ? 'اكتب رقم القيد ورقم الهاتف المسجل' : 'اكتب كود الطالب والرقم القومي';errEl.style.display='block';}
+    return;
+  }
   if(errEl) { errEl.style.display='none'; }
+  const button = document.querySelector('#student-portal-content button.btn');
+  if (button) button.disabled = true;
   try {
-    const { data: student, error } = await sb.rpc('public_student_lookup', { p_student_id: studentId, p_phone: phone });
+    if (!weeklyEntry) {
+      await completeStudentDeviceLogin(studentCode, identity);
+      return;
+    }
+    const { data: student, error } = await sb.rpc('public_student_lookup', { p_student_id: studentCode, p_phone: identity });
     if (error || !student) throw new Error('رقم القيد غير موجود أو تعذر تحميل بيانات الطالب');
     const { data: faceStatus, error: statusError } = await sb.rpc('student_face_status', {
-      p_student_id: studentId, p_phone: phone
+      p_student_id: studentCode, p_phone: identity
     });
     if (statusError) throw statusError;
     if (!faceStatus?.verified) throw new Error('رقم الهاتف غير مطابق للهاتف المسجل لدى المركز');
     unifiedPortalStudent = student;
-    unifiedPortalPhone = phone;
-    const weeklyEntry = new URLSearchParams(window.location.search).get('weekly-quiz') === '1';
-    renderStudentFaceGate(!faceStatus.enrolled, weeklyEntry ? 'weekly_quiz' : 'student_portal');
+    unifiedPortalPhone = identity;
+    renderStudentFaceGate(!faceStatus.enrolled, 'weekly_quiz');
   } catch (e) {
     if(errEl) { errEl.textContent = e.message || 'تعذر التحقق من البيانات'; errEl.style.display='block'; }
     else showToast(e.message || 'تعذر التحقق من البيانات','error');
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
