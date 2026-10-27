@@ -6712,9 +6712,12 @@ function renderQrCodesGrid() {
       '<canvas id="qr-grid-' + escapeHtml(id) + '" style="max-width:100%;"></canvas>' +
       '<div style="font-size:12px;font-weight:700;margin-top:6px;">' + escapeHtml(s.name || 'طالب') + '</div>' +
       '<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">' + escapeHtml(id) + '</div>' +
-      '<button class="btn btn-outline btn-sm" style="width:100%;" onclick="downloadSingleQrFromGrid(' + JSON.stringify(id).replace(/</g, '\\u003c') + ')">⬇️ تحميل</button>' +
+      '<button class="btn btn-outline btn-sm" style="width:100%;" data-qr-download-id="' + escapeHtml(id) + '">⬇️ تحميل</button>' +
     '</div>';
   }).join('');
+  gridEl.querySelectorAll('[data-qr-download-id]').forEach(button => {
+    button.addEventListener('click', () => downloadSingleQrFromGrid(button.dataset.qrDownloadId || ''));
+  });
 
   filtered.forEach(s => {
     const id = String(s.id);
