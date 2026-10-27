@@ -241,7 +241,7 @@ async function saveManageSummary(publish){
  if(!Number.isFinite(price)||price<0||!Number.isInteger(validity)||validity<1||validity>3650){el.textContent='راجع السعر ومدة الصلاحية.';return;}
  if(!fromVal||!untilVal||new Date(untilVal)<=new Date(fromVal)){el.textContent='حدد بداية ونهاية صحيحتين للإتاحة.';return;}
  const enabledBatches=[];if(document.getElementById('ss-manage-batch-a').checked)enabledBatches.push(1);if(document.getElementById('ss-manage-batch-b').checked)enabledBatches.push(2);if(!enabledBatches.length){el.textContent='اختر المجموعة A أو المجموعة B أو الاثنين قبل الحفظ.';return;}
- const q=await sbc.from('study_summary_questions').select('id').eq('summary_id',id).eq('is_selected',true).eq('is_approved',true).in('batch_no',enabledBatches);if(q.error)throw q.error;if(!q.data?.length){el.textContent='لا توجد أسئلة مختارة ومعتمدة في المجموعات التي اخترتها.';return;}
+ const q=await sbc.from('study_summary_questions').select('id,batch_no').eq('summary_id',id).eq('is_selected',true).eq('is_approved',true).in('batch_no',enabledBatches);if(q.error)throw q.error;const missingBatches=enabledBatches.filter(batch=>!(q.data||[]).some(row=>Number(row.batch_no)===batch));if(missingBatches.length){el.textContent='لا يمكن حفظ الإتاحة: اعتمد سؤالًا واحدًا على الأقل من كل مجموعة اخترتها ('+missingBatches.map(batch=>batch===1?'A':'B').join(' و')+').';return;}
  const payload={price,validity_days:validity,enabled_batches:enabledBatches,available_from:new Date(fromVal).toISOString(),available_until:new Date(untilVal).toISOString(),is_published:!!publish,published_at:publish?new Date().toISOString():null,updated_at:new Date().toISOString()};
  const result=await sbc.from('study_summaries').update(payload).eq('id',id).eq('is_approved',true);if(result.error){el.textContent='تعذر الحفظ: '+result.error.message;return;}
  el.textContent=publish?'تم نشر الملخص للطلاب ضمن وقت الإتاحة المحدد.':'تم حفظ الإعدادات فقط. لم يتم نشر الملخص للطلاب.';
@@ -256,7 +256,7 @@ async function hardDeleteSummary(id){
   }
   const d=await sbc.from('study_summaries').delete().eq('id',id);if(d.error)throw d.error;
   if(s.source_pdf_path){const rm=await sbc.storage.from('study-summary-pdfs').remove([s.source_pdf_path]);if(rm.error)console.warn('تعذر حذف ملف PDF من التخزين',rm.error);}
-  if(draftId===id){draftId=null;allQuestions=[];selectedIds.clear();}
+  if(draftId===id)draftId=null;if(reviewSummaryId===id){reviewSummaryId='';allQuestions=[];selectedIds.clear();reviewReadOnly=false;renderQuestionLists();}
   if(typeof showToast==='function')showToast('تم حذف الملخص وجميع سجلاته نهائيًا','success');
   await refreshSummaries();if(typeof window.loadStudySummaryOrdersAdmin==='function')await window.loadStudySummaryOrdersAdmin();
  }catch(e){if(typeof showToast==='function')showToast(e?.message||String(e),'error');else alert(e?.message||String(e));}
