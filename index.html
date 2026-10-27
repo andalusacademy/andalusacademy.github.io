@@ -12830,20 +12830,24 @@ async function resetStudentDeviceBinding() {
   showToast('تم إلغاء ربط الجهاز بنجاح. يمكن للطالب التسجيل على جهازه الجديد.');
 }
 
+async function getStudentDeviceStorageKey(nationalId) {
+  if (!window.crypto?.subtle) throw new Error('secure crypto unavailable');
+  const bytes = new TextEncoder().encode(String(nationalId || '').trim());
+  const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+  const hashedId = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+  return 'andalus_student_device_token_v1:' + hashedId;
+}
+
 async function getStudentDeviceToken(nationalId = '') {
-  const baseKey = 'andalus_student_device_token_v1:';
   const lastKeyName = 'andalus_student_device_last_key_v1';
   try {
     let tokenKey = '';
     if (String(nationalId || '').trim()) {
-      if (!window.crypto?.subtle || !window.crypto?.getRandomValues) throw new Error('secure crypto unavailable');
-      const bytes = new TextEncoder().encode(String(nationalId).trim());
-      const digest = await window.crypto.subtle.digest('SHA-256', bytes);
-      const nationalIdKey = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
-      tokenKey = baseKey + nationalIdKey;
+      if (!window.crypto?.getRandomValues) throw new Error('secure crypto unavailable');
+      tokenKey = await getStudentDeviceStorageKey(nationalId);
     } else {
       tokenKey = localStorage.getItem(lastKeyName) || '';
-      if (!tokenKey.startsWith(baseKey)) return null;
+      if (!tokenKey.startsWith('andalus_student_device_token_v1:')) return null;
     }
     let token = localStorage.getItem(tokenKey);
     if (!token && String(nationalId || '').trim()) {
@@ -12852,7 +12856,6 @@ async function getStudentDeviceToken(nationalId = '') {
       token = Array.from(random, b => b.toString(16).padStart(2, '0')).join('');
       localStorage.setItem(tokenKey, token);
     }
-    if (token && String(nationalId || '').trim()) localStorage.setItem(lastKeyName, tokenKey);
     return token || null;
   } catch (e) {
     throw new Error('تعذر إنشاء أو حفظ رمز الجهاز الآمن. تأكد من السماح ببيانات الموقع ثم أعد المحاولة.');
@@ -12874,6 +12877,14 @@ async function completeStudentDeviceLogin(studentCode = '', nationalId = '') {
     if (data?.reason === 'invalid_device') throw new Error('رمز الجهاز غير صالح. امسح بيانات الدخول وحاول مرة أخرى.');
     if (data?.reason === 'rate_limited') throw new Error('تم إيقاف محاولات الدخول مؤقتًا لكثرة المحاولات. انتظر 15 دقيقة ثم حاول مرة أخرى.');
     throw new Error('بيانات الدخول غير صحيحة، راجع كود الطالب والرقم القومي.');
+  }
+  if (String(nationalId || '').trim()) {
+    try {
+      const key = await getStudentDeviceStorageKey(nationalId);
+      localStorage.setItem('andalus_student_device_last_key_v1', key);
+    } catch (e) {
+      throw new Error('تم التحقق من البيانات لكن تعذر حفظ جلسة هذا الجهاز. أعد المحاولة.');
+    }
   }
   unifiedPortalStudent = data.student;
   unifiedPortalPhone = String(data.student?.phone || '');
