@@ -12,9 +12,12 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
-<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<!-- QR tools are served locally so QR generation does not depend on third-party CDNs. -->
+<script src="./vendor/qrcode-generator.js?v=1"></script>
+<script src="./vendor/qrcode-generator-utf8.js?v=1"></script>
+<script src="./vendor/qr-code-adapter.js?v=1"></script>
+<script src="./vendor/html5-qrcode.min.js?v=1"></script>
+<script src="./vendor/jszip.min.js?v=1"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
 :root{--navy:#152238;--navy2:#1f3562;--gold:#c9a24c;--gold2:#e8c87a;--bg:#f3f5fa;--white:#fff;--text:#1a2437;--muted:#6b7690;--success:#16a34a;--danger:#e0362a;--warning:#e08c1f;--border:#e4e8f2;--sw:240px;--radius:14px;--radius-sm:9px;--shadow-sm:0 1px 3px rgba(21,34,56,.06),0 1px 2px rgba(21,34,56,.04);--shadow-md:0 8px 24px rgba(21,34,56,.10);--shadow-lg:0 16px 44px rgba(21,34,56,.16);}
@@ -6646,16 +6649,33 @@ async function markAttendanceBySession(studentId, status) {
    حضور بالـQR — QR لكل طالب (رقم قيده)، وقارئ يسجّل الحضور فورًا
    ============================================================ */
 function showStudentQrCode(studentId) {
-  const s = allStudents.find(x => x.id === studentId);
-  if (!s) return;
-  document.getElementById('qr-student-name').textContent = s.name + ' — ' + s.id;
+  const s = allStudents.find(x => String(x.id) === String(studentId));
+  if (!s) { showToast('تعذر العثور على الطالب المطلوب.', 'error'); return; }
+  if (!window.QRCode || typeof window.QRCode.toCanvas !== 'function') {
+    showToast('مكتبة QR المحلية لم تُحمّل. أعد تحميل الصفحة ثم حاول مرة أخرى.', 'error');
+    return;
+  }
+  const nameEl = document.getElementById('qr-student-name');
   const canvas = document.getElementById('qr-canvas');
-  QRCode.toCanvas(canvas, s.id, { width: 260, margin: 2 }, err => { if (err) console.error(err); });
-  document.getElementById('modal-student-qr').classList.add('open');
+  if (!canvas || !nameEl) { showToast('نافذة كود الطالب غير جاهزة.', 'error'); return; }
+  nameEl.textContent = String(s.name || 'طالب') + ' — ' + String(s.id);
+  canvas.dataset.qrReady = 'false';
+  QRCode.toCanvas(canvas, String(s.id), { width: 260, margin: 2 }, err => {
+    if (err) {
+      console.error('Student QR generation failed:', err);
+      showToast('تعذر إنشاء كود QR لهذا الطالب: ' + (err.message || err), 'error');
+      return;
+    }
+    document.getElementById('modal-student-qr').classList.add('open');
+  });
 }
 
 function downloadStudentQr() {
   const canvas = document.getElementById('qr-canvas');
+  if (!canvas || canvas.dataset.qrReady !== 'true') {
+    showToast('كود QR لم يجهز بعد. افتح بطاقة الطالب مرة أخرى.', 'error');
+    return;
+  }
   const link = document.createElement('a');
   link.download = 'QR_' + (currentProfileId || 'student') + '.png';
   link.href = canvas.toDataURL('image/png');
@@ -6666,70 +6686,117 @@ function downloadStudentQr() {
    تجميع كل أكواد QR للطلاب فى صفحة واحدة — تحميل فردي أو الكل ZIP
    ============================================================ */
 function renderQrCodesGrid() {
-  const q = (document.getElementById('qr-search')?.value || '').toLowerCase();
+  const gridEl = document.getElementById('qrcodes-grid');
+  if (!gridEl) return;
+  if (!window.QRCode || typeof window.QRCode.toCanvas !== 'function') {
+    gridEl.innerHTML = '<div style="grid-column:1/-1;padding:16px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:10px;">تعذر تحميل مكتبة QR المحلية. تأكد من تحديث الصفحة، وإذا استمرت المشكلة راجع ملفات vendor في المستودع.</div>';
+    return;
+  }
+  const q = String(document.getElementById('qr-search')?.value || '').toLowerCase().trim();
   const branch = document.getElementById('qr-filter-branch')?.value || '';
-  const filtered = allStudents.filter(s => {
-    const mq = !q || s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
+  const students = Array.isArray(allStudents) ? allStudents : [];
+  const filtered = students.filter(s => {
+    const name = String(s?.name || '');
+    const id = String(s?.id ?? '');
+    const mq = !q || name.toLowerCase().includes(q) || id.toLowerCase().includes(q);
     const mb = !branch || s.branch === branch;
     return mq && mb;
   });
-  const gridEl = document.getElementById('qrcodes-grid');
   if (!filtered.length) {
     gridEl.innerHTML = '<div style="grid-column:1/-1;"><div class="empty-state"><div class="emoji">🔳</div><h4>لا يوجد طلاب مطابقين</h4></div></div>';
     return;
   }
-  gridEl.innerHTML = filtered.map(s => `<div class="card" style="margin:0;padding:12px;text-align:center;">
-    <canvas id="qr-grid-${escapeHtml(s.id)}" style="max-width:100%;"></canvas>
-    <div style="font-size:12px;font-weight:700;margin-top:6px;">${escapeHtml(s.name)}</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">${escapeHtml(s.id)}</div>
-    <button class="btn btn-outline btn-sm" style="width:100%;" onclick="downloadSingleQrFromGrid('${escapeHtml(s.id)}')">⬇️ تحميل</button>
-  </div>`).join('');
+  gridEl.innerHTML = filtered.map(s => {
+    const id = String(s.id);
+    return '<div class="card" style="margin:0;padding:12px;text-align:center;">' +
+      '<canvas id="qr-grid-' + escapeHtml(id) + '" style="max-width:100%;"></canvas>' +
+      '<div style="font-size:12px;font-weight:700;margin-top:6px;">' + escapeHtml(s.name || 'طالب') + '</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">' + escapeHtml(id) + '</div>' +
+      '<button class="btn btn-outline btn-sm" style="width:100%;" onclick="downloadSingleQrFromGrid(' + JSON.stringify(id).replace(/</g, '\\u003c') + ')">⬇️ تحميل</button>' +
+    '</div>';
+  }).join('');
 
   filtered.forEach(s => {
-    const canvas = document.getElementById('qr-grid-' + s.id);
-    if (canvas) QRCode.toCanvas(canvas, s.id, { width: 130, margin: 1 }, err => { if (err) console.error(err); });
+    const id = String(s.id);
+    const canvas = document.getElementById('qr-grid-' + id);
+    if (!canvas) return;
+    QRCode.toCanvas(canvas, id, { width: 130, margin: 1 }, err => {
+      if (err) {
+        console.error('Student QR grid generation failed:', id, err);
+        const card = canvas.closest('.card');
+        if (card) {
+          canvas.dataset.qrReady = 'false';
+          const msg = document.createElement('div');
+          msg.style.cssText = 'color:#b91c1c;font-size:11px;padding:8px;';
+          msg.textContent = 'تعذر إنشاء كود الطالب؛ اضغط تحديث الصفحة وحاول مرة أخرى.';
+          canvas.replaceWith(msg);
+        }
+      }
+    });
   });
 }
 
 function downloadSingleQrFromGrid(studentId) {
-  const canvas = document.getElementById('qr-grid-' + studentId);
-  if (!canvas) return;
+  const canvas = document.getElementById('qr-grid-' + String(studentId));
+  if (!canvas || canvas.dataset.qrReady !== 'true') {
+    showToast('كود QR غير جاهز للتحميل؛ أعد عرض قائمة الأكواد وحاول مرة أخرى.', 'error');
+    return;
+  }
   const link = document.createElement('a');
-  link.download = 'QR_' + studentId + '.png';
+  link.download = 'QR_' + String(studentId) + '.png';
   link.href = canvas.toDataURL('image/png');
   link.click();
 }
 
 async function downloadAllQrCodes() {
-  const q = (document.getElementById('qr-search')?.value || '').toLowerCase();
+  if (!window.QRCode || typeof window.QRCode.toCanvas !== 'function') {
+    showToast('مكتبة QR المحلية غير جاهزة. أعد تحميل الصفحة وحاول مرة أخرى.', 'error');
+    return;
+  }
+  if (typeof window.JSZip !== 'function') {
+    showToast('مكتبة ضغط الملفات المحلية غير جاهزة. أعد تحميل الصفحة وحاول مرة أخرى.', 'error');
+    return;
+  }
+  const q = String(document.getElementById('qr-search')?.value || '').toLowerCase().trim();
   const branch = document.getElementById('qr-filter-branch')?.value || '';
-  const filtered = allStudents.filter(s => {
-    const mq = !q || s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-    const mb = !branch || s.branch === branch;
-    return mq && mb;
+  const students = Array.isArray(allStudents) ? allStudents : [];
+  const filtered = students.filter(s => {
+    const name = String(s?.name || '');
+    const id = String(s?.id ?? '');
+    const mq = !q || name.toLowerCase().includes(q) || id.toLowerCase().includes(q);
+    return mq && (!branch || s.branch === branch);
   });
   if (!filtered.length) { showToast('لا يوجد طلاب لتحميل أكوادهم', 'error'); return; }
   showToast('⏳ جاري تجهيز ' + filtered.length + ' كود QR...', 'info');
 
-  const zip = new JSZip();
-  for (const s of filtered) {
-    const canvas = document.createElement('canvas');
-    await new Promise(resolve => {
-      QRCode.toCanvas(canvas, s.id, { width: 300, margin: 2 }, () => resolve());
-    });
-    const dataUrl = canvas.toDataURL('image/png').split(',')[1];
-    const safeName = s.name.replace(/[\\/:*?"<>|]/g, '').trim();
-    zip.file(`${s.id}_${safeName}.png`, dataUrl, { base64: true });
-  }
+  try {
+    const zip = new JSZip();
+    for (let i = 0; i < filtered.length; i++) {
+      const s = filtered[i];
+      const canvas = document.createElement('canvas');
+      await new Promise((resolve, reject) => {
+        QRCode.toCanvas(canvas, String(s.id), { width: 300, margin: 2 }, err => {
+          if (err) reject(err); else resolve();
+        });
+      });
+      if (canvas.dataset.qrReady !== 'true') throw new Error('لم يكتمل إنشاء كود الطالب ' + s.id);
+      const dataUrl = canvas.toDataURL('image/png').split(',')[1];
+      const safeName = String(s.name || 'طالب').replace(/[\\/:*?"<>|]/g, '').trim() || 'طالب';
+      zip.file(String(s.id) + '_' + safeName + '.png', dataUrl, { base64: true });
+    }
 
-  const blob = await zip.generateAsync({ type: 'blob' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.download = 'أكواد_QR_الطلاب_' + new Date().toLocaleDateString('ar-EG').replace(/\//g, '-') + '.zip';
-  link.href = url;
-  link.click();
-  URL.revokeObjectURL(url);
-  showToast('✅ تم تحميل ' + filtered.length + ' كود QR فى ملف مضغوط');
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = 'أكواد_QR_الطلاب_' + new Date().toLocaleDateString('ar-EG').replace(/\\//g, '-') + '.zip';
+    link.href = url;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+    showToast('✅ تم تحميل ' + filtered.length + ' كود QR فى ملف مضغوط');
+  } catch (err) {
+    console.error('Bulk student QR export failed:', err);
+    showToast('تعذر تجهيز ملف أكواد QR: ' + (err?.message || 'خطأ غير معروف'), 'error');
+  }
 }
 
 let qrScannerInstance = null;
@@ -6743,6 +6810,10 @@ async function openQrScanner() {
   document.getElementById('modal-qr-scanner').classList.add('open');
   document.getElementById('qr-scan-feedback').innerHTML = '';
   qrLastScanned = null;
+  if (typeof window.Html5Qrcode !== 'function') {
+    document.getElementById('qr-scan-feedback').innerHTML = '<span style="color:#ef4444;">مكتبة قارئ QR المحلية غير محمّلة. أعد تحميل الصفحة وحاول مرة أخرى.</span>';
+    return;
+  }
   qrScannerInstance = new Html5Qrcode('qr-reader');
   try {
     await qrScannerInstance.start(
