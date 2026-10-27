@@ -25,9 +25,9 @@ function inject(){
   '<div style="padding:18px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">'+
   '<div class="form-group"><label>اسم الملخص</label><input id="ss-ai-title" class="search-input" maxlength="180" placeholder="مثال: ملخص التغذية العلاجية" style="width:100%"></div>'+
   '<div class="form-group"><label>اسم المادة</label><input id="ss-ai-subject" class="search-input" maxlength="160" placeholder="التغذية العلاجية" style="width:100%"></div>'+
-  '<div class="form-group"><label>عدد الاختيار من متعدد</label><input id="ss-ai-mc-count" class="search-input" type="number" min="0" max="50" value="50" style="width:100%"></div>'+
-  '<div class="form-group"><label>عدد الصح والخطأ</label><input id="ss-ai-tf-count" class="search-input" type="number" min="0" max="50" value="50" style="width:100%"></div>'+
-  '<div class="form-group"><label>عدد الأسئلة المقالية</label><input id="ss-ai-essay-count" class="search-input" type="number" min="0" max="30" value="20" style="width:100%"></div>'+
+  '<div class="form-group"><label>عدد الاختيار من متعدد</label><input id="ss-ai-mc-count" class="search-input" type="number" min="0" max="100" value="40" style="width:100%"></div>'+
+  '<div class="form-group"><label>عدد الصح والخطأ</label><input id="ss-ai-tf-count" class="search-input" type="number" min="0" max="100" value="40" style="width:100%"></div>'+
+  '<div class="form-group"><label>عدد الأسئلة المقالية</label><input id="ss-ai-essay-count" class="search-input" type="number" min="0" max="100" value="20" style="width:100%"></div>'+
   '<div class="form-group" style="grid-column:1/-1"><label>ملف المادة PDF</label><input id="ss-ai-pdf" class="search-input" type="file" accept="application/pdf,.pdf" style="width:100%"><div id="ss-ai-file-info" style="margin-top:6px;color:var(--muted);font-size:12px"></div></div>'+
   '<div class="form-group" style="grid-column:1/-1"><label>وصف الملخص (اختياري)</label><textarea id="ss-ai-description" class="search-input" maxlength="3000" placeholder="وصف مختصر للمادة" style="width:100%;min-height:65px"></textarea></div></div>'+
   '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" id="ss-ai-generate-btn" type="button">⬆️ حفظ المادة وتوليد الأسئلة</button></div>'+
@@ -41,10 +41,10 @@ function inject(){
   card.innerHTML='<div class="card-header"><h3>📝 ٢) مراجعة الأسئلة الناتجة</h3><span id="ss-question-counts" style="font-size:12px;color:var(--muted)">ارفع المادة أولًا</span></div>'+
   '<div style="padding:16px"><div id="ss-generated-list"><p style="color:var(--muted)">ستظهر هنا جميع الأسئلة التي أنشأها الذكاء الاصطناعي.</p></div>'+
   '<div style="margin:24px 0 12px;border-top:3px solid #c9a24c;padding-top:16px"><h3 style="margin-bottom:8px">⭐ الأسئلة التي اخترتها للملخص</h3><p style="color:var(--muted);font-size:12px;margin-bottom:12px">أي سؤال تعلّم عليه فوق ينتقل إلى هذه القائمة تلقائيًا.</p><div id="ss-selected-list"><p style="color:var(--muted)">لم تحدد أسئلة بعد.</p></div></div>'+
-  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-gold" id="ss-approve-summary-btn" disabled>✅ اعتماد الأسئلة المحددة والملخص بالكامل</button></div><div id="ss-approve-status" style="margin-top:12px"></div></div>';
+  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-gold" id="ss-approve-summary-btn" disabled>✅ اعتماد الأسئلة المحددة والملخص بالكامل</button><button class="btn btn-outline" id="ss-export-questions-pdf-btn" type="button" disabled>📄 تصدير الأسئلة PDF</button></div><div id="ss-approve-status" style="margin-top:12px"></div></div>';
   document.getElementById('ss-ai-generator-card').insertAdjacentElement('afterend',card);
   card.addEventListener('change',e=>{const box=e.target.closest('input[data-question-id]');if(!box)return;const id=box.dataset.questionId;if(box.checked)selectedIds.add(id);else selectedIds.delete(id);renderQuestionLists();});
-  document.getElementById('ss-approve-summary-btn').addEventListener('click',approveSelected);
+  document.getElementById('ss-approve-summary-btn').addEventListener('click',approveSelected);\n  document.getElementById('ss-export-questions-pdf-btn').addEventListener('click',exportQuestionsPdf);
  }
  if(!document.getElementById('ss-summary-management-card')){
   const card=document.createElement('div');card.id='ss-summary-management-card';card.className='card';
@@ -67,10 +67,10 @@ function inject(){
 }
 async function generate(){
  const sbc=client(),title=document.getElementById('ss-ai-title').value.trim(),subject=document.getElementById('ss-ai-subject').value.trim(),file=document.getElementById('ss-ai-pdf').files?.[0];
- const tf=Math.max(0,Math.min(50,Number(document.getElementById('ss-ai-tf-count').value||0))),mc=Math.max(0,Math.min(50,Number(document.getElementById('ss-ai-mc-count').value||0))),essay=Math.max(0,Math.min(30,Number(document.getElementById('ss-ai-essay-count').value||0))),total=tf+mc+essay,description=document.getElementById('ss-ai-description').value.trim();
+ const tf=Math.max(0,Math.min(100,Number(document.getElementById('ss-ai-tf-count').value||0))),mc=Math.max(0,Math.min(100,Number(document.getElementById('ss-ai-mc-count').value||0))),essay=Math.max(0,Math.min(100,Number(document.getElementById('ss-ai-essay-count').value||0))),total=tf+mc+essay,description=document.getElementById('ss-ai-description').value.trim();
  if(!sbc)return status('اتصال قاعدة البيانات غير جاهز. أعد تحميل الصفحة.');
  if(title.length<2||!subject)return status('اكتب اسم الملخص واسم المادة أولًا.');
- if(total<1||total>130)return status('إجمالي الأسئلة يجب أن يكون من 1 إلى 130 سؤالًا.');
+ if(total<1||total>100)return status('إجمالي الأسئلة يجب أن يكون من 1 إلى 100 سؤال في العملية الواحدة.');
  if(!file||(!file.type.includes('pdf')&&!file.name.toLowerCase().endsWith('.pdf')))return status('اختر ملف PDF للمادة.');
  if(file.size>15*1024*1024)return status('حجم الملف يجب ألا يتجاوز 15 ميجابايت.');
  const btn=document.getElementById('ss-ai-generate-btn');btn.disabled=true;
@@ -88,7 +88,7 @@ async function generate(){
   if(loaded.error)throw loaded.error;
   allQuestions=loaded.data||[];selectedIds=new Set();selectedSummaryId=draftId;
   document.getElementById('ss-question-counts').textContent='تم إنشاء '+allQuestions.length+' سؤالًا: '+allQuestions.filter(q=>q.question_type==='mcq').length+' اختياري، '+allQuestions.filter(q=>q.question_type==='true_false').length+' صح/خطأ، '+allQuestions.filter(q=>q.question_type==='essay').length+' مقالي';
-  renderQuestionLists();document.getElementById('ss-approve-summary-btn').disabled=false;
+  renderQuestionLists();document.getElementById('ss-approve-summary-btn').disabled=false;\n  document.getElementById('ss-export-questions-pdf-btn').disabled=!allQuestions.length;
   status('تم حفظ المادة كمسودة وتوليد الأسئلة. لم يتم نشرها للطلاب. علّم على الأسئلة التي تريدها ثم اضغط اعتماد.',true);
   await refreshSummaries();
  }catch(e){status(e?.message||String(e));}finally{btn.disabled=false;}
@@ -100,7 +100,21 @@ function renderQuestionLists(){
  const picked=allQuestions.filter(q=>selectedIds.has(q.id));
  selected.innerHTML=picked.length?picked.map((q,i)=>'<div style="border:1px solid #86bda0;border-radius:10px;padding:12px;margin:8px 0;background:#f0fdf4"><strong>'+ (i+1)+'. '+esc(q.question_text)+'</strong><div style="font-size:12px;color:#166534;margin-top:4px">'+esc(typeLabel(q.question_type))+' — الإجابة: '+esc(q.answer_text)+'</div><button type="button" class="btn btn-outline btn-sm" data-unselect-id="'+esc(q.id)+'" style="margin-top:8px">إزالة من الاختيار</button></div>').join(''):'<p style="color:var(--muted)">لم تحدد أسئلة بعد.</p>';
  selected.querySelectorAll('[data-unselect-id]').forEach(b=>b.addEventListener('click',()=>{selectedIds.delete(b.dataset.unselectId);renderQuestionLists();}));
- document.getElementById('ss-approve-summary-btn').disabled=!picked.length;
+ document.getElementById('ss-approve-summary-btn').disabled=!picked.length;const exportBtn=document.getElementById('ss-export-questions-pdf-btn');if(exportBtn)exportBtn.disabled=!allQuestions.length;
+}
+function exportQuestionsPdf(){
+ if(!allQuestions.length){status('لا توجد أسئلة لتصديرها بعد.');return;}
+ const summaryTitle=document.getElementById('ss-ai-title')?.value.trim()||'ملخص دراسي';
+ const subject=document.getElementById('ss-ai-subject')?.value.trim()||'';
+ const rows=allQuestions.map((q,i)=>{
+  const opts=Array.isArray(q.options)&&q.options.length?'<ol>'+q.options.map(o=>'<li>'+esc(o)+'</li>').join('')+'</ol>':'';
+  return '<article class="question"><h3>'+esc(q.order_num||i+1)+'. '+esc(q.question_text)+'</h3><div class="meta">'+esc(typeLabel(q.question_type))+' — '+(selectedIds.has(q.id)?'محدد للاعتماد':'غير محدد')+'</div>'+opts+'<p><strong>الإجابة النموذجية:</strong> '+esc(q.answer_text||'—')+'</p>'+(q.explanation?'<p><strong>التوضيح:</strong> '+esc(q.explanation)+'</p>':'')+'<p class="source"><strong>مرجع الصفحة للمراجعة الإدارية:</strong> '+esc(q.source_reference||'غير محدد في المصدر — يحتاج مراجعة يدوية')+'</p></article>';
+ }).join('');
+ const w=window.open('','_blank');
+ if(!w){status('المتصفح منع نافذة التصدير. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.');return;}
+ w.document.open();
+ w.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>'+esc(summaryTitle)+' - الأسئلة</title><style>body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:24px;direction:rtl;line-height:1.8}header{border-bottom:3px solid #183b67;padding-bottom:12px;margin-bottom:20px}h1{color:#183b67;font-size:22px;margin:0}h2{font-size:15px;color:#475569;margin:4px 0}.question{break-inside:avoid;border:1px solid #cbd5e1;border-radius:8px;padding:12px 15px;margin:0 0 14px}.question h3{font-size:16px;margin:0 0 5px;color:#102a43}.meta{font-size:11px;color:#64748b}.question ol{padding-right:24px}.question p{margin:6px 0}.source{color:#92400e;background:#fffbeb;padding:5px 8px;border-radius:4px;font-size:12px}button{font:inherit;padding:9px 16px;border:0;border-radius:6px;background:#183b67;color:white;cursor:pointer;margin:0 0 18px}@media print{body{margin:10mm}button{display:none}.question{break-inside:avoid}}@page{size:A4;margin:12mm}</style></head><body><button onclick="window.print()">طباعة / حفظ كـ PDF</button><header><h1>مركز الأندلس للتدريب</h1><h2>تصدير الأسئلة للمراجعة الإدارية</h2><div><strong>الملخص:</strong> '+esc(summaryTitle)+' '+(subject?' — <strong>المادة:</strong> '+esc(subject):'')+'</div><div><strong>عدد الأسئلة:</strong> '+allQuestions.length+' — <strong>تاريخ التصدير:</strong> '+esc(new Date().toLocaleString('ar-EG'))+'</div></header>'+rows+'</body></html>');
+ w.document.close();w.focus();setTimeout(()=>{try{w.print();}catch(e){}},400);
 }
 async function approveSelected(){
  const sbc=client();if(!sbc||!draftId)return;
