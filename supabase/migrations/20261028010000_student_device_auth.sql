@@ -11,6 +11,9 @@ alter table public.student_device_bindings enable row level security;
 revoke all on public.student_device_bindings from anon, authenticated;
 grant select, insert, update, delete on public.student_device_bindings to service_role;
 
+alter table public.competition_face_verified_sessions
+  add column if not exists verification_method text not null default 'face';
+
 create or replace function public.student_device_auth(
   p_student_code text,
   p_national_id text,
@@ -24,6 +27,7 @@ declare
   v_student public.students%rowtype;
   v_hash text;
   v_bound_hash text;
+  v_session_token uuid;
 begin
   if coalesce(length(p_device_token), 0) < 40 or length(p_device_token) > 256 then
     return jsonb_build_object('ok', false, 'reason', 'invalid_device');
@@ -84,8 +88,15 @@ begin
       where student_id = v_student.id;
   end if;
 
+  -- Issue a short-lived portal session compatible with existing protected student features.
+  insert into public.competition_face_verified_sessions
+    (student_id, competition_type, competition_id, expires_at, verification_method)
+  values (v_student.id, 'student_portal', null, now() + interval '12 hours', 'device')
+  returning token into v_session_token;
+
   return jsonb_build_object(
     'ok', true,
+    'token', v_session_token,
     'student', jsonb_build_object(
       'id', v_student.id, 'name', v_student.name, 'phone', coalesce(v_student.phone, ''),
       'branch', v_student.branch, 'program_id', v_student.program_id,
