@@ -2,7 +2,7 @@
 'use strict';
 const esc=v=>typeof window.escapeHtml==='function'?window.escapeHtml(String(v??'')):String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const client=()=>window.sb||(typeof sb!=='undefined'?sb:null);
-let draftId=null, allQuestions=[], selectedIds=new Set(), selectedSummaryId='';
+let draftId=null, allQuestions=[], selectedIds=new Set(), selectedSummaryId='', reviewSummaryId='', reviewReadOnly=false;
 let wired=false;
 const typeLabel=t=>t==='mcq'?'اختيار من متعدد':t==='true_false'?'صح أو خطأ':t==='essay'?'مقالي':String(t||'سؤال');
 function localDateTime(d){const x=new Date(d.getTime()-d.getTimezoneOffset()*60000);return x.toISOString().slice(0,16);}
@@ -39,12 +39,13 @@ function inject(){
  if(!document.getElementById('ss-question-review-card')){
   const card=document.createElement('div');card.id='ss-question-review-card';card.className='card';
   card.innerHTML='<div class="card-header"><h3>📝 ٢) مراجعة الأسئلة الناتجة</h3><span id="ss-question-counts" style="font-size:12px;color:var(--muted)">ارفع المادة أولًا</span></div>'+
-  '<div style="padding:16px"><div id="ss-generated-list"><p style="color:var(--muted)">ستظهر هنا جميع الأسئلة التي أنشأها الذكاء الاصطناعي.</p></div>'+
+  '<div style="padding:16px"><div class="form-group" style="margin-bottom:12px"><label>اختر ملخصًا لمراجعة الأسئلة المحفوظة</label><select id="ss-review-summary" class="search-input" style="width:100%"><option value="">اختر الملخص</option></select><div id="ss-review-status" style="font-size:12px;color:var(--muted);margin-top:6px"></div></div><div id="ss-generated-list"><p style="color:var(--muted)">اختر ملخصًا لعرض أسئلته وإجاباته ومصادر الصفحات. هذه الشاشة إدارية فقط.</p></div>'+
   '<div style="margin:24px 0 12px;border-top:3px solid #c9a24c;padding-top:16px"><h3 style="margin-bottom:8px">⭐ الأسئلة التي اخترتها للملخص</h3><p style="color:var(--muted);font-size:12px;margin-bottom:12px">أي سؤال تعلّم عليه فوق ينتقل إلى هذه القائمة تلقائيًا.</p><div id="ss-selected-list"><p style="color:var(--muted)">لم تحدد أسئلة بعد.</p></div></div>'+
   '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-gold" id="ss-approve-summary-btn" disabled>✅ اعتماد الأسئلة المحددة والملخص بالكامل</button><button class="btn btn-outline" id="ss-export-questions-pdf-btn" type="button" disabled>📄 تصدير PDF</button><button class="btn btn-outline" id="ss-export-questions-word-btn" type="button" disabled>📝 تصدير Word</button></div><div id="ss-approve-status" style="margin-top:12px"></div></div>';
   document.getElementById('ss-ai-generator-card').insertAdjacentElement('afterend',card);
   card.addEventListener('change',e=>{const box=e.target.closest('input[data-question-id]');if(!box)return;const id=box.dataset.questionId;if(box.checked)selectedIds.add(id);else selectedIds.delete(id);renderQuestionLists();});
   document.getElementById('ss-approve-summary-btn').addEventListener('click',approveSelected);
+  document.getElementById('ss-review-summary').addEventListener('change',e=>loadReviewSummaryQuestions(e.target.value));
   document.getElementById('ss-export-questions-pdf-btn').addEventListener('click',exportQuestionsPdf);
   document.getElementById('ss-export-questions-word-btn').addEventListener('click',exportQuestionsWord);
  }
@@ -80,7 +81,7 @@ async function generate(){
  try{
   status('جاري حفظ المسودة ورفع المادة ثم توليد مجموعتين مستقلتين؛ 50 سؤالًا لكل مجموعة...',true);
   const auth=await sbc.auth.getSession();if(!auth.data?.session)throw new Error('جلسة المدير غير صالحة. سجّل الدخول مرة أخرى.');
-  if(draftId){const old=await sbc.from('study_summaries').update({title,subject_name:subject,description,is_published:false,updated_at:new Date().toISOString()}).eq('id',draftId);if(old.error)throw old.error;}
+  if(draftId){const old=await sbc.from('study_summaries').update({title,subject_name:subject,description,is_published:false,is_approved:false,approved_at:null,approved_by:null,ai_generation_status:'processing',ai_generation_error:null,updated_at:new Date().toISOString()}).eq('id',draftId);if(old.error)throw old.error;}
   else{const made=await sbc.from('study_summaries').insert({title,subject_name:subject,description,price:0,validity_days:30,is_published:false,is_approved:false,created_by:auth.data.session.user.id,ai_generation_status:'processing'}).select('id').single();if(made.error)throw made.error;draftId=made.data.id;}
   const path='summary-'+draftId+'/'+Date.now()+'-source.pdf';
   const upload=await sbc.storage.from('study-summary-pdfs').upload(path,file,{contentType:'application/pdf',upsert:false});if(upload.error)throw upload.error;
@@ -96,7 +97,7 @@ async function generate(){
   const save=await sbc.from('study_summaries').update({source_pdf_path:path,ai_generation_status:'ready',generated_question_count:latestResult?.totalQuestionCount||100,is_published:false,is_approved:false,approved_at:null,approved_by:null}).eq('id',draftId);if(save.error)throw save.error;
   const loaded=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');
   if(loaded.error)throw loaded.error;
-  allQuestions=loaded.data||[];selectedIds=new Set();selectedSummaryId=draftId;
+  allQuestions=loaded.data||[];selectedIds=new Set();selectedSummaryId=draftId;reviewSummaryId=draftId;reviewReadOnly=false;const reviewSel=document.getElementById('ss-review-summary');if(reviewSel)reviewSel.value=draftId;
   document.getElementById('ss-question-counts').textContent='تم إنشاء '+allQuestions.length+' سؤالًا: '+allQuestions.filter(q=>q.question_type==='mcq').length+' اختياري، '+allQuestions.filter(q=>q.question_type==='true_false').length+' صح/خطأ، '+allQuestions.filter(q=>q.question_type==='essay').length+' مقالي';
   renderQuestionLists();document.getElementById('ss-approve-summary-btn').disabled=false;
   document.getElementById('ss-export-questions-pdf-btn').disabled=!allQuestions.length;document.getElementById('ss-export-questions-word-btn').disabled=!allQuestions.length;
@@ -108,7 +109,7 @@ async function generate(){
    try{
     const partial=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');
     if(!partial.error&&partial.data?.length){
-     allQuestions=partial.data;selectedIds=new Set();selectedSummaryId=draftId;
+     allQuestions=partial.data;selectedIds=new Set();selectedSummaryId=draftId;reviewSummaryId=draftId;reviewReadOnly=false;const reviewSel=document.getElementById('ss-review-summary');if(reviewSel)reviewSel.value=draftId;
      document.getElementById('ss-question-counts').textContent='المحفوظ حتى الآن: '+allQuestions.length+' سؤالًا — المجموعة A: '+allQuestions.filter(q=>Number(q.batch_no)===1).length+'، المجموعة B: '+allQuestions.filter(q=>Number(q.batch_no)===2).length;
      renderQuestionLists();
      document.getElementById('ss-approve-summary-btn').disabled=true;
@@ -121,13 +122,13 @@ async function generate(){
 }
 function renderQuestionLists(){
  const generated=document.getElementById('ss-generated-list'),selected=document.getElementById('ss-selected-list');if(!generated||!selected)return;
- const one=q=>'<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0;background:#fff"><label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer"><input type="checkbox" data-question-id="'+esc(q.id)+'" '+(selectedIds.has(q.id)?'checked':'')+' style="margin-top:5px;flex:0 0 auto"><span style="flex:1"><strong>'+esc(q.order_num)+'. المجموعة '+(Number(q.batch_no)===2?'B':'A')+' — '+esc(q.question_text)+'</strong><div style="margin-top:5px;color:#64748b;font-size:12px">'+esc(typeLabel(q.question_type))+'</div>'+(Array.isArray(q.options)&&q.options.length?'<ol style="margin:8px 22px">'+q.options.map(o=>'<li>'+esc(o)+'</li>').join('')+'</ol>':'')+'<div style="margin-top:8px;color:#166534;white-space:pre-wrap"><strong>الإجابة النموذجية:</strong> '+esc(q.answer_text||'')+'</div>'+(q.explanation?'<div style="margin-top:5px;color:#64748b">التوضيح: '+esc(q.explanation)+'</div>':'')+'<div style="margin-top:6px;color:#92400e;background:#fffbeb;padding:5px 8px;border-radius:6px;font-size:12px"><strong>📄 صفحة المصدر (للمدير فقط):</strong> '+esc(q.source_reference||'لم يحدد الذكاء الاصطناعي الصفحة — راجع ملف PDF يدويًا')+(q.source_page?' (رقم الصفحة: '+esc(q.source_page)+')':'')+'</div></span></label></div>';
+ const one=q=>'<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0;background:#fff"><label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer"><input type="checkbox" data-question-id="'+esc(q.id)+'" '+(selectedIds.has(q.id)?'checked':'')+' '+(reviewReadOnly?'disabled':'')+' style="margin-top:5px;flex:0 0 auto"><span style="flex:1"><strong>'+esc(q.order_num)+'. المجموعة '+(Number(q.batch_no)===2?'B':'A')+' — '+esc(q.question_text)+'</strong><div style="margin-top:5px;color:#64748b;font-size:12px">'+esc(typeLabel(q.question_type))+'</div>'+(Array.isArray(q.options)&&q.options.length?'<ol style="margin:8px 22px">'+q.options.map(o=>'<li>'+esc(o)+'</li>').join('')+'</ol>':'')+'<div style="margin-top:8px;color:#166534;white-space:pre-wrap"><strong>الإجابة النموذجية:</strong> '+esc(q.answer_text||'')+'</div>'+(q.explanation?'<div style="margin-top:5px;color:#64748b">التوضيح: '+esc(q.explanation)+'</div>':'')+'<div style="margin-top:6px;color:#92400e;background:#fffbeb;padding:5px 8px;border-radius:6px;font-size:12px"><strong>📄 صفحة المصدر (للمدير فقط):</strong> '+esc(q.source_reference||'لم يحدد الذكاء الاصطناعي الصفحة — راجع ملف PDF يدويًا')+(q.source_page?' (رقم الصفحة: '+esc(q.source_page)+')':'')+'</div></span></label></div>';
  generated.innerHTML=allQuestions.length?allQuestions.map(one).join(''):'<p style="color:var(--muted)">لا توجد أسئلة مولّدة حتى الآن.</p>';
  const picked=allQuestions.filter(q=>selectedIds.has(q.id));
  selected.innerHTML=picked.length?picked.map((q,i)=>'<div style="border:1px solid #86bda0;border-radius:10px;padding:12px;margin:8px 0;background:#f0fdf4"><strong>'+ (i+1)+'. '+esc(q.question_text)+'</strong><div style="font-size:12px;color:#166534;margin-top:4px">'+esc(typeLabel(q.question_type))+' — الإجابة: '+esc(q.answer_text)+'</div><button type="button" class="btn btn-outline btn-sm" data-unselect-id="'+esc(q.id)+'" style="margin-top:8px">إزالة من الاختيار</button></div>').join(''):'<p style="color:var(--muted)">لم تحدد أسئلة بعد.</p>';
  selected.querySelectorAll('[data-unselect-id]').forEach(b=>b.addEventListener('click',()=>{selectedIds.delete(b.dataset.unselectId);renderQuestionLists();}));
  selected.querySelectorAll('[data-unselect-id]').forEach(b=>{const q=allQuestions.find(x=>x.id===b.dataset.unselectId);if(q){const d=document.createElement('div');d.style.cssText='font-size:12px;color:#92400e;margin-top:5px';d.textContent='صفحة المصدر (للمدير فقط): '+(q.source_reference||'غير محددة — راجع PDF');b.parentElement.appendChild(d);}});
- document.getElementById('ss-approve-summary-btn').disabled=!picked.length;const exportBtn=document.getElementById('ss-export-questions-pdf-btn');if(exportBtn)exportBtn.disabled=!allQuestions.length;const wordBtn=document.getElementById('ss-export-questions-word-btn');if(wordBtn)wordBtn.disabled=!allQuestions.length;
+ document.getElementById('ss-approve-summary-btn').disabled=reviewReadOnly||!picked.length;const exportBtn=document.getElementById('ss-export-questions-pdf-btn');if(exportBtn)exportBtn.disabled=!allQuestions.length;const wordBtn=document.getElementById('ss-export-questions-word-btn');if(wordBtn)wordBtn.disabled=!allQuestions.length;
 }
 function exportQuestionsPdf(){
  if(!allQuestions.length){status('لا توجد أسئلة لتصديرها بعد.');return;}
@@ -160,18 +161,19 @@ function exportQuestionsWord(){
  status('تم تجهيز ملف Word للتنزيل. يتضمن صفحة المصدر للمراجعة الإدارية فقط.',true);
 }
 async function approveSelected(){
- const sbc=client();if(!sbc||!draftId)return;
+ const sbc=client(),targetId=reviewSummaryId||draftId;if(!sbc||!targetId||reviewReadOnly)return;
  const picked=allQuestions.filter(q=>selectedIds.has(q.id));if(!picked.length)return;
  const btn=document.getElementById('ss-approve-summary-btn');btn.disabled=true;
  try{
   const auth=await sbc.auth.getSession();if(!auth.data?.session)throw new Error('انتهت جلسة المدير.');
-  const reset=await sbc.from('study_summary_questions').update({is_selected:false,is_approved:false,reviewed_at:null,reviewed_by:null}).eq('summary_id',draftId);if(reset.error)throw reset.error;
+  const reset=await sbc.from('study_summary_questions').update({is_selected:false,is_approved:false,reviewed_at:null,reviewed_by:null}).eq('summary_id',targetId);if(reset.error)throw reset.error;
   const ids=picked.map(q=>q.id);
   const selected=await sbc.from('study_summary_questions').update({is_selected:true,is_approved:true,reviewed_at:new Date().toISOString(),reviewed_by:auth.data.session.user.id}).in('id',ids);if(selected.error)throw selected.error;
-  const summary=await sbc.from('study_summaries').update({is_approved:true,approved_at:new Date().toISOString(),approved_by:auth.data.session.user.id,is_published:false,updated_at:new Date().toISOString()}).eq('id',draftId);if(summary.error)throw summary.error;
+  const summary=await sbc.from('study_summaries').update({is_approved:true,approved_at:new Date().toISOString(),approved_by:auth.data.session.user.id,is_published:false,updated_at:new Date().toISOString()}).eq('id',targetId);if(summary.error)throw summary.error;
   allQuestions=allQuestions.map(q=>({...q,is_selected:selectedIds.has(q.id),is_approved:selectedIds.has(q.id)}));
+  reviewReadOnly=true;
   const el=document.getElementById('ss-approve-status');el.innerHTML='<div style="background:#ecfdf5;color:#166534;padding:12px;border-radius:10px">✅ تم اعتماد الملخص بالكامل مع '+picked.length+' سؤالًا محددًا. انتقل إلى إعداد الملخص المعتمد لاختيار السعر ووقت الإتاحة، ثم انشره للطلاب.</div>';
-  document.getElementById('ss-manage-summary').value=draftId;await refreshSummaries();await loadManageSummary();
+  selectedSummaryId=targetId;document.getElementById('ss-manage-summary').value=targetId;await refreshSummaries();await loadManageSummary();
   if(typeof window.loadStudySummaryOrdersAdmin==='function')await window.loadStudySummaryOrdersAdmin();
  }catch(e){document.getElementById('ss-approve-status').textContent='❌ '+(e?.message||e);btn.disabled=false;}
 }
@@ -179,12 +181,39 @@ async function refreshSummaries(){
  const sbc=client();if(!sbc)return;
  const {data,error}=await sbc.from('study_summaries').select('*').order('created_at',{ascending:false});
  if(error){const el=document.getElementById('ss-manage-status');if(el)el.textContent='تعذر تحميل الملخصات: '+error.message;return;}
- if(typeof studySummaryAdminRows!=='undefined')studySummaryAdminRows=data||[];
- renderSummaryTable(data||[]);
+ const rows=data||[];
+ if(typeof studySummaryAdminRows!=='undefined')studySummaryAdminRows=rows;
+ renderSummaryTable(rows);
  const sel=document.getElementById('ss-manage-summary'),previous=sel?.value||selectedSummaryId;
- if(sel)sel.innerHTML='<option value="">اختر الملخص</option>'+(data||[]).filter(s=>s.is_approved).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.title)+' — '+esc(s.subject_name||'')+(s.is_published?' (منشور)':'')+'</option>').join('');
- if(sel&&previous&&(data||[]).some(s=>s.id===previous&&s.is_approved))sel.value=previous;
+ if(sel)sel.innerHTML='<option value="">اختر الملخص</option>'+rows.filter(s=>s.is_approved).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.title)+' — '+esc(s.subject_name||'')+(s.is_published?' (منشور)':'')+'</option>').join('');
+ if(sel&&previous&&rows.some(s=>s.id===previous&&s.is_approved))sel.value=previous;
  if(sel?.value)await loadManageSummary();
+ const reviewSel=document.getElementById('ss-review-summary'),reviewPrevious=reviewSummaryId||reviewSel?.value||(draftId&&rows.some(s=>s.id===draftId)?draftId:'');
+ if(reviewSel){
+  reviewSel.innerHTML='<option value="">اختر الملخص</option>'+rows.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.title)+' — '+esc(s.subject_name||'')+' ('+(s.is_published?'منشور':s.is_approved?'معتمد':'مسودة')+')</option>').join('');
+  if(reviewPrevious&&rows.some(s=>s.id===reviewPrevious))reviewSel.value=reviewPrevious;
+  else if(rows.length)reviewSel.value=rows[0].id;
+ }
+ if(reviewSel?.value)await loadReviewSummaryQuestions(reviewSel.value);
+}
+async function loadReviewSummaryQuestions(id){
+ const sbc=client(),statusEl=document.getElementById('ss-review-status');
+ if(!sbc||!id){allQuestions=[];selectedIds=new Set();reviewReadOnly=false;renderQuestionLists();if(statusEl)statusEl.textContent='اختر ملخصًا لعرض أسئلته وإجاباته ومراجع الصفحات.';const b=document.getElementById('ss-approve-summary-btn');if(b)b.disabled=true;return;}
+ reviewSummaryId=id;
+ if(statusEl)statusEl.textContent='جاري تحميل الأسئلة المحفوظة...';
+ const [summaryResult,questionResult]=await Promise.all([
+  sbc.from('study_summaries').select('id,title,subject_name,is_approved,is_published').eq('id',id).single(),
+  sbc.from('study_summary_questions').select('*').eq('summary_id',id).order('batch_no').order('order_num')
+ ]);
+ if(summaryResult.error||questionResult.error){if(statusEl)statusEl.textContent='تعذر تحميل المراجعة: '+(summaryResult.error?.message||questionResult.error?.message||'خطأ غير معروف');return;}
+ const summary=summaryResult.data;
+ allQuestions=questionResult.data||[];
+ reviewReadOnly=!!summary.is_approved||!!summary.is_published;
+ selectedIds=new Set(allQuestions.filter(q=>q.is_selected).map(q=>q.id));
+ document.getElementById('ss-question-counts').textContent='أسئلة '+summary.title+': '+allQuestions.length+' — المجموعة A: '+allQuestions.filter(q=>Number(q.batch_no)===1).length+'، المجموعة B: '+allQuestions.filter(q=>Number(q.batch_no)===2).length;
+ if(statusEl)statusEl.textContent=reviewReadOnly?'وضع معاينة فقط: الملخص معتمد أو منشور. إلغاء التحديد والتعديل متوقفان لحماية النسخة المتاحة للطلاب.':'وضع مراجعة: يمكنك تحديد الأسئلة المطلوبة ثم اعتماد الملخص.';
+ renderQuestionLists();
+ document.getElementById('ss-export-questions-pdf-btn').disabled=!allQuestions.length;document.getElementById('ss-export-questions-word-btn').disabled=!allQuestions.length;
 }
 function renderSummaryTable(rows){
  const body=document.getElementById('ss-admin-list');if(!body)return;
