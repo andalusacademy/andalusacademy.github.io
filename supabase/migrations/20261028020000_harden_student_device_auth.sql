@@ -50,14 +50,20 @@ begin
       'UTF8'
     ), 'sha256'), 'hex');
 
-  -- Limit repeated credential guesses to five failed attempts per 15-minute window.
+  -- Limit repeated guesses per device; keep a higher account-wide ceiling to reduce lockout abuse.
   if not v_is_resume then
     select count(*)::integer into v_failed_count
     from public.student_device_auth_attempts
     where credential_hash = v_credential_hash
       and succeeded = false
       and attempted_at > now() - interval '15 minutes';
-    if v_failed_count >= 5 then
+    select count(*)::integer into v_device_failed_count
+    from public.student_device_auth_attempts
+    where credential_hash = v_credential_hash
+      and device_hash = v_hash
+      and succeeded = false
+      and attempted_at > now() - interval '15 minutes';
+    if v_device_failed_count >= 5 or v_failed_count >= 20 then
       insert into public.student_device_auth_attempts(credential_hash, device_hash, succeeded, reason)
       values (v_credential_hash, v_hash, false, 'rate_limited');
       return jsonb_build_object('ok', false, 'reason', 'rate_limited');
