@@ -44,7 +44,8 @@ function inject(){
   '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-gold" id="ss-approve-summary-btn" disabled>✅ اعتماد الأسئلة المحددة والملخص بالكامل</button><button class="btn btn-outline" id="ss-export-questions-pdf-btn" type="button" disabled>📄 تصدير الأسئلة PDF</button></div><div id="ss-approve-status" style="margin-top:12px"></div></div>';
   document.getElementById('ss-ai-generator-card').insertAdjacentElement('afterend',card);
   card.addEventListener('change',e=>{const box=e.target.closest('input[data-question-id]');if(!box)return;const id=box.dataset.questionId;if(box.checked)selectedIds.add(id);else selectedIds.delete(id);renderQuestionLists();});
-  document.getElementById('ss-approve-summary-btn').addEventListener('click',approveSelected);\n  document.getElementById('ss-export-questions-pdf-btn').addEventListener('click',exportQuestionsPdf);
+  document.getElementById('ss-approve-summary-btn').addEventListener('click',approveSelected);
+  document.getElementById('ss-export-questions-pdf-btn').addEventListener('click',exportQuestionsPdf);
  }
  if(!document.getElementById('ss-summary-management-card')){
   const card=document.createElement('div');card.id='ss-summary-management-card';card.className='card';
