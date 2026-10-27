@@ -1071,6 +1071,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
                 <div class="form-group"><label>عنوان التنبيه</label><input id="notification-title" maxlength="180" placeholder="عنوان واضح للتنبيه"></div>
                 <div class="form-group"><label>نوع التنبيه</label><select id="notification-type"><option value="general">عام</option><option value="academic">أكاديمي</option><option value="attendance">حضور وغياب</option><option value="payments">مدفوعات</option><option value="exam">امتحانات</option><option value="competition">مسابقات</option><option value="request">طلبات وشكاوى</option><option value="system">النظام</option></select></div>
                 <div class="form-group"><label>الأولوية</label><select id="notification-priority"><option value="normal">عادية</option><option value="low">منخفضة</option><option value="high">عالية</option><option value="urgent">عاجلة</option></select></div>
+                <div class="form-group" id="notification-show-on-login-wrap" style="grid-column:1/-1;"><label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;"><input id="notification-show-on-login" type="checkbox" style="margin-top:4px;transform:scale(1.1);"><span><strong>إظهار نافذة مهمة فور دخول الطالب</strong><small style="display:block;color:var(--muted);font-weight:400;line-height:1.8;margin-top:3px;">سيظهر عنوان الإشعار ومحتواه تلقائيًا في بوابة الطالب، ويظل غير مقروء حتى يضغط الطالب «قرأت الإشعار». ويمكنه التأجيل إلى دخوله القادم.</small></span></label></div>
                 <div class="form-group"><label>المستهدفون</label><select id="notification-audience" onchange="toggleNotificationTargetFields()"><option value="all">الجميع</option><option value="student">الطلاب</option><option value="parent">أولياء الأمور</option><option value="branch">فرع محدد</option><option value="program">برنامج محدد</option><option value="staff">الموظفون</option></select></div>
                 <div class="form-group" id="notification-branch-wrap" style="display:none;"><label>الفرع</label><select id="notification-branch"><option value="كفر الدوار">كفر الدوار</option><option value="فرع اسكندرية">فرع اسكندرية</option></select></div>
                 <div class="form-group" id="notification-program-wrap" style="display:none;"><label>اسم البرنامج</label><input id="notification-program" maxlength="180" placeholder="اسم البرنامج كما هو مسجل"></div>
@@ -12713,6 +12714,8 @@ function showStudentPortalLoginStep() {
   studentPortalFaceToken = null;
   unifiedPortalStudent = null;
   unifiedPortalPhone = '';
+  studentLoginNotificationSessionKey = '';
+  studentLoginNotificationSnoozedForSession = false;
   stopStudentFaceCamera();
   document.getElementById('student-portal-content').innerHTML = `
     <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أدخل رقم القيد ورقم الهاتف المسجل، ثم تحقق من الوجه للدخول الآمن</p>
@@ -12950,6 +12953,117 @@ function stopStudentFaceCamera() {
   if (video) { video.pause(); video.srcObject = null; }
 }
 
+let studentLoginNotificationSessionKey = '';
+let studentLoginNotificationSnoozedForSession = false;
+let studentLoginNotificationQueue = [];
+let studentLoginNotificationActive = false;
+
+async function checkStudentLoginNotifications() {
+  const studentId = String(unifiedPortalStudent?.id || '');
+  const phone = String(unifiedPortalPhone || '');
+  if (!studentId || !phone || studentLoginNotificationSnoozedForSession) return;
+  const sessionKey = studentId + ':' + phone;
+  if (studentLoginNotificationSessionKey === sessionKey) return;
+  // Set before the request to prevent duplicate dialogs if the menu renders twice.
+  studentLoginNotificationSessionKey = sessionKey;
+  try {
+    const { data, error } = await sb.rpc('get_portal_notifications', {
+      p_student_id: studentId, p_phone: phone, p_portal_type: 'student'
+    });
+    if (error || !data?.verified) return;
+    const unread = (data.notifications || []).filter(n => n.show_on_login === true && n.is_read !== true);
+    if (unread.length) showStudentLoginNotificationQueue(unread);
+  } catch (e) {
+    console.warn('Student login notifications unavailable:', e);
+  }
+}
+
+function showStudentLoginNotificationQueue(items) {
+  studentLoginNotificationQueue = Array.isArray(items) ? items.slice() : [];
+  studentLoginNotificationActive = studentLoginNotificationQueue.length > 0;
+  renderStudentLoginNotificationDialog();
+}
+
+function renderStudentLoginNotificationDialog() {
+  if (!studentLoginNotificationQueue.length) {
+    closeStudentLoginNotificationDialog();
+    return;
+  }
+  let overlay = document.getElementById('student-login-notification-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'student-login-notification-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:1000000;background:rgba(15,23,42,.78);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;';
+    document.body.appendChild(overlay);
+  }
+  const n = studentLoginNotificationQueue[0];
+  const urgent = n.priority === 'urgent';
+  const high = n.priority === 'high';
+  const accent = urgent ? '#b91c1c' : high ? '#b45309' : '#1d4ed8';
+  const label = urgent ? 'إشعار عاجل' : high ? 'إشعار مهم' : 'إشعار مطلوب مراجعته';
+  const published = n.published_at || n.created_at;
+  overlay.innerHTML = `
+    <div role="dialog" aria-modal="true" aria-labelledby="student-login-notice-title" style="width:100%;max-width:520px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 25px 70px rgba(0,0,0,.32);border-top:6px solid ${accent};direction:rtl;">
+      <div style="padding:18px 20px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:${accent};font-weight:900;">🔔 ${label}</span>
+          <span style="font-size:11px;color:#64748b;">${studentLoginNotificationQueue.length > 1 ? 'إشعار ' + 1 + ' من ' + studentLoginNotificationQueue.length : 'يرجى المراجعة'}</span>
+        </div>
+        <h2 id="student-login-notice-title" style="margin:10px 0 0;color:#172554;font-size:21px;line-height:1.6;">${escapeHtml(n.title || 'إشعار مهم من مركز الأندلس')}</h2>
+      </div>
+      <div style="padding:20px;">
+        <div style="font-size:15px;line-height:2;white-space:pre-wrap;color:#334155;">${escapeHtml(n.body || '')}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:14px;">${published ? new Date(published).toLocaleString('ar-EG') : ''}</div>
+        <div id="student-login-notice-error" role="alert" style="display:none;margin-top:10px;color:#b91c1c;font-size:12px;"></div>
+        <button id="student-login-notice-read" class="btn btn-gold" style="width:100%;padding:13px;margin-top:16px;" onclick="acknowledgeStudentLoginNotification()">✅ قرأت الإشعار</button>
+        <button id="student-login-notice-later" class="btn btn-outline" style="width:100%;padding:11px;margin-top:8px;" onclick="deferStudentLoginNotifications()">تذكير لاحقًا</button>
+        <p style="font-size:11px;line-height:1.7;color:#64748b;text-align:center;margin:12px 0 0;">لن يظهر هذا التنبيه في نافذة الدخول مرة أخرى بعد تأكيد قراءته.</p>
+      </div>
+    </div>`;
+}
+
+async function acknowledgeStudentLoginNotification() {
+  const n = studentLoginNotificationQueue[0];
+  if (!n || !unifiedPortalStudent?.id || !unifiedPortalPhone) return;
+  const button = document.getElementById('student-login-notice-read');
+  const later = document.getElementById('student-login-notice-later');
+  const errorBox = document.getElementById('student-login-notice-error');
+  if (button) button.disabled = true;
+  if (later) later.disabled = true;
+  if (errorBox) errorBox.style.display = 'none';
+  try {
+    const { data, error } = await sb.rpc('mark_portal_notification_read', {
+      p_student_id: String(unifiedPortalStudent.id),
+      p_phone: String(unifiedPortalPhone),
+      p_portal_type: 'student',
+      p_notification_id: n.id
+    });
+    if (error || !data?.ok) throw new Error(error?.message || 'تعذر تسجيل قراءة الإشعار. حاول مرة أخرى.');
+    studentLoginNotificationQueue.shift();
+    renderStudentLoginNotificationDialog();
+  } catch (e) {
+    if (errorBox) {
+      errorBox.textContent = e?.message || 'تعذر تسجيل قراءة الإشعار.';
+      errorBox.style.display = 'block';
+    }
+    if (button) button.disabled = false;
+    if (later) later.disabled = false;
+  }
+}
+
+function deferStudentLoginNotifications() {
+  // Keep receipts unread. They will be presented again at the student's next login.
+  studentLoginNotificationSnoozedForSession = true;
+  studentLoginNotificationQueue = [];
+  closeStudentLoginNotificationDialog();
+}
+
+function closeStudentLoginNotificationDialog() {
+  const overlay = document.getElementById('student-login-notification-overlay');
+  if (overlay) overlay.remove();
+  studentLoginNotificationActive = false;
+}
+
 function renderStudentPortalMenu() {
   document.getElementById('student-portal-content').innerHTML = `
     <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أهلاً ${escapeHtml(unifiedPortalStudent.name)} 👋</p>
@@ -12969,6 +13083,8 @@ function renderStudentPortalMenu() {
   if (typeof loadStudentPortalRequests === 'function') {
     loadStudentPortalRequests();
   }
+  // Surface unread important notices immediately after successful face verification.
+  void checkStudentLoginNotifications();
 }
 
 function goToPortalExams() {
@@ -13943,6 +14059,10 @@ function toggleNotificationTargetFields() {
   const branchWrap = document.getElementById('notification-branch-wrap');
   const programWrap = document.getElementById('notification-program-wrap');
   const studentWrap = document.getElementById('notification-student-wrap');
+  const loginWrap = document.getElementById('notification-show-on-login-wrap');
+  const loginCheckbox = document.getElementById('notification-show-on-login');
+  if (loginWrap) loginWrap.style.display = ['parent','staff'].includes(audience) ? 'none' : '';
+  if (['parent','staff'].includes(audience) && loginCheckbox) loginCheckbox.checked = false;
   if (branchWrap) branchWrap.style.display = audience === 'branch' ? '' : 'none';
   if (programWrap) programWrap.style.display = audience === 'program' ? '' : 'none';
   if (studentWrap) studentWrap.style.display = ['student','parent'].includes(audience) ? '' : 'none';
@@ -13962,7 +14082,7 @@ async function loadNotificationsAdmin() {
   const priorityNames={low:'منخفضة',normal:'عادية',high:'عالية',urgent:'عاجلة'};
   tbody.innerHTML=(data||[]).map(n=>{
     const state=n.is_published ? ((n.scheduled_for && new Date(n.scheduled_for)>new Date())?'مجدول':'منشور') : 'مسودة';
-    return `<tr><td><strong>${escapeHtml(n.title)}</strong><div style="font-size:11px;color:var(--muted);max-width:320px;">${escapeHtml(n.body)}</div></td>
+    return `<tr><td><strong>${escapeHtml(n.title)}</strong><div style="font-size:11px;color:var(--muted);max-width:320px;">${escapeHtml(n.body)}</div>${n.show_on_login?'<div style="margin-top:5px;"><span style="display:inline-block;border-radius:5px;padding:2px 7px;background:#fff7ed;color:#9a3412;font-size:11px;font-weight:800;">🔔 نافذة عند الدخول</span></div>':''}</td>
       <td>${escapeHtml(audienceNames[n.audience]||n.audience)}${n.branch?' · '+escapeHtml(n.branch):''}${n.program?' · '+escapeHtml(n.program):''}${n.student_id?' · '+escapeHtml(n.student_id):''}</td>
       <td>${escapeHtml(priorityNames[n.priority]||n.priority)}</td><td>${escapeHtml(state)}</td>
       <td>${n.published_at?new Date(n.published_at).toLocaleString('ar-EG'):(n.scheduled_for?new Date(n.scheduled_for).toLocaleString('ar-EG'):'—')}</td>
@@ -13986,6 +14106,7 @@ async function saveNotification() {
   const row = {
     title, body, notification_type:document.getElementById('notification-type').value,
     priority:document.getElementById('notification-priority').value, audience,
+    show_on_login:!['parent','staff'].includes(audience) && !!document.getElementById('notification-show-on-login')?.checked,
     branch:audience==='branch'?document.getElementById('notification-branch').value:null,
     program:audience==='program'?(document.getElementById('notification-program').value.trim()||null):null,
     student_id:['student','parent'].includes(audience)?(document.getElementById('notification-student-id').value.trim()||null):null,
@@ -13995,13 +14116,14 @@ async function saveNotification() {
   };
   const { error } = await sb.from('notifications').insert(row);
   if (error) { if(status) status.textContent='فشل حفظ التنبيه: '+(error.message||'خطأ غير معروف'); return; }
-  if(status) status.textContent='تم حفظ التنبيه.';
+  if(status) status.textContent=row.show_on_login?'تم حفظ الإشعار وسيظهر تلقائيًا للطالب عند دخوله حتى يقرؤه.':'تم حفظ التنبيه.';
   document.getElementById('notification-title').value='';
   document.getElementById('notification-body').value='';
   document.getElementById('notification-program').value='';
   document.getElementById('notification-student-id').value='';
   document.getElementById('notification-scheduled-for').value='';
   document.getElementById('notification-expires-at').value='';
+  if(document.getElementById('notification-show-on-login'))document.getElementById('notification-show-on-login').checked=false;
   await loadNotificationsAdmin();
 }
 
