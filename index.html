@@ -12813,6 +12813,7 @@ async function completeStudentDeviceLogin(studentCode = '', nationalId = '') {
     if (data?.reason === 'device_mismatch') throw new Error('هذا الحساب مربوط بجهاز آخر. تواصل مع إدارة المركز لإعادة ربط الجهاز.');
     if (data?.reason === 'session_not_found') return false;
     if (data?.reason === 'invalid_device') throw new Error('رمز الجهاز غير صالح. امسح بيانات الدخول وحاول مرة أخرى.');
+    if (data?.reason === 'rate_limited') throw new Error('تم إيقاف محاولات الدخول مؤقتًا لكثرة المحاولات. انتظر 15 دقيقة ثم حاول مرة أخرى.');
     throw new Error('بيانات الدخول غير صحيحة، راجع كود الطالب والرقم القومي.');
   }
   unifiedPortalStudent = data.student;
