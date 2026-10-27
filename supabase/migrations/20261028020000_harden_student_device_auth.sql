@@ -10,6 +10,10 @@ create table if not exists public.student_device_auth_attempts (
 );
 create index if not exists student_device_auth_attempts_recent_idx
   on public.student_device_auth_attempts (credential_hash, attempted_at desc);
+create index if not exists student_device_auth_attempts_cleanup_idx
+  on public.student_device_auth_attempts (attempted_at);
+create index if not exists student_device_auth_attempts_device_idx
+  on public.student_device_auth_attempts (credential_hash, device_hash, attempted_at desc);
 alter table public.student_device_auth_attempts enable row level security;
 revoke all on public.student_device_auth_attempts from public, anon, authenticated;
 grant select, insert, update, delete on public.student_device_auth_attempts to service_role;
@@ -30,6 +34,7 @@ declare
   v_bound_hash text;
   v_session_token uuid;
   v_failed_count integer := 0;
+  v_device_failed_count integer := 0;
   v_reason text;
   v_is_resume boolean;
 begin
