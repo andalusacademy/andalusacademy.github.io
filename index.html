@@ -927,7 +927,14 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 
         <!-- STUDENTS -->
         <div id="page-students" class="page">
-          <div style="display:flex;justify-content:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:14px;"><button class="btn btn-gold" onclick="openTraineeRanking()">🏆 ترتيب المتدربين</button></div>
+          <div style="display:flex;justify-content:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:14px;"><button class="btn btn-gold" onclick="openTraineeRanking()">🏆 ترتيب المتدربين</button><button class="btn btn-outline admin-only" onclick="openStudentDeviceResetPanel()" style="display:none;">📱 إدارة أجهزة بوابة الطالب</button></div>
+          <div id="student-device-reset-panel" class="card" style="display:none;margin-bottom:18px;border:1px solid var(--border);">
+            <div class="card-header"><h3>📱 إعادة ربط جهاز الطالب</h3><button class="btn btn-outline btn-sm" onclick="document.getElementById('student-device-reset-panel').style.display='none'">إغلاق</button></div>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">استخدم الإجراء عند تغيير هاتف الطالب أو حذف بيانات التطبيق. سيُطلب من الطالب إدخال كود الطالب والرقم القومي على الجهاز الجديد.</p>
+            <div class="form-group"><label for="student-device-reset-student">الطالب</label><select id="student-device-reset-student" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"><option value="">اختر الطالب</option></select></div>
+            <button class="btn btn-danger" onclick="resetStudentDeviceBinding()">🔓 إلغاء ربط الجهاز الحالي</button>
+            <div style="font-size:12px;color:var(--muted);margin-top:8px;">الإجراء متاح للمدير فقط، ويسجل عملية إعادة الربط في سجل دخول بوابة الطالب.</div>
+          </div>
           <div id="students-branch-home" style="margin-bottom:18px;">
             <div style="font-size:15px;font-weight:900;color:var(--navy);margin-bottom:12px;">📍 اختار الفرع</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
@@ -12783,6 +12790,45 @@ let weeklyQuizFaceToken = null;
 let examFaceVerifiedStudentId = null;
 let examFaceVerificationToken = null;
 let examStudentPhone = '';
+
+function openStudentDeviceResetPanel() {
+  if (currentUser?.role !== 'admin') { showToast('إعادة ربط الأجهزة للمدير فقط', 'error'); return; }
+  const panel = document.getElementById('student-device-reset-panel');
+  const select = document.getElementById('student-device-reset-student');
+  if (!panel || !select) return;
+  const previous = select.value;
+  const activeStudents = (allStudents || []).filter(s => !s.deleted_at);
+  select.innerHTML = '<option value="">اختر الطالب</option>' + activeStudents
+    .sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'ar'))
+    .map(s => '<option value="' + escapeHtml(String(s.id)) + '">' +
+      escapeHtml(String(s.name || 'بدون اسم')) + ' — ' +
+      escapeHtml(String(s.enrollment_number || s.id)) + '</option>').join('');
+  if (activeStudents.some(s => String(s.id) === String(previous))) select.value = previous;
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function resetStudentDeviceBinding() {
+  if (currentUser?.role !== 'admin') { showToast('إعادة ربط الأجهزة للمدير فقط', 'error'); return; }
+  const select = document.getElementById('student-device-reset-student');
+  const studentId = String(select?.value || '').trim();
+  if (!studentId) { showToast('اختر الطالب أولًا', 'error'); return; }
+  const student = (allStudents || []).find(s => String(s.id) === studentId);
+  if (!student) { showToast('تعذر العثور على الطالب في القائمة الحالية', 'error'); return; }
+  const label = String(student.name || student.id) + ' — ' + String(student.enrollment_number || student.id);
+  if (!confirm('تأكيد إلغاء ربط الجهاز للطالب: ' + label + '؟\nسيحتاج الطالب إلى تسجيل الدخول بكود الطالب والرقم القومي على الجهاز الجديد.')) return;
+  const { data, error } = await sb.rpc('admin_reset_student_device_binding', { p_student_code: studentId });
+  if (error) {
+    console.error('admin_reset_student_device_binding failed:', error);
+    showToast('تعذر إعادة ربط الجهاز. تأكد من تفعيل تحديث قاعدة البيانات ومن صلاحية حساب المدير.', 'error');
+    return;
+  }
+  if (!data?.ok) {
+    showToast(data?.reason === 'student_not_found' ? 'الطالب غير موجود أو محذوف' : 'تعذر إلغاء ربط الجهاز', 'error');
+    return;
+  }
+  showToast('تم إلغاء ربط الجهاز بنجاح. يمكن للطالب التسجيل على جهازه الجديد.');
+}
 
 function getStudentDeviceToken() {
   const key = 'andalus_student_device_token_v1';
