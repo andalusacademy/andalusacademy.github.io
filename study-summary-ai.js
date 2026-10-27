@@ -94,7 +94,7 @@ async function generate(){
    latestResult=result;
   }
   const save=await sbc.from('study_summaries').update({source_pdf_path:path,ai_generation_status:'ready',generated_question_count:latestResult?.totalQuestionCount||100,is_published:false,is_approved:false,approved_at:null,approved_by:null}).eq('id',draftId);if(save.error)throw save.error;
-  const loaded=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('order_num');
+  const loaded=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');
   if(loaded.error)throw loaded.error;
   allQuestions=loaded.data||[];selectedIds=new Set();selectedSummaryId=draftId;
   document.getElementById('ss-question-counts').textContent='تم إنشاء '+allQuestions.length+' سؤالًا: '+allQuestions.filter(q=>q.question_type==='mcq').length+' اختياري، '+allQuestions.filter(q=>q.question_type==='true_false').length+' صح/خطأ، '+allQuestions.filter(q=>q.question_type==='essay').length+' مقالي';
@@ -102,7 +102,22 @@ async function generate(){
   document.getElementById('ss-export-questions-pdf-btn').disabled=!allQuestions.length;document.getElementById('ss-export-questions-word-btn').disabled=!allQuestions.length;
   status('اكتمل توليد المجموعتين A وB (50 سؤالًا لكل مجموعة). الإجمالي 100 سؤال. لم يتم نشرها للطلاب؛ راجع الأسئلة والمراجع ثم اختر المناسب واضغط اعتماد.',true);
   await refreshSummaries();
- }catch(e){status(e?.message||String(e));}finally{btn.disabled=false;}
+  }catch(e){
+  const reason=e?.message||String(e);status(reason);
+  if(draftId){
+   try{
+    const partial=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');
+    if(!partial.error&&partial.data?.length){
+     allQuestions=partial.data;selectedIds=new Set();selectedSummaryId=draftId;
+     document.getElementById('ss-question-counts').textContent='المحفوظ حتى الآن: '+allQuestions.length+' سؤالًا — المجموعة A: '+allQuestions.filter(q=>Number(q.batch_no)===1).length+'، المجموعة B: '+allQuestions.filter(q=>Number(q.batch_no)===2).length;
+     renderQuestionLists();
+     document.getElementById('ss-approve-summary-btn').disabled=true;
+     document.getElementById('ss-export-questions-pdf-btn').disabled=false;document.getElementById('ss-export-questions-word-btn').disabled=false;
+     status('لم تكتمل المجموعتان: '+reason+' — تم الحفاظ على الأسئلة التي حُفظت بالفعل. راجعها ثم أعد المحاولة لإكمال التوليد.',false);
+    }
+   }catch(partialError){console.error('تعذر تحميل الأسئلة المحفوظة جزئيًا',partialError);}
+  }
+ }finally{btn.disabled=false;}
 }
 function renderQuestionLists(){
  const generated=document.getElementById('ss-generated-list'),selected=document.getElementById('ss-selected-list');if(!generated||!selected)return;
