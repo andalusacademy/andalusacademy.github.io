@@ -927,7 +927,14 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 
         <!-- STUDENTS -->
         <div id="page-students" class="page">
-          <div style="display:flex;justify-content:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:14px;"><button class="btn btn-gold" onclick="openTraineeRanking()">🏆 ترتيب المتدربين</button></div>
+          <div style="display:flex;justify-content:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:14px;"><button class="btn btn-gold" onclick="openTraineeRanking()">🏆 ترتيب المتدربين</button><button class="btn btn-outline admin-only" onclick="openStudentDeviceResetPanel()" style="display:none;">📱 إدارة أجهزة بوابة الطالب</button></div>
+          <div id="student-device-reset-panel" class="card" style="display:none;margin-bottom:18px;border:1px solid var(--border);">
+            <div class="card-header"><h3>📱 إعادة ربط جهاز الطالب</h3><button class="btn btn-outline btn-sm" onclick="document.getElementById('student-device-reset-panel').style.display='none'">إغلاق</button></div>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">استخدم الإجراء عند تغيير هاتف الطالب أو حذف بيانات التطبيق. سيُطلب من الطالب إدخال كود الطالب والرقم القومي على الجهاز الجديد.</p>
+            <div class="form-group"><label for="student-device-reset-student">الطالب</label><select id="student-device-reset-student" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"><option value="">اختر الطالب</option></select></div>
+            <button class="btn btn-danger" onclick="resetStudentDeviceBinding()">🔓 إلغاء ربط الجهاز الحالي</button>
+            <div style="font-size:12px;color:var(--muted);margin-top:8px;">الإجراء متاح للمدير فقط، ويسجل عملية إعادة الربط في سجل دخول بوابة الطالب.</div>
+          </div>
           <div id="students-branch-home" style="margin-bottom:18px;">
             <div style="font-size:15px;font-weight:900;color:var(--navy);margin-bottom:12px;">📍 اختار الفرع</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
@@ -12784,6 +12791,109 @@ let examFaceVerifiedStudentId = null;
 let examFaceVerificationToken = null;
 let examStudentPhone = '';
 
+function openStudentDeviceResetPanel() {
+  if (currentUser?.role !== 'admin') { showToast('إعادة ربط الأجهزة للمدير فقط', 'error'); return; }
+  const panel = document.getElementById('student-device-reset-panel');
+  const select = document.getElementById('student-device-reset-student');
+  if (!panel || !select) return;
+  const previous = select.value;
+  const activeStudents = (allStudents || []).filter(s => !s.deleted_at);
+  select.innerHTML = '<option value="">اختر الطالب</option>' + activeStudents
+    .sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'ar'))
+    .map(s => '<option value="' + escapeHtml(String(s.id)) + '">' +
+      escapeHtml(String(s.name || 'بدون اسم')) + ' — ' +
+      escapeHtml(String(s.enrollment_number || s.id)) + '</option>').join('');
+  if (activeStudents.some(s => String(s.id) === String(previous))) select.value = previous;
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function resetStudentDeviceBinding() {
+  if (currentUser?.role !== 'admin') { showToast('إعادة ربط الأجهزة للمدير فقط', 'error'); return; }
+  const select = document.getElementById('student-device-reset-student');
+  const studentId = String(select?.value || '').trim();
+  if (!studentId) { showToast('اختر الطالب أولًا', 'error'); return; }
+  const student = (allStudents || []).find(s => String(s.id) === studentId);
+  if (!student) { showToast('تعذر العثور على الطالب في القائمة الحالية', 'error'); return; }
+  const label = String(student.name || student.id) + ' — ' + String(student.enrollment_number || student.id);
+  if (!confirm('تأكيد إلغاء ربط الجهاز للطالب: ' + label + '؟\nسيحتاج الطالب إلى تسجيل الدخول بكود الطالب والرقم القومي على الجهاز الجديد.')) return;
+  const { data, error } = await sb.rpc('admin_reset_student_device_binding', { p_student_code: studentId });
+  if (error) {
+    console.error('admin_reset_student_device_binding failed:', error);
+    showToast('تعذر إعادة ربط الجهاز. تأكد من تفعيل تحديث قاعدة البيانات ومن صلاحية حساب المدير.', 'error');
+    return;
+  }
+  if (!data?.ok) {
+    showToast(data?.reason === 'student_not_found' ? 'الطالب غير موجود أو محذوف' : 'تعذر إلغاء ربط الجهاز', 'error');
+    return;
+  }
+  showToast('تم إلغاء ربط الجهاز بنجاح. يمكن للطالب التسجيل على جهازه الجديد.');
+}
+
+async function getStudentDeviceStorageKey(nationalId) {
+  if (!window.crypto?.subtle) throw new Error('secure crypto unavailable');
+  const bytes = new TextEncoder().encode(String(nationalId || '').trim());
+  const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+  const hashedId = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+  return 'andalus_student_device_token_v1:' + hashedId;
+}
+
+async function getStudentDeviceToken(nationalId = '') {
+  const lastKeyName = 'andalus_student_device_last_key_v1';
+  try {
+    let tokenKey = '';
+    if (String(nationalId || '').trim()) {
+      if (!window.crypto?.getRandomValues) throw new Error('secure crypto unavailable');
+      tokenKey = await getStudentDeviceStorageKey(nationalId);
+    } else {
+      tokenKey = localStorage.getItem(lastKeyName) || '';
+      if (!tokenKey.startsWith('andalus_student_device_token_v1:')) return null;
+    }
+    let token = localStorage.getItem(tokenKey);
+    if (!token && String(nationalId || '').trim()) {
+      const random = new Uint8Array(32);
+      window.crypto.getRandomValues(random);
+      token = Array.from(random, b => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem(tokenKey, token);
+    }
+    return token || null;
+  } catch (e) {
+    throw new Error('تعذر إنشاء أو حفظ رمز الجهاز الآمن. تأكد من السماح ببيانات الموقع ثم أعد المحاولة.');
+  }
+}
+
+async function completeStudentDeviceLogin(studentCode = '', nationalId = '') {
+  const token = await getStudentDeviceToken(nationalId);
+  if (!token) return false;
+  const { data, error } = await sb.rpc('student_device_auth', {
+    p_student_code: studentCode,
+    p_national_id: nationalId,
+    p_device_token: token
+  });
+  if (error) throw new Error('خدمة تسجيل الجهاز غير مفعلة بعد أو تعذر الاتصال. حاول لاحقًا.');
+  if (!data?.ok) {
+    if (data?.reason === 'device_mismatch') throw new Error('هذا الحساب مربوط بجهاز آخر. تواصل مع إدارة المركز لإعادة ربط الجهاز.');
+    if (data?.reason === 'session_not_found') return false;
+    if (data?.reason === 'invalid_device') throw new Error('رمز الجهاز غير صالح. امسح بيانات الدخول وحاول مرة أخرى.');
+    if (data?.reason === 'rate_limited') throw new Error('تم إيقاف محاولات الدخول مؤقتًا لكثرة المحاولات. انتظر 15 دقيقة ثم حاول مرة أخرى.');
+    throw new Error('بيانات الدخول غير صحيحة، راجع كود الطالب والرقم القومي.');
+  }
+  if (String(nationalId || '').trim()) {
+    try {
+      const key = await getStudentDeviceStorageKey(nationalId);
+      localStorage.setItem('andalus_student_device_last_key_v1', key);
+    } catch (e) {
+      throw new Error('تم التحقق من البيانات لكن تعذر حفظ جلسة هذا الجهاز. أعد المحاولة.');
+    }
+  }
+  unifiedPortalStudent = data.student;
+  unifiedPortalPhone = String(data.student?.phone || '');
+  studentPortalFaceToken = data.token || null;
+  if (!studentPortalFaceToken) throw new Error('تعذر إنشاء جلسة بوابة الطالب. حاول مرة أخرى.');
+  renderStudentPortalMenu();
+  return true;
+}
+
 function showStudentPortalLoginStep() {
   studentPortalFaceToken = null;
   unifiedPortalStudent = null;
@@ -12791,40 +12901,62 @@ function showStudentPortalLoginStep() {
   studentLoginNotificationSessionKey = '';
   studentLoginNotificationSnoozedForSession = false;
   stopStudentFaceCamera();
-  document.getElementById('student-portal-content').innerHTML = `
-    <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أدخل رقم القيد ورقم الهاتف المسجل، ثم تحقق من الوجه للدخول الآمن</p>
+  const weeklyEntry = new URLSearchParams(window.location.search).get('weekly-quiz') === '1';
+  document.getElementById('student-portal-content').innerHTML = weeklyEntry ? `
+    <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أدخل رقم القيد ورقم الهاتف المسجل، ثم تحقق من الوجه للمسابقة الأسبوعية</p>
     <div class="form-group"><label>رقم القيد</label><input type="text" id="student-portal-id-input" autocomplete="username" placeholder="رقم القيد" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
     <div class="form-group"><label>رقم الهاتف المسجل لدى المركز</label><input type="tel" inputmode="tel" autocomplete="tel" id="student-portal-phone-input" placeholder="01xxxxxxxxx" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
     <div id="student-portal-login-err" role="alert" style="color:#dc2626;font-size:12px;margin-top:6px;display:none;"></div>
-    <button class="btn btn-gold" style="width:100%;padding:13px;margin-top:12px;" onclick="enterStudentPortal()">متابعة والتحقق من الوجه</button>
+    <button class="btn btn-gold" style="width:100%;padding:13px;margin-top:12px;" onclick="enterStudentPortal()">متابعة</button>
+  ` : `
+    <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أول دخول يربط الحساب بهذا الجهاز. بعد ذلك يمكنك فتح البوابة من الجهاز نفسه دون إعادة إدخال البيانات.</p>
+    <div class="form-group"><label>كود الطالب / رقم القيد</label><input type="text" id="student-portal-id-input" autocomplete="username" placeholder="كود الطالب أو رقم القيد" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
+    <div class="form-group"><label>الرقم القومي للطالب</label><input type="password" inputmode="numeric" autocomplete="off" id="student-portal-phone-input" placeholder="أدخل الرقم القومي" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
+    <div id="student-portal-login-err" role="alert" style="color:#dc2626;font-size:12px;margin-top:6px;display:none;"></div>
+    <button class="btn btn-gold" style="width:100%;padding:13px;margin-top:12px;" onclick="enterStudentPortal()">تسجيل الدخول وربط الجهاز</button>
   `;
   document.getElementById('student-portal-phone-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') enterStudentPortal(); });
   document.getElementById('student-portal-id-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') enterStudentPortal(); });
+  // Resume the saved installation session after reopening the app; no camera is needed.
+  if (!weeklyEntry) {
+    completeStudentDeviceLogin('', '').catch(e => console.warn('Student device session resume:', e));
+  }
 }
 
 async function enterStudentPortal() {
   const idInput = document.getElementById('student-portal-id-input');
-  const phoneInput = document.getElementById('student-portal-phone-input');
+  const identityInput = document.getElementById('student-portal-phone-input');
   const errEl = document.getElementById('student-portal-login-err');
-  const studentId = idInput?.value.trim();
-  const phone = phoneInput?.value.trim();
-  if (!studentId || !phone) { if(errEl){errEl.textContent='اكتب رقم القيد ورقم الهاتف المسجل';errEl.style.display='block';} return; }
+  const studentCode = idInput?.value.trim();
+  const identity = identityInput?.value.trim();
+  const weeklyEntry = new URLSearchParams(window.location.search).get('weekly-quiz') === '1';
+  if (!studentCode || !identity) {
+    if(errEl){errEl.textContent=weeklyEntry ? 'اكتب رقم القيد ورقم الهاتف المسجل' : 'اكتب كود الطالب والرقم القومي';errEl.style.display='block';}
+    return;
+  }
   if(errEl) { errEl.style.display='none'; }
+  const button = document.querySelector('#student-portal-content button.btn');
+  if (button) button.disabled = true;
   try {
-    const { data: student, error } = await sb.rpc('public_student_lookup', { p_student_id: studentId, p_phone: phone });
+    if (!weeklyEntry) {
+      await completeStudentDeviceLogin(studentCode, identity);
+      return;
+    }
+    const { data: student, error } = await sb.rpc('public_student_lookup', { p_student_id: studentCode, p_phone: identity });
     if (error || !student) throw new Error('رقم القيد غير موجود أو تعذر تحميل بيانات الطالب');
     const { data: faceStatus, error: statusError } = await sb.rpc('student_face_status', {
-      p_student_id: studentId, p_phone: phone
+      p_student_id: studentCode, p_phone: identity
     });
     if (statusError) throw statusError;
     if (!faceStatus?.verified) throw new Error('رقم الهاتف غير مطابق للهاتف المسجل لدى المركز');
     unifiedPortalStudent = student;
-    unifiedPortalPhone = phone;
-    const weeklyEntry = new URLSearchParams(window.location.search).get('weekly-quiz') === '1';
-    renderStudentFaceGate(!faceStatus.enrolled, weeklyEntry ? 'weekly_quiz' : 'student_portal');
+    unifiedPortalPhone = identity;
+    renderStudentFaceGate(!faceStatus.enrolled, 'weekly_quiz');
   } catch (e) {
     if(errEl) { errEl.textContent = e.message || 'تعذر التحقق من البيانات'; errEl.style.display='block'; }
     else showToast(e.message || 'تعذر التحقق من البيانات','error');
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
