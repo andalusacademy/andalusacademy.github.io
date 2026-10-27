@@ -1,6 +1,5 @@
 /* Andalus Global Back Navigation
  * Adds a consistent رجوع control to admin, student and parent flows.
- * It closes modals first, then delegates to the most specific active flow.
  */
 (function () {
   'use strict';
@@ -28,23 +27,20 @@
   function goBack() {
     if (closeModalFirst()) return;
 
-    // Exam portal: move one step back inside the exam flow.
     if (visible(document.getElementById('exam-portal-screen'))) {
       if (visible(document.getElementById('exam-question-screen')) && typeof window.showExamScreen === 'function') {
         window.showExamScreen('exam-select-screen'); return;
       }
-      if (visible(document.getElementById('exam-select-screen'))) {
-        if (typeof window.examStudentLogout === 'function') { window.examStudentLogout(); return; }
+      if (visible(document.getElementById('exam-select-screen')) && typeof window.examStudentLogout === 'function') {
+        window.examStudentLogout(); return;
       }
     }
 
-    // Weekly quiz/public competition screens return to the student portal.
     if (visible(document.getElementById('weekly-quiz-screen')) || visible(document.getElementById('public-competition-screen')) || visible(document.getElementById('competition-screen'))) {
       if (typeof window.renderStudentPortalMenu === 'function') { window.renderStudentPortalMenu(); return; }
       if (typeof window.showStudentPortalLoginStep === 'function') { window.showStudentPortalLoginStep(); return; }
     }
 
-    // Student portal: a detail view goes back to the portal menu; the menu goes to login.
     const student = document.getElementById('student-portal-screen');
     if (visible(student)) {
       const content = document.getElementById('student-portal-content');
@@ -52,15 +48,10 @@
       if (text.includes('ملخصات الامتحانات الشهرية') && typeof window.goToPortalStudySummaries === 'function') {
         window.goToPortalStudySummaries(); return;
       }
-      if (typeof window.renderStudentPortalMenu === 'function') {
-        window.renderStudentPortalMenu(); return;
-      }
-      if (typeof window.showStudentPortalLoginStep === 'function') {
-        window.showStudentPortalLoginStep(); return;
-      }
+      if (typeof window.renderStudentPortalMenu === 'function') { window.renderStudentPortalMenu(); return; }
+      if (typeof window.showStudentPortalLoginStep === 'function') { window.showStudentPortalLoginStep(); return; }
     }
 
-    // Parent portal: prefer a known home/menu function when available.
     const parentIds = ['parent-portal-screen', 'parent-portal-content', 'parent-screen'];
     if (parentIds.some(id => visible(document.getElementById(id)))) {
       const candidates = ['renderParentPortalMenu','renderParentPortalHome','showParentPortalHome','showParentPortalLoginStep'];
@@ -69,16 +60,17 @@
       }
     }
 
-    // Admin SPA: return to dashboard when a sub-page is active.
     const activePage = document.querySelector('.page.active');
     if (activePage) {
+      // If the system already has a built-in home/back control, use it first.
+      const homeBtn = document.querySelector('.back-home-btn');
+      if (homeBtn && visible(homeBtn)) { homeBtn.click(); return; }
       const id = activePage.id || '';
       if (id !== 'page-dashboard' && typeof window.showPage === 'function') {
         try { window.showPage('dashboard'); return; } catch (_) {}
       }
     }
 
-    // Last resort: use browser history only when it is actually useful.
     if (window.history.length > 1) window.history.back();
   }
 
@@ -106,8 +98,7 @@
       const student = document.getElementById('student-portal-screen');
       const parent = document.getElementById('parent-portal-screen');
       const shouldShow = visible(app) || visible(exam) || visible(student) || visible(parent);
-      btn.style.display = shouldShow ? 'flex' : 'none';
-      if (visible(login) && !shouldShow) btn.style.display = 'none';
+      btn.style.display = shouldShow && !(visible(login) && !shouldShow) ? 'flex' : 'none';
     };
 
     const observer = new MutationObserver(refresh);
