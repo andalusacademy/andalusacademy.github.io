@@ -41,11 +41,12 @@ function inject(){
   card.innerHTML='<div class="card-header"><h3>📝 ٢) مراجعة الأسئلة الناتجة</h3><span id="ss-question-counts" style="font-size:12px;color:var(--muted)">ارفع المادة أولًا</span></div>'+
   '<div style="padding:16px"><div id="ss-generated-list"><p style="color:var(--muted)">ستظهر هنا جميع الأسئلة التي أنشأها الذكاء الاصطناعي.</p></div>'+
   '<div style="margin:24px 0 12px;border-top:3px solid #c9a24c;padding-top:16px"><h3 style="margin-bottom:8px">⭐ الأسئلة التي اخترتها للملخص</h3><p style="color:var(--muted);font-size:12px;margin-bottom:12px">أي سؤال تعلّم عليه فوق ينتقل إلى هذه القائمة تلقائيًا.</p><div id="ss-selected-list"><p style="color:var(--muted)">لم تحدد أسئلة بعد.</p></div></div>'+
-  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-gold" id="ss-approve-summary-btn" disabled>✅ اعتماد الأسئلة المحددة والملخص بالكامل</button><button class="btn btn-outline" id="ss-export-questions-pdf-btn" type="button" disabled>📄 تصدير الأسئلة PDF</button></div><div id="ss-approve-status" style="margin-top:12px"></div></div>';
+  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-gold" id="ss-approve-summary-btn" disabled>✅ اعتماد الأسئلة المحددة والملخص بالكامل</button><button class="btn btn-outline" id="ss-export-questions-pdf-btn" type="button" disabled>📄 تصدير PDF</button><button class="btn btn-outline" id="ss-export-questions-word-btn" type="button" disabled>📝 تصدير Word</button></div><div id="ss-approve-status" style="margin-top:12px"></div></div>';
   document.getElementById('ss-ai-generator-card').insertAdjacentElement('afterend',card);
   card.addEventListener('change',e=>{const box=e.target.closest('input[data-question-id]');if(!box)return;const id=box.dataset.questionId;if(box.checked)selectedIds.add(id);else selectedIds.delete(id);renderQuestionLists();});
   document.getElementById('ss-approve-summary-btn').addEventListener('click',approveSelected);
   document.getElementById('ss-export-questions-pdf-btn').addEventListener('click',exportQuestionsPdf);
+  document.getElementById('ss-export-questions-word-btn').addEventListener('click',exportQuestionsWord);
  }
  if(!document.getElementById('ss-summary-management-card')){
   const card=document.createElement('div');card.id='ss-summary-management-card';card.className='card';
@@ -90,19 +91,20 @@ async function generate(){
   allQuestions=loaded.data||[];selectedIds=new Set();selectedSummaryId=draftId;
   document.getElementById('ss-question-counts').textContent='تم إنشاء '+allQuestions.length+' سؤالًا: '+allQuestions.filter(q=>q.question_type==='mcq').length+' اختياري، '+allQuestions.filter(q=>q.question_type==='true_false').length+' صح/خطأ، '+allQuestions.filter(q=>q.question_type==='essay').length+' مقالي';
   renderQuestionLists();document.getElementById('ss-approve-summary-btn').disabled=false;
-  document.getElementById('ss-export-questions-pdf-btn').disabled=!allQuestions.length;
+  document.getElementById('ss-export-questions-pdf-btn').disabled=!allQuestions.length;document.getElementById('ss-export-questions-word-btn').disabled=!allQuestions.length;
   status('تم حفظ المادة كمسودة وتوليد الأسئلة. لم يتم نشرها للطلاب. علّم على الأسئلة التي تريدها ثم اضغط اعتماد.',true);
   await refreshSummaries();
  }catch(e){status(e?.message||String(e));}finally{btn.disabled=false;}
 }
 function renderQuestionLists(){
  const generated=document.getElementById('ss-generated-list'),selected=document.getElementById('ss-selected-list');if(!generated||!selected)return;
- const one=q=>'<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0;background:#fff"><label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer"><input type="checkbox" data-question-id="'+esc(q.id)+'" '+(selectedIds.has(q.id)?'checked':'')+' style="margin-top:5px;flex:0 0 auto"><span style="flex:1"><strong>'+esc(q.order_num)+'. '+esc(q.question_text)+'</strong><div style="margin-top:5px;color:#64748b;font-size:12px">'+esc(typeLabel(q.question_type))+'</div>'+(Array.isArray(q.options)&&q.options.length?'<ol style="margin:8px 22px">'+q.options.map(o=>'<li>'+esc(o)+'</li>').join('')+'</ol>':'')+'<div style="margin-top:8px;color:#166534;white-space:pre-wrap"><strong>الإجابة النموذجية:</strong> '+esc(q.answer_text||'')+'</div>'+(q.explanation?'<div style="margin-top:5px;color:#64748b">التوضيح: '+esc(q.explanation)+'</div>':'')+'</span></label></div>';
+ const one=q=>'<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0;background:#fff"><label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer"><input type="checkbox" data-question-id="'+esc(q.id)+'" '+(selectedIds.has(q.id)?'checked':'')+' style="margin-top:5px;flex:0 0 auto"><span style="flex:1"><strong>'+esc(q.order_num)+'. '+esc(q.question_text)+'</strong><div style="margin-top:5px;color:#64748b;font-size:12px">'+esc(typeLabel(q.question_type))+'</div>'+(Array.isArray(q.options)&&q.options.length?'<ol style="margin:8px 22px">'+q.options.map(o=>'<li>'+esc(o)+'</li>').join('')+'</ol>':'')+'<div style="margin-top:8px;color:#166534;white-space:pre-wrap"><strong>الإجابة النموذجية:</strong> '+esc(q.answer_text||'')+'</div>'+(q.explanation?'<div style="margin-top:5px;color:#64748b">التوضيح: '+esc(q.explanation)+'</div>':'')+'<div style="margin-top:6px;color:#92400e;background:#fffbeb;padding:5px 8px;border-radius:6px;font-size:12px"><strong>📄 صفحة المصدر (للمدير فقط):</strong> '+esc(q.source_reference||'لم يحدد الذكاء الاصطناعي الصفحة — راجع ملف PDF يدويًا')+'</div></span></label></div>';
  generated.innerHTML=allQuestions.length?allQuestions.map(one).join(''):'<p style="color:var(--muted)">لا توجد أسئلة مولّدة حتى الآن.</p>';
  const picked=allQuestions.filter(q=>selectedIds.has(q.id));
  selected.innerHTML=picked.length?picked.map((q,i)=>'<div style="border:1px solid #86bda0;border-radius:10px;padding:12px;margin:8px 0;background:#f0fdf4"><strong>'+ (i+1)+'. '+esc(q.question_text)+'</strong><div style="font-size:12px;color:#166534;margin-top:4px">'+esc(typeLabel(q.question_type))+' — الإجابة: '+esc(q.answer_text)+'</div><button type="button" class="btn btn-outline btn-sm" data-unselect-id="'+esc(q.id)+'" style="margin-top:8px">إزالة من الاختيار</button></div>').join(''):'<p style="color:var(--muted)">لم تحدد أسئلة بعد.</p>';
  selected.querySelectorAll('[data-unselect-id]').forEach(b=>b.addEventListener('click',()=>{selectedIds.delete(b.dataset.unselectId);renderQuestionLists();}));
- document.getElementById('ss-approve-summary-btn').disabled=!picked.length;const exportBtn=document.getElementById('ss-export-questions-pdf-btn');if(exportBtn)exportBtn.disabled=!allQuestions.length;
+ selected.querySelectorAll('[data-unselect-id]').forEach(b=>{const q=allQuestions.find(x=>x.id===b.dataset.unselectId);if(q){const d=document.createElement('div');d.style.cssText='font-size:12px;color:#92400e;margin-top:5px';d.textContent='صفحة المصدر (للمدير فقط): '+(q.source_reference||'غير محددة — راجع PDF');b.parentElement.appendChild(d);}});
+ document.getElementById('ss-approve-summary-btn').disabled=!picked.length;const exportBtn=document.getElementById('ss-export-questions-pdf-btn');if(exportBtn)exportBtn.disabled=!allQuestions.length;const wordBtn=document.getElementById('ss-export-questions-word-btn');if(wordBtn)wordBtn.disabled=!allQuestions.length;
 }
 function exportQuestionsPdf(){
  if(!allQuestions.length){status('لا توجد أسئلة لتصديرها بعد.');return;}
@@ -117,6 +119,22 @@ function exportQuestionsPdf(){
  w.document.open();
  w.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>'+esc(summaryTitle)+' - الأسئلة</title><style>body{font-family:Tahoma,Arial,sans-serif;color:#172033;margin:24px;direction:rtl;line-height:1.8}header{border-bottom:3px solid #183b67;padding-bottom:12px;margin-bottom:20px}h1{color:#183b67;font-size:22px;margin:0}h2{font-size:15px;color:#475569;margin:4px 0}.question{break-inside:avoid;border:1px solid #cbd5e1;border-radius:8px;padding:12px 15px;margin:0 0 14px}.question h3{font-size:16px;margin:0 0 5px;color:#102a43}.meta{font-size:11px;color:#64748b}.question ol{padding-right:24px}.question p{margin:6px 0}.source{color:#92400e;background:#fffbeb;padding:5px 8px;border-radius:4px;font-size:12px}button{font:inherit;padding:9px 16px;border:0;border-radius:6px;background:#183b67;color:white;cursor:pointer;margin:0 0 18px}@media print{body{margin:10mm}button{display:none}.question{break-inside:avoid}}@page{size:A4;margin:12mm}</style></head><body><button onclick="window.print()">طباعة / حفظ كـ PDF</button><header><h1>مركز الأندلس للتدريب</h1><h2>تصدير الأسئلة للمراجعة الإدارية</h2><div><strong>الملخص:</strong> '+esc(summaryTitle)+' '+(subject?' — <strong>المادة:</strong> '+esc(subject):'')+'</div><div><strong>عدد الأسئلة:</strong> '+allQuestions.length+' — <strong>تاريخ التصدير:</strong> '+esc(new Date().toLocaleString('ar-EG'))+'</div></header>'+rows+'</body></html>');
  w.document.close();w.focus();setTimeout(()=>{try{w.print();}catch(e){}},400);
+}
+
+function exportQuestionsWord(){
+ if(!allQuestions.length){status('لا توجد أسئلة لتصديرها بعد.');return;}
+ const summaryTitle=document.getElementById('ss-ai-title')?.value.trim()||'ملخص دراسي';
+ const subject=document.getElementById('ss-ai-subject')?.value.trim()||'';
+ const rows=allQuestions.map((q,i)=>{
+  const opts=Array.isArray(q.options)&&q.options.length?'<ol>'+q.options.map(o=>'<li>'+esc(o)+'</li>').join('')+'</ol>':'';
+  return '<article class="question"><h3>'+(i+1)+'. '+esc(q.question_text)+'</h3><div class="meta">'+esc(typeLabel(q.question_type))+' — '+(selectedIds.has(q.id)?'محدد للاعتماد':'غير محدد')+'</div>'+opts+'<p><strong>الإجابة النموذجية:</strong> '+esc(q.answer_text||'—')+'</p>'+(q.explanation?'<p><strong>التوضيح:</strong> '+esc(q.explanation)+'</p>':'')+'<p class="source"><strong>صفحة المصدر (للمراجعة الإدارية فقط):</strong> '+esc(q.source_reference||'غير محددة — يلزم مراجعة ملف PDF يدويًا')+'</p></article>';
+ }).join('');
+ const html='<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>'+esc(summaryTitle)+'</title><style>body{font-family:Arial,Tahoma,sans-serif;direction:rtl;text-align:right;color:#172033;line-height:1.8}h1{color:#183b67;border-bottom:3px solid #c9a24c;padding-bottom:10px}.meta{color:#64748b;font-size:10pt}.question{border:1px solid #cbd5e1;padding:12px;margin:12px 0;page-break-inside:avoid}.question h3{color:#183b67}.source{color:#92400e;background:#fffbeb;padding:6px}.question ol{padding-right:28px}@page{size:A4;margin:18mm}</style></head><body><h1>مركز الأندلس للتدريب — أسئلة الملخص</h1><p><strong>الملخص:</strong> '+esc(summaryTitle)+(subject?' — <strong>المادة:</strong> '+esc(subject):'')+'</p><p><strong>عدد الأسئلة:</strong> '+allQuestions.length+' — <strong>تاريخ التصدير:</strong> '+esc(new Date().toLocaleString('ar-EG'))+'</p>'+rows+'</body></html>';
+ const blob=new Blob(['\ufeff',html],{type:'application/msword;charset=utf-8'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download=(summaryTitle.replace(/[\\/:*?"<>|]/g,'_')||'study-summary')+'-questions.doc';
+ document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+ status('تم تجهيز ملف Word للتنزيل. يتضمن صفحة المصدر للمراجعة الإدارية فقط.',true);
 }
 async function approveSelected(){
  const sbc=client();if(!sbc||!draftId)return;
