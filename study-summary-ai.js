@@ -2,6 +2,7 @@
 'use strict';
 const esc=v=>typeof window.escapeHtml==='function'?window.escapeHtml(String(v??'')):String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const client=()=>window.sb||(typeof sb!=='undefined'?sb:null);
+let startFresh=false;
 let draftId=null, allQuestions=[], selectedIds=new Set(), selectedSummaryId='', reviewSummaryId='', reviewReadOnly=false, activeBatch='all', expandedReviewId='', selectedManageIds=new Set();
 let wired=false;
 const typeLabel=t=>t==='mcq'?'اختيار من متعدد':t==='true_false'?'صح أو خطأ':t==='essay'?'مقالي':String(t||'سؤال');
@@ -94,15 +95,15 @@ async function generate(){
  const btn=document.getElementById('ss-ai-generate-btn');btn.disabled=true;
  try{
   const auth=await sbc.auth.getSession();if(!auth.data?.session)throw new Error('جلسة المدير غير صالحة. سجّل الدخول مرة أخرى.');
-  const chosenDraft=draftId||document.getElementById('ss-review-summary')?.value||'';
+  const chosenDraft=startFresh?'':(draftId||document.getElementById('ss-review-summary')?.value||'');
   let summary=null;
   if(chosenDraft){const found=await sbc.from('study_summaries').select('id,title,subject_name,description,source_pdf_path,is_approved,is_published').eq('id',chosenDraft).single();if(found.error)throw found.error;summary=found.data;draftId=summary.id;if(summary.is_published)throw new Error('الملخص منشور بالفعل. أوقف نشره أولًا قبل إضافة جزء جديد.');}
   const title=(document.getElementById('ss-ai-title').value.trim()||summary?.title||'').trim();
   const subject=(document.getElementById('ss-ai-subject').value.trim()||summary?.subject_name||'').trim();
   if(title.length<2||!subject)throw new Error('اكتب اسم الملخص واسم المادة أولًا.');
   if(!summary&&!file)throw new Error('ارفع ملف PDF لإنشاء الجزء الأول.');
-  if(summary){const old=await sbc.from('study_summaries').update({title,subject_name:subject,description:description||summary.description||'',is_published:false,ai_generation_status:'processing',ai_generation_error:null,updated_at:new Date().toISOString()}).eq('id',draftId);if(old.error)throw old.error;}
-  else{const made=await sbc.from('study_summaries').insert({title,subject_name:subject,description,price:0,validity_days:30,is_published:false,is_approved:false,created_by:auth.data.session.user.id,ai_generation_status:'processing'}).select('id').single();if(made.error)throw made.error;draftId=made.data.id;}
+  if(summary){const old=await sbc.from('study_summaries').update({title,subject_name:subject,description:description||summary.description||'',is_approved:false,approved_at:null,approved_by:null,is_published:false,ai_generation_status:'processing',ai_generation_error:null,updated_at:new Date().toISOString()}).eq('id',draftId);if(old.error)throw old.error;}
+  else{const made=await sbc.from('study_summaries').insert({title,subject_name:subject,description,price:0,validity_days:30,is_published:false,is_approved:false,created_by:auth.data.session.user.id,ai_generation_status:'processing'}).select('id').single();if(made.error)throw made.error;draftId=made.data.id;startFresh=false;}
   let path=summary?.source_pdf_path||'';
   if(file){path='summary-'+draftId+'/'+Date.now()+'-source.pdf';const upload=await sbc.storage.from('study-summary-pdfs').upload(path,file,{contentType:'application/pdf',upsert:false});if(upload.error)throw upload.error;}
   if(!path)throw new Error('لم يتم العثور على ملف المادة المحفوظ. ارفع ملف PDF ثم أعد المحاولة.');
@@ -114,7 +115,7 @@ async function generate(){
   const count=await sbc.from('study_summary_questions').select('id',{count:'exact',head:true}).eq('summary_id',draftId);if(count.error)throw count.error;
   const save=await sbc.from('study_summaries').update({source_pdf_path:path,ai_generation_status:'ready',generated_question_count:count.count||result.totalQuestionCount||total,is_published:false,updated_at:new Date().toISOString()}).eq('id',draftId);if(save.error)throw save.error;
   const loaded=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');if(loaded.error)throw loaded.error;
-  allQuestions=loaded.data||[];selectedIds=new Set();selectedSummaryId=draftId;reviewSummaryId=draftId;reviewReadOnly=false;
+  allQuestions=loaded.data||[];selectedIds=new Set();selectedSummaryId=draftId;reviewSummaryId=draftId;reviewReadOnly=false;startFresh=false;
   const reviewSel=document.getElementById('ss-review-summary');if(reviewSel)reviewSel.value=draftId;
   document.getElementById('ss-question-counts').textContent='تم حفظ الجزء '+batchNo+' — إجمالي الأسئلة: '+allQuestions.length+' ('+allQuestions.filter(q=>q.question_type==='mcq').length+' اختياري، '+allQuestions.filter(q=>q.question_type==='true_false').length+' صح/خطأ، '+allQuestions.filter(q=>q.question_type==='essay').length+' مقالي)';
   renderQuestionLists();document.getElementById('ss-approve-summary-btn').disabled=false;
@@ -128,7 +129,7 @@ async function generate(){
 }
 function startNewSummary(){
  if(draftId&&!confirm('سيتم بدء ملخص جديد. الملخصات والأسئلة المحفوظة سابقًا لن تُحذف. هل تريد المتابعة؟'))return;
- draftId=null;reviewSummaryId='';selectedSummaryId='';allQuestions=[];selectedIds.clear();reviewReadOnly=false;activeBatch='all';expandedReviewId='';
+ startFresh=true;draftId=null;reviewSummaryId='';selectedSummaryId='';allQuestions=[];selectedIds.clear();reviewReadOnly=false;activeBatch='all';expandedReviewId='';
  ['ss-ai-title','ss-ai-subject','ss-ai-description','ss-ai-pdf','ss-ai-mc-count','ss-ai-tf-count','ss-ai-essay-count'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
  ['ss-ai-mc-enabled','ss-ai-tf-enabled','ss-ai-essay-enabled'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
  [['ss-ai-mc-enabled','ss-ai-mc-count'],['ss-ai-tf-enabled','ss-ai-tf-count'],['ss-ai-essay-enabled','ss-ai-essay-count']].forEach(([a,b])=>{const x=document.getElementById(a),y=document.getElementById(b);if(x&&y)y.disabled=!x.checked;});
