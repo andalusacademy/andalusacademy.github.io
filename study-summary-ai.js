@@ -196,11 +196,11 @@ function renderSummaryPickerCards(rows){
 }
 function setReviewWorkspaceVisible(visible){['ss-review-batch','ss-select-all-questions','ss-generated-list','ss-selected-list','ss-approve-summary-btn','ss-export-questions-pdf-btn','ss-export-questions-word-btn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=visible?'':'none';});const selected=document.getElementById('ss-selected-list');if(selected?.parentElement)selected.parentElement.style.display=visible?'':'none';}
 async function populateTargetOptions(){
- const sbc=client();if(!sbc)return;const branch=document.getElementById('ss-manage-target-branch'),system=document.getElementById('ss-manage-target-system'),batch=document.getElementById('ss-manage-target-batch');if(!branch||branch.dataset.loaded==='1')return;branch.dataset.loaded='1';
+ const sbc=client();if(!sbc)return;const branch=document.getElementById('ss-manage-target-branch'),system=document.getElementById('ss-manage-target-system'),batch=document.getElementById('ss-manage-target-batch');if(!branch||branch.dataset.loaded==='1')return;
  try{const [students,programs,users]=await Promise.all([sbc.from('students').select('branch,system_name,program'),sbc.from('programs').select('name,system,systems'),sbc.from('users').select('branch')]);
  const uniq=a=>[...new Set(a.map(v=>String(v||'').trim()).filter(v=>v&&v!=='—'))].sort((a,b)=>a.localeCompare(b,'ar'));
  const branches=uniq([...(students.data||[]).map(x=>x.branch),...(users.data||[]).map(x=>x.branch)]),systems=uniq([...(students.data||[]).map(x=>x.system_name),...(programs.data||[]).flatMap(x=>[x.system,...(Array.isArray(x.systems)?x.systems:[])])]),batches=uniq([...(students.data||[]).map(x=>x.program),...(programs.data||[]).map(x=>x.name)]);
- const fill=(el,items,placeholder)=>{const old=el.value;el.innerHTML='<option value="">'+placeholder+'</option>'+items.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if(old&&items.includes(old))el.value=old;};fill(branch,branches,'اختر الفرع');fill(system,systems,'اختر النظام');fill(batch,batches,'اختر الدفعة / البرنامج');
+ const fill=(el,items,placeholder)=>{const old=el.value;el.innerHTML='<option value="">'+placeholder+'</option>'+items.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if(old&&items.includes(old))el.value=old;};fill(branch,branches,'اختر الفرع');fill(system,systems,'اختر النظام');fill(batch,batches,'اختر الدفعة / البرنامج');branch.dataset.loaded='1';
  }catch(e){console.warn('تعذر تحميل خيارات الفروع والأنظمة',e);}
 }
 
