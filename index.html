@@ -16013,7 +16013,7 @@ async function loadStudySummaryOrdersAdmin(){
       '<button class="btn btn-outline btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'pending_payment\')">لم يتم الدفع</button>'+
       '<button class="btn btn-outline btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'cancelled\')">إلغاء الطلب</button>'+
       '<button class="btn btn-danger btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'rejected\')">رفض الطلب</button></div>';
-    return '<tr><td><code>'+ssOrderNumber(o.id)+'</code></td><td>'+ssEsc(st?.name||'—')+'</td><td>'+ssEsc(st?.enrollment_number||st?.id||o.student_id)+'</td><td>'+ssEsc(sm?.title||'ملخص محذوف')+'</td><td>'+ssMoney(o.amount)+'</td><td><span class="badge '+statusClass+'">'+ssEsc(statusLabel)+'</span></td><td>'+ssEsc(new Date(o.created_at).toLocaleString('ar-EG'))+'</td><td>'+actions+'</td></tr>';
+    return '<tr><td><code>'+ssEsc(o.order_code||ssOrderNumber(o.id))+'</code>'+(o.payment_reference?'<div style="margin-top:5px;font-size:11px;color:#92400e">مرجع التحويل: '+ssEsc(o.payment_reference)+'</div>':'<div style="margin-top:5px;font-size:11px;color:var(--muted)">لم يرسل مرجع التحويل</div>')+'</td><td>'+ssEsc(st?.name||'—')+'</td><td>'+ssEsc(st?.enrollment_number||st?.id||o.student_id)+'</td><td>'+ssEsc(sm?.title||'ملخص محذوف')+'</td><td>'+ssMoney(o.amount)+'</td><td><span class="badge '+statusClass+'">'+ssEsc(statusLabel)+'</span></td><td>'+ssEsc(new Date(o.created_at).toLocaleString('ar-EG'))+'</td><td>'+actions+'</td></tr>';
   }).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px">لا توجد طلبات شراء حتى الآن.</td></tr>';
 }
 async function reviewStudySummaryOrder(orderId,nextStatus){
@@ -16075,17 +16075,29 @@ async function goToPortalStudySummaries(){
         </div>
       </div>`).join(''):'<div style="text-align:center;padding:28px;color:var(--muted);border:1px dashed var(--border);border-radius:12px">لا توجد ملخصات متاحة حاليًا.</div>'}</div>
     <div style="margin-top:18px"><h3 style="font-size:14px;color:var(--navy);margin-bottom:8px">🧾 طلباتي</h3>
-    ${orders.length?orders.map(o=>{const labels={pending_payment:'لم يتم الدفع — الطلب قيد المراجعة',paid:'تم الدفع — الملخص متاح لك',cancelled:'تم إلغاء الطلب',rejected:'تم رفض الطلب'};const color=o.status==='paid'?'#15803d':o.status==='rejected'?'#b91c1c':o.status==='cancelled'?'#64748b':'#b45309';return '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding:9px 0;font-size:12px"><span>'+ssEsc(o.summary_title)+' · رقم '+ssOrderNumber(o.id)+'</span><strong>'+ssMoney(o.amount)+' — <span style="color:'+color+'">'+ssEsc(labels[o.status]||o.status)+'</span></strong></div>';}).join(''):'<div style="font-size:12px;color:var(--muted)">لا توجد طلبات حتى الآن.</div>'}</div>`;
+    ${orders.length?orders.map(o=>{const labels={pending_payment:'بانتظار مراجعة التحويل',paid:'تم الدفع — الملخص متاح لك',cancelled:'تم إلغاء الطلب',rejected:'تم رفض الطلب',expired:'انتهت مهلة الطلب'};const color=o.status==='paid'?'#15803d':o.status==='rejected'?'#b91c1c':o.status==='cancelled'||o.status==='expired'?'#64748b':'#b45309';return '<div style="border-bottom:1px solid var(--border);padding:12px 0;font-size:12px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span>'+ssEsc(o.summary_title)+' · كود الطلب <code>'+ssEsc(o.order_code||o.order_number||ssOrderNumber(o.id))+'</code></span><strong>'+ssMoney(o.amount)+' — <span style="color:'+color+'">'+ssEsc(labels[o.status]||o.status)+'</span></strong></div>'+(o.status==='pending_payment'?'<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;line-height:1.9"><strong>تعليمات التحويل</strong><div>الوسيلة: '+ssEsc(o.payment_provider||'محفظة إلكترونية')+'</div><div>حوّل المبلغ إلى: <strong>'+ssEsc(o.payment_wallet_number||'رقم المحفظة غير متاح؛ تواصل مع الإدارة')+'</strong></div><div>اكتب كود الطلب في رسالة التحويل أو مرجع العملية: <strong>'+ssEsc(o.order_code||o.order_number||ssOrderNumber(o.id))+'</strong></div><label style="display:block;margin-top:8px">رقم/مرجع التحويل</label><input id="ss-payment-reference-'+ssEsc(o.id)+'" class="search-input" maxlength="120" value="'+ssEsc(o.payment_reference||'')+'" placeholder="اكتب رقم العملية بعد التحويل" style="width:100%;margin:4px 0 8px"><button class="btn btn-gold btn-sm" onclick="submitStudySummaryPaymentReference(\''+ssEsc(o.id)+'\')">'+(o.payment_reference?'تحديث مرجع التحويل':'إرسال مرجع التحويل للمراجعة')+'</button><div style="color:#92400e;margin-top:5px">لن يفتح الملخص إلا بعد مراجعة الإدارة وتأكيد وصول المبلغ.</div></div>':'')+'</div>';}).join(''):'<div style="font-size:12px;color:var(--muted)">لا توجد طلبات حتى الآن.</div>'}</div>`;
 }
 async function requestStudentStudySummary(id){
   const s=studySummaryStudentRows.find(x=>x.id===id);if(!s)return;
-  if(!confirm('إنشاء طلب شراء للملخص «'+s.title+'» بقيمة '+ssMoney(s.price)+'؟ لن يتم خصم أي مبلغ ولن تُمنح صلاحية الآن.'))return;
-  const {data,error}=await sb.rpc('student_create_study_summary_order',{p_session_token:studentPortalFaceToken,p_summary_id:id});
+  if(!confirm('إنشاء طلب شراء للملخص «'+s.title+'» بقيمة '+ssMoney(s.price)+'؟ ستظهر لك بيانات التحويل وكود الطلب، ولن يُفتح الملخص قبل اعتماد الدفع.'))return;
+  const {data,error}=await sb.rpc('student_create_paid_study_summary_order',{p_session_token:studentPortalFaceToken,p_summary_id:id});
   if(error||!data?.ok){
-    const msg=data?.reason==='already_has_access'?'لديك صلاحية فعّالة لهذا الملخص.':data?.reason==='session_expired'?'انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.':error?.message||'تعذر إنشاء الطلب.';
-    showToast(msg,'error');if(data?.reason==='session_expired')studentPortalFaceToken=null;return;
+    const reasons={already_has_access:'لديك صلاحية فعّالة لهذا الملخص.',session_expired:'انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.',payment_not_configured:'لم تُدخل الإدارة رقم المحفظة لهذا الملخص بعد. حاول لاحقًا.',summary_unavailable:'انتهت فترة إتاحة شراء الملخص أو أنه غير منشور.',pending_order_exists:'لديك طلب شراء قائم بالفعل؛ راجع قسم طلباتي.'};
+    showToast(reasons[data?.reason]||error?.message||'تعذر إنشاء الطلب.','error');if(data?.reason==='session_expired')studentPortalFaceToken=null;return;
   }
-  showToast('تم إنشاء طلب الشراء بنجاح، وحالته الآن «لم يتم الدفع»','success');
+  showToast('تم تجهيز طلب الشراء. حوّل المبلغ ثم أرسل مرجع التحويل للمراجعة.','success');
+  await goToPortalStudySummaries();
+}
+async function submitStudySummaryPaymentReference(orderId){
+  const input=document.getElementById('ss-payment-reference-'+orderId),reference=input?.value?.trim();
+  if(!reference||reference.length<3){showToast('اكتب رقم أو مرجع التحويل أولًا.','error');return;}
+  if(!studentPortalFaceToken){showToast('انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.','error');return;}
+  const {data,error}=await sb.rpc('student_submit_study_summary_payment_reference',{p_session_token:studentPortalFaceToken,p_order_id:orderId,p_payment_reference:reference});
+  if(error||!data?.ok){
+    const reasons={session_expired:'انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.',order_unavailable:'الطلب غير متاح أو انتهت مهلة الدفع.',invalid_reference:'مرجع التحويل غير صحيح.'};
+    showToast(reasons[data?.reason]||error?.message||'تعذر إرسال مرجع التحويل.','error');if(data?.reason==='session_expired')studentPortalFaceToken=null;return;
+  }
+  showToast('تم إرسال مرجع التحويل للإدارة. سيظل الملخص مغلقًا حتى اعتماد الدفع.','success');
   await goToPortalStudySummaries();
 }
 async function openStudentStudySummary(id){
@@ -16111,6 +16123,7 @@ async function renderStudentStudySummaryQuestion(){
       <div style="padding:14px 16px;background:linear-gradient(135deg,#152238,#1f3562);color:#fff"><div style="font-size:11px;opacity:.8;margin-bottom:4px">${ssEsc(data.summary.title)}</div><div style="font-weight:800">السؤال ${ssEsc(data.question_number)} من ${ssEsc(data.total)}</div></div>
       <div style="padding:18px;line-height:2;user-select:none;-webkit-user-select:none">
         <div style="font-weight:900;color:var(--navy);font-size:16px;margin-bottom:14px;white-space:pre-wrap">${ssEsc(q.question_text)}</div>
+        ${Array.isArray(q.options)&&q.options.length?'<div style="margin:0 0 16px;padding:12px;background:#f8fafc;border-radius:8px"><strong style="display:block;margin-bottom:8px">الاختيارات</strong><ol style="margin:0;padding-right:22px;line-height:2">'+q.options.map(option=>'<li>'+ssEsc(option)+'</li>').join('')+'</ol></div>':''}
         <div style="border-top:1px dashed var(--border);padding-top:12px"><div style="font-size:12px;color:#0f766e;font-weight:900;margin-bottom:5px">الإجابة النموذجية</div><div style="font-size:14px;white-space:pre-wrap;line-height:2">${ssEsc(q.answer_text)}</div>
         ${q.explanation?'<div style="margin-top:12px;background:#f8fafc;border-radius:8px;padding:10px;font-size:12px;line-height:1.8"><strong>توضيح:</strong> '+ssEsc(q.explanation)+'</div>':''}
         </div>
@@ -16132,7 +16145,7 @@ async function changeStudySummaryQuestion(delta){
 </script>
 
 
-<script src="study-summary-ai.js?v=13"></script>
+<script src="study-summary-ai.js?v=14"></script>
 <script src="login-runtime-guard.js?v=1"></script>
 </body>
 </html>
