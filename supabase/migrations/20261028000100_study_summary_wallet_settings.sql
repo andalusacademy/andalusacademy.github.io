@@ -123,4 +123,45 @@ grant execute on function public.student_create_study_summary_order(uuid,uuid) t
 revoke all on function public.student_submit_study_summary_payment_reference(uuid,uuid,text) from public;
 grant execute on function public.student_submit_study_summary_payment_reference(uuid,uuid,text) to anon, authenticated;
 
+
+create or replace function public.student_list_study_summary_orders(p_session_token uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare v_student_id text; v_result jsonb;
+begin
+  select s.student_id into v_student_id
+  from public.competition_face_verified_sessions s
+  join public.students st on st.id=s.student_id
+  where s.token=p_session_token and s.competition_type='student_portal'
+    and s.expires_at>now() and st.deleted_at is null
+    and coalesce(st.student_status,'active')='active'
+  limit 1;
+  if v_student_id is null then return jsonb_build_object('ok',false,'reason','session_expired'); end if;
+
+  update public.study_summary_orders set status='expired',updated_at=now()
+  where student_id=v_student_id and status='pending_payment' and expires_at<=now();
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',o.id,'order_number',coalesce(o.order_code,upper(left(replace(o.id::text,'-',''),12))),
+    'order_code',coalesce(o.order_code,upper(left(replace(o.id::text,'-',''),12))),
+    'summary_title',sm.title,'amount',o.amount,'status',o.status,
+    'created_at',o.created_at,'expires_at',o.expires_at,'access_hours',o.access_hours,
+    'payment_reference',o.payment_reference,'payment_provider',sm.payment_provider,
+    'payment_wallet_number',sm.payment_wallet_number
+  ) order by o.created_at desc), '[]'::jsonb)
+  into v_result
+  from public.study_summary_orders o
+  join public.study_summaries sm on sm.id=o.summary_id
+  where o.student_id=v_student_id and o.created_at>now()-interval '30 days';
+  return jsonb_build_object('ok',true,'orders',v_result);
+end;
+$function$;
+
+revoke all on function public.student_list_study_summary_orders(uuid) from public;
+grant execute on function public.student_list_study_summary_orders(uuid) to anon, authenticated;
+
+
 commit;
