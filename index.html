@@ -16020,21 +16020,18 @@ async function reviewStudySummaryOrder(orderId,nextStatus){
   const labels={paid:'تأكيد الدفع ومنح الطالب صلاحية الملخص أو الباقة كاملة',pending_payment:'تسجيل أن الدفع لم يتم بعد',cancelled:'إلغاء طلب الشراء',rejected:'رفض طلب الشراء'};
   if(!confirm(labels[nextStatus]+'؟'))return;
   if(nextStatus==='paid'){
-    const {data:reviewQuestions,error:reviewError}=await sb.from('study_summary_questions').select('id,is_approved,is_selected').eq('summary_id',order.summary_id);
-    if(reviewError){showToast('تعذر فحص أسئلة الملخص: '+reviewError.message,'error');return;}
-    const chosenQuestions=(reviewQuestions||[]).filter(q=>q.is_selected);
-    if(!chosenQuestions.length||chosenQuestions.some(q=>!q.is_approved)){
-      const {data:packageItems}=await sb.from('study_summary_package_items').select('summary_id').eq('package_id',(await sb.from('study_summary_package_items').select('package_id').eq('summary_id',order.summary_id).maybeSingle()).data?.package_id||'00000000-0000-0000-0000-000000000000');
-      let packageReady=true;
-      if(packageItems?.length){
-        for(const item of packageItems){
-          const {data:qs,error:qerr}=await sb.from('study_summary_questions').select('id,is_approved,is_selected').eq('summary_id',item.summary_id);
-          if(qerr){showToast('تعذر فحص أسئلة الباقة: '+qerr.message,'error');return;}
-          const chosen=(qs||[]).filter(q=>q.is_selected);
-          if(!chosen.length||chosen.some(q=>!q.is_approved)){packageReady=false;break;}
-        }
-      }else packageReady=false;
-      if(!packageReady){showToast('لا يمكن إتاحة الملخص/الباقة قبل اعتماد جميع الأسئلة المختارة.','error');return;}
+    const {data:member}=await sb.from('study_summary_package_items').select('package_id').eq('summary_id',order.summary_id).maybeSingle();
+    let summaryIds=[order.summary_id];
+    if(member?.package_id){
+      const {data:items,error:itemsError}=await sb.from('study_summary_package_items').select('summary_id').eq('package_id',member.package_id);
+      if(itemsError||!items?.length){showToast('تعذر فحص أجزاء الباقة: '+(itemsError?.message||'لم يتم العثور على الأجزاء'),'error');return;}
+      summaryIds=items.map(x=>x.summary_id);
+    }
+    for(const summaryId of summaryIds){
+      const {data:questions,error:qError}=await sb.from('study_summary_questions').select('id,is_approved,is_selected').eq('summary_id',summaryId);
+      if(qError){showToast('تعذر فحص أسئلة الملخص: '+qError.message,'error');return;}
+      const chosen=(questions||[]).filter(q=>q.is_selected);
+      if(!chosen.length||chosen.some(q=>!q.is_approved)){showToast('لا يمكن تأكيد الدفع قبل اعتماد جميع الأسئلة المختارة في كل أجزاء الباقة.','error');return;}
     }
   }
   const {data,error}=await sb.rpc('admin_review_study_summary_order',{p_order_id:orderId,p_status:nextStatus,p_reason:null});
