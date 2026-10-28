@@ -16058,9 +16058,10 @@ async function goToPortalStudySummaries(){
   studySummaryStudentRows=data.summaries||[];
   const ordersResult=await sb.rpc('student_list_study_summary_orders',{p_session_token:studentPortalFaceToken});
   const orders=ordersResult.data?.ok?(ordersResult.data.orders||[]):[];
-  const purchasedRows=studySummaryStudentRows.filter(s=>s.has_access===true || s.has_access==='true');
+  const summaryHasAccess=s=>[true,1,'1','true','t','TRUE','yes'].includes(s?.has_access);
+  const purchasedRows=studySummaryStudentRows.filter(summaryHasAccess);
   const purchasedSummaryIds=new Set(purchasedRows.map(s=>String(s.id)));
-  const availableRows=studySummaryStudentRows.filter(s=>!(s.has_access===true || s.has_access==='true') && !purchasedSummaryIds.has(String(s.id)));
+  const availableRows=studySummaryStudentRows.filter(s=>!summaryHasAccess(s) && !purchasedSummaryIds.has(String(s.id)));
   const visibleOrders=orders.filter(o=>o.status!=='paid');
   box.innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><button class="btn btn-outline btn-sm" onclick="renderStudentPortalMenu()">← رجوع</button><strong style="color:var(--navy);font-size:17px">📚 ملخصات الامتحانات الشهرية</strong></div>
@@ -16110,8 +16111,8 @@ async function submitStudySummaryPaymentReference(orderId){
   await goToPortalStudySummaries();
 }
 async function openStudentStudySummary(id){
-  const s=studySummaryStudentRows.find(x=>x.id===id);
-  if(!s?.has_access){showToast('لا توجد صلاحية فعّالة لعرض محتوى هذا الملخص','error');return;}
+  const s=studySummaryStudentRows.find(x=>String(x.id)===String(id));
+  if(!s||![true,1,'1','true','t','TRUE','yes'].includes(s.has_access)){showToast('لا توجد صلاحية فعّالة لعرض محتوى هذا الملخص','error');return;}
   studySummaryActive=s;studySummaryQuestionNumber=1;
   await renderStudentStudySummaryQuestion();
 }
@@ -16157,7 +16158,9 @@ async function renderStudentStudySummaryQuestion(){
     const wm=document.createElement('div');
     wm.className='study-summary-watermark';
     wm.setAttribute('aria-hidden','true');
-    wm.textContent='مركز الأندلس للتدريب · '+String(unifiedPortalStudent?.name||unifiedPortalStudent?.student_name||'طالب')+' · رقم القيد '+String(unifiedPortalStudent?.enrollment_number||unifiedPortalStudent?.id||'غير متاح');
+    const wmName=unifiedPortalStudent?.name||unifiedPortalStudent?.student_name||unifiedPortalStudent?.full_name;
+    const wmNumber=unifiedPortalStudent?.enrollment_number||unifiedPortalStudent?.registration_number||unifiedPortalStudent?.student_code||unifiedPortalStudent?.code;
+    wm.textContent='مركز الأندلس للتدريب · '+String(wmName&&String(wmName)!=='0'?wmName:'نسخة مخصصة')+' · رقم القيد '+String(wmNumber&&String(wmNumber)!=='0'?wmNumber:'غير متاح');
     box.appendChild(wm);
   }
   if(!window.__studySummaryProtectionInstalled){
