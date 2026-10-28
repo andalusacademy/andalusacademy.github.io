@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+(function(){try{var p=new URLSearchParams(window.location.search);if(p.get("student-portal")==="1")document.documentElement.setAttribute("data-student-portal-direct","1");}catch(_){}})();
+</script>
 <meta name="theme-color" content="#1a2a4a">
 <meta name="description" content="نظام إدارة مركز الاندلس للتدريب">
 <link rel="manifest" href="manifest.json">
@@ -20,6 +23,8 @@
 <script src="./vendor/jszip.min.js?v=1"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+html[data-student-portal-direct="1"] #login-screen{display:none!important}
+html[data-student-portal-direct="1"] #student-portal-screen{display:block!important}
 :root{--navy:#152238;--navy2:#1f3562;--gold:#c9a24c;--gold2:#e8c87a;--bg:#f3f5fa;--white:#fff;--text:#1a2437;--muted:#6b7690;--success:#16a34a;--danger:#e0362a;--warning:#e08c1f;--border:#e4e8f2;--sw:240px;--radius:14px;--radius-sm:9px;--shadow-sm:0 1px 3px rgba(21,34,56,.06),0 1px 2px rgba(21,34,56,.04);--shadow-md:0 8px 24px rgba(21,34,56,.10);--shadow-lg:0 16px 44px rgba(21,34,56,.16);}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;letter-spacing:.1px;}
@@ -3752,6 +3757,14 @@ async function doLogout() {
     showStudentPortalLoginStep();
     return;
   }
+  // بوابة الطالب الموحّدة تُعرض فورًا قبل أي تحميل لإعدادات الإدارة أو استعلامات الشبكة.
+  if (params.get('student-portal') === '1') {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('student-portal-screen').style.display = 'block';
+    showStudentPortalLoginStep();
+    return;
+  }
+
   await loadSystemName();
   try { await loadWhatsappNewsLink(); } catch (e) { WHATSAPP_NEWS_LINK = ''; }
   // ✅ بوابة الطالب للامتحانات الإلكترونية — مسار مستقل تمامًا
@@ -3775,13 +3788,6 @@ async function doLogout() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('competition-screen').style.display = 'block';
     loadCompetitionEntryForm(competitionId);
-    return;
-  }
-  // ✅ بوابة الطالب الموحّدة — رابط واحد لدخول الامتحانات الإلكترونية
-  if (new URLSearchParams(window.location.search).get('student-portal') === '1') {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('student-portal-screen').style.display = 'block';
-    showStudentPortalLoginStep();
     return;
   }
   // ✅ التحقق من صحة الشهادة عبر QR — مسار عام مستقل
