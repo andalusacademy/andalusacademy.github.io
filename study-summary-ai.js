@@ -54,7 +54,9 @@ function inject(){
   card.innerHTML='<div class="card-header"><h3>📦 ٣) إعداد الملخص المعتمد ونشره</h3><span style="font-size:12px;color:var(--muted)">لا يظهر للطلاب إلا بعد النشر</span></div>'+
   '<div style="padding:18px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">'+
   '<div class="form-group" style="grid-column:1/-1"><label>اختر ملخصًا تم اعتماده</label><select id="ss-manage-summary" class="search-input" style="width:100%"><option value="">اختر الملخص</option></select></div>'+
-  '<div class="form-group"><label>السعر بالجنيه</label><input id="ss-manage-price" type="number" min="0" step="0.01" value="0" class="search-input" style="width:100%"></div>'+
+  '<div class="form-group"><label>السعر بالجنيه</label><input id="ss-manage-price" type="number" min="0" step="0.01" value="50" class="search-input" style="width:100%"></div>'+
+  '<div class="form-group"><label>وسيلة التحويل</label><input id="ss-manage-payment-provider" type="text" maxlength="80" value="محفظة إلكترونية" class="search-input" style="width:100%" placeholder="مثال: محفظة إلكترونية"></div>'+
+  '<div class="form-group"><label>رقم المحفظة المستقبِلة</label><input id="ss-manage-wallet-number" type="text" inputmode="tel" maxlength="40" class="search-input" style="width:100%" placeholder="أدخل رقم المحفظة قبل النشر"></div>'+
   '<div class="form-group"><label>مدة صلاحية الطالب بعد الشراء (بالأيام)</label><input id="ss-manage-validity" type="number" min="1" max="3650" value="30" class="search-input" style="width:100%"></div>'+
   '<div class="form-group"><label>بداية الإتاحة للشراء</label><input id="ss-manage-from" type="datetime-local" class="search-input" style="width:100%"></div>'+
   '<div class="form-group"><label>نهاية الإتاحة للشراء</label><input id="ss-manage-until" type="datetime-local" class="search-input" style="width:100%"></div>'+
@@ -224,7 +226,8 @@ function renderSummaryTable(rows){
 async function loadManageSummary(){
  const id=document.getElementById('ss-manage-summary')?.value;if(!id)return;
  selectedSummaryId=id;const sbc=client();const {data,error}=await sbc.from('study_summaries').select('*').eq('id',id).single();if(error){document.getElementById('ss-manage-status').textContent=error.message;return;}
- document.getElementById('ss-manage-price').value=data.price??0;document.getElementById('ss-manage-validity').value=data.validity_days??30;
+ document.getElementById('ss-manage-price').value=data.price??50;document.getElementById('ss-manage-validity').value=data.validity_days??30;
+ document.getElementById('ss-manage-payment-provider').value=data.payment_provider||'محفظة إلكترونية';document.getElementById('ss-manage-wallet-number').value=data.payment_wallet_number||'';
  document.getElementById('ss-manage-from').value=data.available_from?localDateTime(new Date(data.available_from)):localDateTime(new Date());
  document.getElementById('ss-manage-until').value=data.available_until?localDateTime(new Date(data.available_until)):localDateTime(new Date(Date.now()+30*86400000));
  const enabledBatches=Array.isArray(data.enabled_batches)?data.enabled_batches.map(Number):[1,2];
@@ -238,13 +241,17 @@ async function loadManageSummary(){
 async function saveManageSummary(publish){
  const sbc=client(),id=document.getElementById('ss-manage-summary').value,el=document.getElementById('ss-manage-status');if(!id){el.textContent='اختر ملخصًا معتمدًا أولًا.';return;}
  const price=Number(document.getElementById('ss-manage-price').value),validity=Number(document.getElementById('ss-manage-validity').value),fromVal=document.getElementById('ss-manage-from').value,untilVal=document.getElementById('ss-manage-until').value;
+ const paymentProvider=document.getElementById('ss-manage-payment-provider').value.trim(),walletNumber=document.getElementById('ss-manage-wallet-number').value.trim();
  if(!Number.isFinite(price)||price<0||!Number.isInteger(validity)||validity<1||validity>3650){el.textContent='راجع السعر ومدة الصلاحية.';return;}
  if(!fromVal||!untilVal||new Date(untilVal)<=new Date(fromVal)){el.textContent='حدد بداية ونهاية صحيحتين للإتاحة.';return;}
+ if(publish&&(!paymentProvider||!walletNumber)){el.textContent='أدخل وسيلة التحويل ورقم المحفظة قبل نشر الملخص للطلاب.';return;}
+ if(walletNumber&&!/^[0-9+\s()-]{6,40}$/.test(walletNumber)){el.textContent='راجع رقم المحفظة؛ أدخل رقمًا صحيحًا فقط.';return;}
  const enabledBatches=[];if(document.getElementById('ss-manage-batch-a').checked)enabledBatches.push(1);if(document.getElementById('ss-manage-batch-b').checked)enabledBatches.push(2);if(!enabledBatches.length){el.textContent='اختر المجموعة A أو المجموعة B أو الاثنين قبل الحفظ.';return;}
  const q=await sbc.from('study_summary_questions').select('id,batch_no').eq('summary_id',id).eq('is_selected',true).eq('is_approved',true).in('batch_no',enabledBatches);if(q.error)throw q.error;const missingBatches=enabledBatches.filter(batch=>!(q.data||[]).some(row=>Number(row.batch_no)===batch));if(missingBatches.length){el.textContent='لا يمكن حفظ الإتاحة: اعتمد سؤالًا واحدًا على الأقل من كل مجموعة اخترتها ('+missingBatches.map(batch=>batch===1?'A':'B').join(' و')+').';return;}
- const payload={price,validity_days:validity,enabled_batches:enabledBatches,available_from:new Date(fromVal).toISOString(),available_until:new Date(untilVal).toISOString(),is_published:!!publish,published_at:publish?new Date().toISOString():null,updated_at:new Date().toISOString()};
+ const payload={price,validity_days:validity,payment_provider:paymentProvider||'محفظة إلكترونية',payment_wallet_number:walletNumber||null,enabled_batches:enabledBatches,available_from:new Date(fromVal).toISOString(),available_until:new Date(untilVal).toISOString(),is_published:!!publish,published_at:publish?new Date().toISOString():null,updated_at:new Date().toISOString()};
  const result=await sbc.from('study_summaries').update(payload).eq('id',id).eq('is_approved',true);if(result.error){el.textContent='تعذر الحفظ: '+result.error.message;return;}
  el.textContent=publish?'تم نشر الملخص للطلاب ضمن وقت الإتاحة المحدد.':'تم حفظ الإعدادات فقط. لم يتم نشر الملخص للطلاب.';
+ if(publish&&typeof showToast==='function')showToast('تم نشر الملخص. ستظهر تعليمات الدفع للطالب بعد تجهيز واجهة الطلب.','success');
  await refreshSummaries();if(typeof window.loadStudySummaryOrdersAdmin==='function')await window.loadStudySummaryOrdersAdmin();
 }
 async function hardDeleteSummary(id){
