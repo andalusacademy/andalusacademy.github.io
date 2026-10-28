@@ -62,6 +62,7 @@ function inject(){
   '<div class="form-group"><label>مدة صلاحية الطالب بعد الشراء (بالأيام)</label><input id="ss-manage-validity" type="number" min="1" max="3650" value="" class="search-input" style="width:100%"></div>'+
   '<div class="form-group"><label>بداية الإتاحة للشراء</label><input id="ss-manage-from" type="datetime-local" class="search-input" style="width:100%"></div>'+
   '<div class="form-group"><label>نهاية الإتاحة للشراء</label><input id="ss-manage-until" type="datetime-local" class="search-input" style="width:100%"></div>'+
+  '<div class="form-group" style="grid-column:1/-1"><label><input id="ss-manage-target-all" type="checkbox"> إتاحة المنتج لكل الطلاب</label><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:8px"><div><label>الفرع المستهدف (اختياري)</label><input id="ss-manage-target-branch" class="search-input" maxlength="120" placeholder="اسم الفرع" style="width:100%"></div><div><label>النظام المستهدف (اختياري)</label><input id="ss-manage-target-system" class="search-input" maxlength="120" placeholder="اسم النظام" style="width:100%"></div><div><label>الدفعة / البرنامج المستهدف (اختياري)</label><input id="ss-manage-target-batch" class="search-input" maxlength="120" placeholder="اسم الدفعة أو البرنامج" style="width:100%"></div></div><small style="display:block;color:var(--muted);margin-top:5px">حدد «كل الطلاب» أو أدخل شرطًا واحدًا على الأقل للجمهور المستهدف.</small></div>'+
   '<div class="form-group" style="grid-column:1/-1"><label>الأجزاء المتاحة للطالب</label><div id="ss-manage-batches" style="display:flex;gap:12px;flex-wrap:wrap;padding:10px;border:1px solid var(--border);border-radius:8px">احفظ جزءًا واحدًا على الأقل أولًا</div><small style="display:block;color:var(--muted);margin-top:5px">حدد الأجزاء التي تريد بيعها داخل هذا المنتج.</small></div>'+
   '<div class="form-group" style="grid-column:1/-1"><label>أنواع الأسئلة المتاحة في المنتج</label><div id="ss-manage-types" style="display:flex;gap:18px;flex-wrap:wrap;padding:10px;border:1px solid var(--border);border-radius:8px"><label><input type="checkbox" data-summary-type="mcq" checked> اختياري فقط / ضمن الملخص</label><label><input type="checkbox" data-summary-type="true_false" checked> صح وغلط</label><label><input type="checkbox" data-summary-type="essay" checked> مقالي</label></div><small style="display:block;color:var(--muted);margin-top:5px">يمكنك بيع نوع واحد فقط أو مزيج من الأنواع المحددة.</small></div></div>'+
   '<div id="ss-manage-info" style="margin:8px 0;color:var(--muted);font-size:12px"></div>'+
@@ -70,7 +71,8 @@ function inject(){
   document.getElementById('ss-manage-summary').addEventListener('change',loadManageSummary);
   document.getElementById('ss-manage-save').addEventListener('click',()=>saveManageSummary(false));
   document.getElementById('ss-manage-publish').addEventListener('click',()=>saveManageSummary(true));
-  const now=new Date();document.getElementById('ss-manage-from').value=localDateTime(now);document.getElementById('ss-manage-until').value='';
+  document.getElementById('ss-manage-from').value='';document.getElementById('ss-manage-until').value='';
+  document.getElementById('ss-manage-target-all').addEventListener('change',()=>{const all=document.getElementById('ss-manage-target-all').checked;['ss-manage-target-branch','ss-manage-target-system','ss-manage-target-batch'].forEach(id=>{document.getElementById(id).disabled=all;});});
  }
  hideLegacy();
 }
@@ -229,6 +231,9 @@ async function loadManageSummary(){
  document.getElementById('ss-manage-payment-provider').value=data.payment_provider||'';document.getElementById('ss-manage-wallet-number').value=data.payment_wallet_number||'';
  document.getElementById('ss-manage-from').value=data.available_from?localDateTime(new Date(data.available_from)):'';
  document.getElementById('ss-manage-until').value=data.available_until?localDateTime(new Date(data.available_until)):'';
+ document.getElementById('ss-manage-target-all').checked=data.target_all===true;
+ document.getElementById('ss-manage-target-branch').value=data.target_branch||'';document.getElementById('ss-manage-target-system').value=data.target_system||'';document.getElementById('ss-manage-target-batch').value=data.target_batch||'';
+ ['ss-manage-target-branch','ss-manage-target-system','ss-manage-target-batch'].forEach(id=>{document.getElementById(id).disabled=data.target_all===true;});
  const enabledBatches=Array.isArray(data.enabled_batches)?data.enabled_batches.map(Number):[];
  const batchQuery=await sbc.from('study_summary_questions').select('batch_no').eq('summary_id',id).eq('is_selected',true).eq('is_approved',true).order('batch_no');
  const availableBatches=[...new Set((batchQuery.data||[]).map(q=>Number(q.batch_no)).filter(n=>n>0))];
@@ -244,17 +249,19 @@ async function saveManageSummary(publish){
  const sbc=client(),id=document.getElementById('ss-manage-summary').value,el=document.getElementById('ss-manage-status');if(!id){el.textContent='اختر ملخصًا معتمدًا أولًا.';return;}
  const priceRaw=document.getElementById('ss-manage-price').value.trim(),price=Number(priceRaw),validity=Number(document.getElementById('ss-manage-validity').value),fromVal=document.getElementById('ss-manage-from').value,untilVal=document.getElementById('ss-manage-until').value;
  const paymentProvider=document.getElementById('ss-manage-payment-provider').value.trim(),walletNumber=document.getElementById('ss-manage-wallet-number').value.trim();
+ const targetAll=document.getElementById('ss-manage-target-all').checked,targetBranch=document.getElementById('ss-manage-target-branch').value.trim(),targetSystem=document.getElementById('ss-manage-target-system').value.trim(),targetBatch=document.getElementById('ss-manage-target-batch').value.trim();
  if(!Number.isFinite(price)||price<0||!Number.isInteger(validity)||validity<1||validity>3650){el.textContent='راجع السعر ومدة الصلاحية.';return;}
  if(!priceRaw||!Number.isFinite(price)||price<0){el.textContent='أدخل سعرًا صحيحًا للملخص.';return;}
  if(!validity||validity<1||validity>3650){el.textContent='أدخل مدة إتاحة صحيحة بالأيام.';return;}
  if(!fromVal||!untilVal||new Date(untilVal)<=new Date(fromVal)){el.textContent='حدد بداية ونهاية صحيحتين للإتاحة.';return;}
+ if(!targetAll&&!targetBranch&&!targetSystem&&!targetBatch){el.textContent='حدد الجمهور المستهدف: كل الطلاب أو فرعًا أو نظامًا أو دفعة/برنامجًا.';return;}
  if(publish&&(!paymentProvider||!walletNumber)){el.textContent='أدخل وسيلة التحويل ورقم المحفظة قبل نشر الملخص للطلاب.';return;}
  if(walletNumber&&!/^[0-9+\s()-]{6,40}$/.test(walletNumber)){el.textContent='راجع رقم المحفظة؛ أدخل رقمًا صحيحًا فقط.';return;}
  const enabledBatches=[...document.querySelectorAll('#ss-manage-batches input[data-summary-batch]:checked')].map(box=>Number(box.dataset.summaryBatch));
  const enabledTypes=[...document.querySelectorAll('#ss-manage-types input[data-summary-type]:checked')].map(box=>box.dataset.summaryType);
  if(!enabledBatches.length){el.textContent='حدد جزءًا واحدًا على الأقل للبيع.';return;}if(!enabledTypes.length){el.textContent='حدد نوع سؤال واحدًا على الأقل للبيع.';return;}
  const q=await sbc.from('study_summary_questions').select('id,batch_no,question_type').eq('summary_id',id).eq('is_selected',true).eq('is_approved',true).in('batch_no',enabledBatches).in('question_type',enabledTypes);if(q.error)throw q.error;if(!(q.data||[]).length){el.textContent='لا توجد أسئلة معتمدة تطابق الأجزاء وأنواع الأسئلة المحددة.';return;}
- const payload={price,validity_days:validity,payment_provider:paymentProvider||'محفظة إلكترونية',payment_wallet_number:walletNumber||null,enabled_batches:enabledBatches,enabled_question_types:enabledTypes,available_from:new Date(fromVal).toISOString(),available_until:new Date(untilVal).toISOString(),is_published:!!publish,published_at:publish?new Date().toISOString():null,updated_at:new Date().toISOString()};
+ const payload={price,validity_days:validity,payment_provider:paymentProvider||null,payment_wallet_number:walletNumber||null,enabled_batches:enabledBatches,enabled_question_types:enabledTypes,target_all:targetAll,target_branch:targetAll?null:(targetBranch||null),target_system:targetAll?null:(targetSystem||null),target_batch:targetAll?null:(targetBatch||null),available_from:new Date(fromVal).toISOString(),available_until:new Date(untilVal).toISOString(),is_published:!!publish,published_at:publish?new Date().toISOString():null,updated_at:new Date().toISOString()};
  const result=await sbc.from('study_summaries').update(payload).eq('id',id).eq('is_approved',true);if(result.error){el.textContent='تعذر الحفظ: '+result.error.message;return;}
  el.textContent=publish?'تم نشر الملخص للطلاب ضمن وقت الإتاحة المحدد.':'تم حفظ الإعدادات فقط. لم يتم نشر الملخص للطلاب.';
  if(publish&&typeof showToast==='function')showToast('تم نشر الملخص وإتاحة تعليمات التحويل للطلاب المستهدفين.','success');
