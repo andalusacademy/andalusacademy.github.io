@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const PROJECT_URL = 'https://uvwarprsghwvrfmdaaqv.supabase.co';
-  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ1dndhcnByc2dod3ZyZm1kYWFxdjYiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc4MTI5ODM2NCwiZXhwIjoyMDk2ODczNjM0fQ.bPfXaNqmWUIM7pYU8rHfRtHNs6Z7fsZs2nf8-Vo5T7E';
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2d2FycHJzZ2h3dnJmbWRhYXF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTgzNjQsImV4cCI6MjA5Njg3NDM2NH0.bPfXaNqmWUIM7pYU8rHfRtHNs6Z7fsZs2nf8-Vo5T7E';
 
   function showError(message) {
     const box = document.getElementById('login-error');
