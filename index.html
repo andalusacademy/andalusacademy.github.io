@@ -16071,7 +16071,7 @@ async function goToPortalStudySummaries(){
         <div style="font-size:12px;color:var(--muted);margin-top:4px">${ssEsc(s.subject_name||'ملخص عام')} · ${ssEsc(s.question_count)} سؤال · صلاحية ${ssEsc(s.validity_days)} يومًا</div>
         <p style="font-size:12px;line-height:1.8;margin:8px 0">${ssEsc(s.description||'')}</p>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong style="color:#0f766e">${ssMoney(s.price)}</strong>
-        \${s.has_access?'<button class="btn btn-success btn-sm" onclick="openStudentStudySummary(\''+s.id+'\')">فتح الملخص</button>':''}\${s.pending_order?'<span class="badge badge-warning">طلبك في انتظار الدفع</span>':'<button class="btn btn-gold btn-sm" onclick="requestStudentStudySummary(\''+s.id+'\')">'+(s.has_access?'شراء مرة أخرى':'طلب شراء')+'</button>'}
+        \${s.has_access?'<button class="btn btn-success btn-sm" onclick="openStudentStudySummary(\''+s.id+'\')">فتح الملخص</button>':''}${s.pending_order?'<span class="badge badge-warning">طلبك في انتظار الدفع</span>':'<button class="btn btn-gold btn-sm" onclick="requestStudentStudySummary(\''+s.id+'\')">'+(s.has_access?'شراء مرة أخرى':'طلب شراء')+'</button>'}
         </div>
       </div>`).join(''):'<div style="text-align:center;padding:28px;color:var(--muted);border:1px dashed var(--border);border-radius:12px">لا توجد ملخصات متاحة حاليًا.</div>'}</div></section>
     <section style="margin-top:18px"><h3 style="font-size:14px;color:var(--navy);margin-bottom:8px">🧾 الطلبات التي تحتاج متابعة</h3>
