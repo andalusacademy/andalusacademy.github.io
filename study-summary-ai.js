@@ -220,7 +220,7 @@ async function refreshSummaries(){
  renderSummaryPickerCards(rows);
  const reviewSel=document.getElementById('ss-review-summary'),reviewPrevious=reviewSummaryId||reviewSel?.value||(draftId&&rows.some(x=>x.id===draftId)?draftId:'');
  if(reviewSel){reviewSel.innerHTML='<option value="">—</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.title)+' — '+esc(x.subject_name||'')+'</option>').join('');if(reviewPrevious&&rows.some(x=>x.id===reviewPrevious))reviewSel.value=reviewPrevious;else if(rows.length)reviewSel.value=rows[0].id;}
- if(reviewSel?.value)await loadReviewSummaryQuestions(reviewSel.value);
+ if(reviewSel?.value){await loadReviewSummaryQuestions(reviewSel.value);renderSummaryPickerCards(rows);}
 }
 async function loadReviewSummaryQuestions(id){
  const sbc=client(),statusEl=document.getElementById('ss-review-status');
@@ -248,6 +248,7 @@ function renderSummaryTable(rows){
  body.querySelectorAll('[data-delete-id]').forEach(b=>b.addEventListener('click',()=>hardDeleteSummary(b.dataset.deleteId)));
 }
 async function loadManageSummary(){
+ await populateTargetOptions();
  const id=document.getElementById('ss-manage-summary')?.value;if(!id)return;
  selectedSummaryId=id;const sbc=client();const {data,error}=await sbc.from('study_summaries').select('*').eq('id',id).single();if(error){document.getElementById('ss-manage-status').textContent=error.message;return;}
  document.getElementById('ss-manage-price').value=data.price??'';document.getElementById('ss-manage-validity').value=(Number(data.price||0)===0&&!data.payment_wallet_number&&!data.available_until)?'':(data.validity_days??'');
