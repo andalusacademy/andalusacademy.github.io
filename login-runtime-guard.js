@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const PROJECT_URL = 'https://uvwarprsghwvrfmdaaqv.supabase.co';
-  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2d2FycHJzZ2h3dnJmbWRhYXF2Iiwicm9sZSI6ImFub24iLCJpYXQiMTc4MTI5ODM2NCwiZXhwIjoyMDk2ODc0MzY0fQ.bPfXaNqmWUIM7pYU8rHfRtHNs6Z7fsZs2nf8-Vo5T7E';
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ1dndhcnByc2dod3ZyZm1kYWFxdjYiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc4MTI5ODM2NCwiZXhwIjoyMDk2ODczNjM0fQ.bPfXaNqmWUIM7pYU8rHfRtHNs6Z7fsZs2nf8-Vo5T7E';
 
   function showError(message) {
     const box = document.getElementById('login-error');
@@ -113,5 +113,17 @@
   script.dataset.andalusStudentPasskey = '1';
   script.onload = () => console.info('Andalus student passkey gate loaded.');
   script.onerror = () => console.warn('Student passkey gate could not be loaded; device-bound fallback remains available.');
+  document.head.appendChild(script);
+})();
+
+// Load the staged AI exam generator after the main application script.
+(function loadStagedExamGenerator() {
+  if (document.querySelector('script[data-andalus-staged-exam]')) return;
+  const script = document.createElement('script');
+  script.src = './exam-generation-stages.js?v=1';
+  script.async = false;
+  script.dataset.andalusStagedExam = '1';
+  script.onload = () => console.info('Andalus staged exam generation loaded.');
+  script.onerror = () => console.warn('Staged exam generator could not be loaded; original generator remains available.');
   document.head.appendChild(script);
 })();
