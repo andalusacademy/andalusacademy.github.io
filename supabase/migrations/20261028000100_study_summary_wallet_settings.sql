@@ -73,9 +73,10 @@ begin
     and (
       coalesce(sm.target_all, true)
       or (
-        (nullif(btrim(sm.target_branch), '') is not null and lower(btrim(sm.target_branch)) = lower(btrim(coalesce((select st.branch from public.students st where st.id = v_student_id), ''))))
-        or (nullif(btrim(sm.target_system), '') is not null and lower(btrim(sm.target_system)) = lower(btrim(coalesce((select st.system_name from public.students st where st.id = v_student_id), ''))))
-        or (nullif(btrim(sm.target_batch), '') is not null and lower(btrim(sm.target_batch)) = lower(btrim(coalesce((select st.program from public.students st where st.id = v_student_id), ''))))
+        (nullif(btrim(sm.target_branch), '') is not null or nullif(btrim(sm.target_system), '') is not null or nullif(btrim(sm.target_batch), '') is not null)
+        and (nullif(btrim(sm.target_branch), '') is null or lower(btrim(sm.target_branch)) = lower(btrim(coalesce((select st.branch from public.students st where st.id = v_student_id), ''))))
+        and (nullif(btrim(sm.target_system), '') is null or lower(btrim(sm.target_system)) = lower(btrim(coalesce((select st.system_name from public.students st where st.id = v_student_id), ''))))
+        and (nullif(btrim(sm.target_batch), '') is null or lower(btrim(sm.target_batch)) = lower(btrim(coalesce((select st.program from public.students st where st.id = v_student_id), ''))))
       )
     );
 
@@ -292,14 +293,16 @@ begin
   from public.study_summaries sm
   join public.students st on st.id = v_student_id
   where sm.is_published = true
+    and sm.is_approved = true
     and (sm.available_from is null or sm.available_from <= now())
     and (sm.available_until is null or sm.available_until > now())
     and (
       coalesce(sm.target_all, true)
       or (
-        (nullif(btrim(sm.target_branch), '') is not null and lower(btrim(sm.target_branch)) = lower(btrim(coalesce(st.branch, ''))))
-        or (nullif(btrim(sm.target_system), '') is not null and lower(btrim(sm.target_system)) = lower(btrim(coalesce(st.system_name, ''))))
-        or (nullif(btrim(sm.target_batch), '') is not null and lower(btrim(sm.target_batch)) = lower(btrim(coalesce(st.program, ''))))
+        (nullif(btrim(sm.target_branch), '') is not null or nullif(btrim(sm.target_system), '') is not null or nullif(btrim(sm.target_batch), '') is not null)
+        and (nullif(btrim(sm.target_branch), '') is null or lower(btrim(sm.target_branch)) = lower(btrim(coalesce(st.branch, ''))))
+        and (nullif(btrim(sm.target_system), '') is null or lower(btrim(sm.target_system)) = lower(btrim(coalesce(st.system_name, ''))))
+        and (nullif(btrim(sm.target_batch), '') is null or lower(btrim(sm.target_batch)) = lower(btrim(coalesce(st.program, ''))))
       )
     );
 
@@ -405,11 +408,11 @@ begin
       coalesce(sm.target_all, true)
       or exists (
         select 1 from public.students st
-        where st.id = v_student_id and (
-          (nullif(btrim(sm.target_branch), '') is not null and lower(btrim(sm.target_branch)) = lower(btrim(coalesce(st.branch, ''))))
-          or (nullif(btrim(sm.target_system), '') is not null and lower(btrim(sm.target_system)) = lower(btrim(coalesce(st.system_name, ''))))
-          or (nullif(btrim(sm.target_batch), '') is not null and lower(btrim(sm.target_batch)) = lower(btrim(coalesce(st.program, ''))))
-        )
+        where st.id = v_student_id
+          and (nullif(btrim(sm.target_branch), '') is not null or nullif(btrim(sm.target_system), '') is not null or nullif(btrim(sm.target_batch), '') is not null)
+          and (nullif(btrim(sm.target_branch), '') is null or lower(btrim(sm.target_branch)) = lower(btrim(coalesce(st.branch, ''))))
+          and (nullif(btrim(sm.target_system), '') is null or lower(btrim(sm.target_system)) = lower(btrim(coalesce(st.system_name, ''))))
+          and (nullif(btrim(sm.target_batch), '') is null or lower(btrim(sm.target_batch)) = lower(btrim(coalesce(st.program, ''))))
       )
     );
 
