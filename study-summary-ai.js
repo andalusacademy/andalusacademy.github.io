@@ -67,7 +67,7 @@ function inject(){
   document.getElementById('ss-manage-summary').addEventListener('change',loadManageSummary);
   document.getElementById('ss-manage-save').addEventListener('click',()=>saveManageSummary(false));
   document.getElementById('ss-manage-publish').addEventListener('click',()=>saveManageSummary(true));
-  const now=new Date();document.getElementById('ss-manage-from').value=localDateTime(now);document.getElementById('ss-manage-until').value=localDateTime(new Date(now.getTime()+30*86400000));
+  const now=new Date(),endToday=new Date(now);endToday.setHours(23,59,0,0);document.getElementById('ss-manage-from').value=localDateTime(now);document.getElementById('ss-manage-until').value=localDateTime(endToday);
  }
  hideLegacy();
 }
@@ -229,7 +229,7 @@ async function loadManageSummary(){
  document.getElementById('ss-manage-price').value=data.price??50;document.getElementById('ss-manage-validity').value=data.validity_days??30;
  document.getElementById('ss-manage-payment-provider').value=data.payment_provider||'محفظة إلكترونية';document.getElementById('ss-manage-wallet-number').value=data.payment_wallet_number||'';
  document.getElementById('ss-manage-from').value=data.available_from?localDateTime(new Date(data.available_from)):localDateTime(new Date());
- document.getElementById('ss-manage-until').value=data.available_until?localDateTime(new Date(data.available_until)):localDateTime(new Date(Date.now()+30*86400000));
+ const endToday=new Date();endToday.setHours(23,59,0,0);document.getElementById('ss-manage-until').value=data.available_until?localDateTime(new Date(data.available_until)):localDateTime(endToday);
  const enabledBatches=Array.isArray(data.enabled_batches)?data.enabled_batches.map(Number):[1,2];
  document.getElementById('ss-manage-batch-a').checked=enabledBatches.includes(1);
  document.getElementById('ss-manage-batch-b').checked=enabledBatches.includes(2);
