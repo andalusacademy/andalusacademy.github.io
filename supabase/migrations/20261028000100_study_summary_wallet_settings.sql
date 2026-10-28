@@ -67,8 +67,13 @@ begin
   update public.study_summary_orders set status='expired',updated_at=now()
   where student_id=v_student_id and summary_id=p_summary_id and status='pending_payment' and expires_at<=now();
   select * into v_order from public.study_summary_orders
-  where student_id=v_student_id and summary_id=p_summary_id and status='pending_payment' and expires_at>now()
+  where student_id=v_student_id and summary_id=p_summary_id and status='pending_payment' and (expires_at is null or expires_at>now())
   order by created_at desc limit 1;
+  if found and (v_order.order_code is null or v_order.expires_at is null) then
+    v_code := coalesce(v_order.order_code,'AND-SUM-' || upper(substr(replace(gen_random_uuid()::text,'-',''),1,12)));
+    update public.study_summary_orders set order_code=v_code,expires_at=coalesce(expires_at,now()+interval '24 hours'),updated_at=now()
+    where id=v_order.id returning * into v_order;
+  end if;
   if not found then
     v_code := 'AND-SUM-' || upper(substr(replace(gen_random_uuid()::text,'-',''),1,12));
     insert into public.study_summary_orders(student_id,summary_id,amount,status,payment_method,order_code,expires_at)
