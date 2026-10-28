@@ -16058,8 +16058,9 @@ async function goToPortalStudySummaries(){
   studySummaryStudentRows=data.summaries||[];
   const ordersResult=await sb.rpc('student_list_study_summary_orders',{p_session_token:studentPortalFaceToken});
   const orders=ordersResult.data?.ok?(ordersResult.data.orders||[]):[];
-  const purchasedRows=studySummaryStudentRows.filter(s=>s.has_access);
-  const availableRows=studySummaryStudentRows.filter(s=>!s.has_access);
+  const purchasedRows=studySummaryStudentRows.filter(s=>s.has_access===true || s.has_access==='true');
+  const purchasedSummaryIds=new Set(purchasedRows.map(s=>String(s.id)));
+  const availableRows=studySummaryStudentRows.filter(s=>!(s.has_access===true || s.has_access==='true') && !purchasedSummaryIds.has(String(s.id)));
   const visibleOrders=orders.filter(o=>o.status!=='paid');
   box.innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><button class="btn btn-outline btn-sm" onclick="renderStudentPortalMenu()">← رجوع</button><strong style="color:var(--navy);font-size:17px">📚 ملخصات الامتحانات الشهرية</strong></div>
@@ -16141,20 +16142,41 @@ async function renderStudentStudySummaryQuestion(){
     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-outline" style="flex:1" ${data.question_number<=1?'disabled':''} onclick="changeStudySummaryQuestion(-1)">السابق</button><button class="btn btn-gold" style="flex:1" ${data.question_number>=data.total?'disabled':''} onclick="changeStudySummaryQuestion(1)">التالي</button></div>
     <p style="font-size:10px;color:var(--muted);line-height:1.7;margin-top:10px">تُعرض الأسئلة واحدًا تلو الآخر. لا يمكن للمتصفح منع تصوير الشاشة من جهاز خارجي أو ضمان منع كل وسائل الالتقاط.</p>`;
   box.classList.add('study-summary-reader');
+  box.setAttribute('oncontextmenu','return false');
   box.oncontextmenu=e=>{e.preventDefault();return false;};
   box.oncopy=e=>{e.preventDefault();showToast('نسخ محتوى الملخص غير متاح.','error');return false;};
   box.oncut=e=>{e.preventDefault();return false;};
   box.onselectstart=e=>{e.preventDefault();return false;};
+  if(!document.getElementById('study-summary-protection-style')){
+    const style=document.createElement('style');
+    style.id='study-summary-protection-style';
+    style.textContent='.study-summary-reader{position:relative;user-select:none!important;-webkit-user-select:none!important}.study-summary-reader.study-summary-obscured{filter:blur(18px)!important;pointer-events:none!important}.study-summary-reader .study-summary-watermark{position:fixed;inset:0;z-index:999;pointer-events:none;opacity:.13;background-image:repeating-linear-gradient(-28deg,transparent 0,transparent 110px,rgba(21,34,56,.5) 111px,transparent 113px);display:flex;align-items:center;justify-content:center;color:#152238;font-size:16px;font-weight:900;letter-spacing:1px;text-align:center}';
+    document.head.appendChild(style);
+  }
+  if(!box.querySelector('.study-summary-watermark')){
+    const wm=document.createElement('div');
+    wm.className='study-summary-watermark';
+    wm.setAttribute('aria-hidden','true');
+    wm.textContent='مركز الأندلس للتدريب · '+String(unifiedPortalStudent?.name||'طالب')+' · '+String(unifiedPortalStudent?.id||'');
+    box.appendChild(wm);
+  }
   if(!window.__studySummaryProtectionInstalled){
     window.__studySummaryProtectionInstalled=true;
+    const obscure=()=>{const reader=document.getElementById('student-portal-content');if(reader?.classList.contains('study-summary-reader'))reader.classList.add('study-summary-obscured');};
+    const reveal=()=>{const reader=document.getElementById('student-portal-content');if(reader?.classList.contains('study-summary-reader')&&document.visibilityState==='visible'&&document.hasFocus())reader.classList.remove('study-summary-obscured');};
+    window.addEventListener('blur',obscure,true);
+    window.addEventListener('focus',reveal,true);
+    document.addEventListener('visibilitychange',()=>document.hidden?obscure():reveal(),true);
     document.addEventListener('keydown',e=>{
       const reader=document.getElementById('student-portal-content');
       if(!reader?.classList.contains('study-summary-reader'))return;
       const k=(e.key||'').toLowerCase();
       if((e.ctrlKey||e.metaKey)&&['c','x','s','p','u','a'].includes(k)){e.preventDefault();e.stopPropagation();showToast('هذا الإجراء غير متاح أثناء عرض الملخص.','error');}
-      if(e.key==='PrintScreen'){e.preventDefault();}
+      if(e.key==='PrintScreen'||((e.shiftKey)&&(e.metaKey||e.ctrlKey)&&k==='s')){e.preventDefault();e.stopPropagation();obscure();setTimeout(reveal,1800);}
     },true);
     document.addEventListener('contextmenu',e=>{const reader=document.getElementById('student-portal-content');if(reader?.classList.contains('study-summary-reader')&&reader.contains(e.target)){e.preventDefault();}},true);
+    window.addEventListener('beforeprint',obscure,true);
+    window.addEventListener('afterprint',reveal,true);
   }
 }
 async function changeStudySummaryQuestion(delta){
