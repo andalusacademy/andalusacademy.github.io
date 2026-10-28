@@ -57,9 +57,9 @@ function inject(){
   '<div style="padding:18px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">'+
   '<div class="form-group" style="grid-column:1/-1"><label>اختر ملخصًا تم اعتماده</label><select id="ss-manage-summary" class="search-input" style="width:100%"><option value="">اختر الملخص</option></select></div>'+
   '<div class="form-group"><label>السعر بالجنيه</label><input id="ss-manage-price" type="number" min="0" step="0.01" value="" class="search-input" style="width:100%" placeholder="أدخل السعر"></div>'+
-  '<div class="form-group"><label>وسيلة التحويل</label><input id="ss-manage-payment-provider" type="text" maxlength="80" value="محفظة إلكترونية" class="search-input" style="width:100%" placeholder="مثال: محفظة إلكترونية"></div>'+
+  '<div class="form-group"><label>وسيلة التحويل</label><input id="ss-manage-payment-provider" type="text" maxlength="80" value="" class="search-input" style="width:100%" placeholder="اكتب وسيلة التحويل"></div>'+
   '<div class="form-group"><label>رقم المحفظة المستقبِلة</label><input id="ss-manage-wallet-number" type="text" inputmode="tel" maxlength="40" class="search-input" style="width:100%" placeholder="أدخل رقم المحفظة قبل النشر"></div>'+
-  '<div class="form-group"><label>مدة صلاحية الطالب بعد الشراء (بالأيام)</label><input id="ss-manage-validity" type="number" min="1" max="3650" value="30" class="search-input" style="width:100%"></div>'+
+  '<div class="form-group"><label>مدة صلاحية الطالب بعد الشراء (بالأيام)</label><input id="ss-manage-validity" type="number" min="1" max="3650" value="" class="search-input" style="width:100%"></div>'+
   '<div class="form-group"><label>بداية الإتاحة للشراء</label><input id="ss-manage-from" type="datetime-local" class="search-input" style="width:100%"></div>'+
   '<div class="form-group"><label>نهاية الإتاحة للشراء</label><input id="ss-manage-until" type="datetime-local" class="search-input" style="width:100%"></div>'+
   '<div class="form-group" style="grid-column:1/-1"><label>الأجزاء المتاحة للطالب</label><div id="ss-manage-batches" style="display:flex;gap:12px;flex-wrap:wrap;padding:10px;border:1px solid var(--border);border-radius:8px">احفظ جزءًا واحدًا على الأقل أولًا</div><small style="display:block;color:var(--muted);margin-top:5px">حدد الأجزاء التي تريد بيعها داخل هذا المنتج.</small></div>'+
@@ -225,9 +225,9 @@ function renderSummaryTable(rows){
 async function loadManageSummary(){
  const id=document.getElementById('ss-manage-summary')?.value;if(!id)return;
  selectedSummaryId=id;const sbc=client();const {data,error}=await sbc.from('study_summaries').select('*').eq('id',id).single();if(error){document.getElementById('ss-manage-status').textContent=error.message;return;}
- document.getElementById('ss-manage-price').value=data.price??'';document.getElementById('ss-manage-validity').value=data.validity_days??30;
- document.getElementById('ss-manage-payment-provider').value=data.payment_provider||'محفظة إلكترونية';document.getElementById('ss-manage-wallet-number').value=data.payment_wallet_number||'';
- document.getElementById('ss-manage-from').value=data.available_from?localDateTime(new Date(data.available_from)):localDateTime(new Date());
+ document.getElementById('ss-manage-price').value=data.price??'';document.getElementById('ss-manage-validity').value=(Number(data.price||0)===0&&!data.payment_wallet_number&&!data.available_until)?'':(data.validity_days??'');
+ document.getElementById('ss-manage-payment-provider').value=data.payment_provider||'';document.getElementById('ss-manage-wallet-number').value=data.payment_wallet_number||'';
+ document.getElementById('ss-manage-from').value=data.available_from?localDateTime(new Date(data.available_from)):'';
  document.getElementById('ss-manage-until').value=data.available_until?localDateTime(new Date(data.available_until)):'';
  const enabledBatches=Array.isArray(data.enabled_batches)?data.enabled_batches.map(Number):[];
  const batchQuery=await sbc.from('study_summary_questions').select('batch_no').eq('summary_id',id).eq('is_selected',true).eq('is_approved',true).order('batch_no');
