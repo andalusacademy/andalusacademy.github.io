@@ -16017,31 +16017,29 @@ async function loadStudySummaryOrdersAdmin(){
 async function reviewStudySummaryOrder(orderId,nextStatus){
   const order=studySummaryOrderRows.find(o=>o.id===orderId);if(!order)return;
   if(nextStatus==='paid'&&!String(order.payment_reference||'').trim()){showToast('لا يمكن تأكيد الدفع قبل أن يرسل الطالب رقم معاملة التحويل.','error');return;}
-  const labels={paid:'تأكيد الدفع ومنح الطالب صلاحية الملخص',pending_payment:'تسجيل أن الدفع لم يتم بعد',cancelled:'إلغاء طلب الشراء',rejected:'رفض طلب الشراء'};
+  const labels={paid:'تأكيد الدفع ومنح الطالب صلاحية الملخص أو الباقة كاملة',pending_payment:'تسجيل أن الدفع لم يتم بعد',cancelled:'إلغاء طلب الشراء',rejected:'رفض طلب الشراء'};
   if(!confirm(labels[nextStatus]+'؟'))return;
-  const summary=studySummaryAdminRows.find(s=>s.id===order.summary_id);
   if(nextStatus==='paid'){
     const {data:reviewQuestions,error:reviewError}=await sb.from('study_summary_questions').select('id,is_approved,is_selected').eq('summary_id',order.summary_id);
     if(reviewError){showToast('تعذر فحص أسئلة الملخص: '+reviewError.message,'error');return;}
-    const chosenQuestions=(reviewQuestions||[]).filter(q=>q.is_selected);if(!chosenQuestions.length||chosenQuestions.some(q=>!q.is_approved)){showToast('لا يمكن إتاحة الملخص قبل اعتماد الأسئلة التي تم اختيارها للملخص.','error');return;}
-  }
-  const reviewedBy=(typeof currentAuth!=='undefined'&&currentAuth?.id)?currentAuth.id:null;
-  const {error:updateError}=await sb.from('study_summary_orders').update({status:nextStatus,reviewed_by:reviewedBy,reviewed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',orderId);
-  if(updateError){showToast('تعذر تحديث الطلب: '+updateError.message,'error');return;}
-  if(nextStatus==='paid'){
-    if(!summary){await sb.from('study_summary_orders').update({status:'pending_payment'}).eq('id',orderId);showToast('الملخص المرتبط بالطلب غير موجود؛ لم تُمنح الصلاحية.','error');return;}
-    const {data:existing,error:checkError}=await sb.from('study_summary_entitlements').select('id').eq('order_id',orderId).is('revoked_at',null).limit(1);
-    if(checkError){await sb.from('study_summary_orders').update({status:'pending_payment'}).eq('id',orderId);showToast('تعذر فحص صلاحية الطالب: '+checkError.message,'error');return;}
-    if(!existing?.length){
-      const now=new Date(),expires=new Date(now.getTime()+Math.max(1,Number(summary.validity_days)||30)*86400000);
-      const {error:grantError}=await sb.from('study_summary_entitlements').insert({student_id:order.student_id,summary_id:order.summary_id,order_id:orderId,starts_at:now.toISOString(),expires_at:expires.toISOString()});
-      if(grantError){await sb.from('study_summary_orders').update({status:'pending_payment'}).eq('id',orderId);showToast('تم حفظ حالة الطلب جزئيًا لكن تعذر منح الصلاحية: '+grantError.message,'error');return;}
+    const chosenQuestions=(reviewQuestions||[]).filter(q=>q.is_selected);
+    if(!chosenQuestions.length||chosenQuestions.some(q=>!q.is_approved)){
+      const {data:packageItems}=await sb.from('study_summary_package_items').select('summary_id').eq('package_id',(await sb.from('study_summary_package_items').select('package_id').eq('summary_id',order.summary_id).maybeSingle()).data?.package_id||'00000000-0000-0000-0000-000000000000');
+      let packageReady=true;
+      if(packageItems?.length){
+        for(const item of packageItems){
+          const {data:qs,error:qerr}=await sb.from('study_summary_questions').select('id,is_approved,is_selected').eq('summary_id',item.summary_id);
+          if(qerr){showToast('تعذر فحص أسئلة الباقة: '+qerr.message,'error');return;}
+          const chosen=(qs||[]).filter(q=>q.is_selected);
+          if(!chosen.length||chosen.some(q=>!q.is_approved)){packageReady=false;break;}
+        }
+      }else packageReady=false;
+      if(!packageReady){showToast('لا يمكن إتاحة الملخص/الباقة قبل اعتماد جميع الأسئلة المختارة.','error');return;}
     }
-  }else if(nextStatus==='cancelled'||nextStatus==='rejected'||nextStatus==='pending_payment'){
-    const {error:revokeError}=await sb.from('study_summary_entitlements').update({revoked_at:new Date().toISOString()}).eq('order_id',orderId).is('revoked_at',null);
-    if(revokeError){showToast('تم تحديث الطلب لكن تعذر إلغاء الصلاحية السابقة: '+revokeError.message,'error');}
   }
-  showToast(nextStatus==='paid'?'تم تأكيد الدفع وإتاحة الملخص للطالب.':nextStatus==='pending_payment'?'تم تسجيل أن الدفع لم يتم.':nextStatus==='cancelled'?'تم إلغاء الطلب.':'تم رفض الطلب.','success');
+  const {data,error}=await sb.rpc('admin_review_study_summary_order',{p_order_id:orderId,p_status:nextStatus,p_reason:null});
+  if(error){showToast('تعذر مراجعة الطلب: '+error.message,'error');return;}
+  showToast(nextStatus==='paid'?'تم تأكيد الدفع وإتاحة جميع أجزاء الباقة للطالب.':nextStatus==='pending_payment'?'تم تسجيل أن الدفع لم يتم.':nextStatus==='cancelled'?'تم إلغاء الطلب.':'تم رفض الطلب.','success');
   await loadStudySummaryOrdersAdmin();
 }
 
