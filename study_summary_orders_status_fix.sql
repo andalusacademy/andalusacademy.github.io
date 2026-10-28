@@ -109,3 +109,55 @@ BEGIN
   END IF;
 END;
 $function$;
+
+-- The INSERT trigger previously forced status='pending' (not allowed by the
+-- CHECK constraint) and required a transfer reference before the student could
+-- even create an order. The reference belongs to the later submission step.
+CREATE OR REPLACE FUNCTION public.validate_study_summary_order()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $function$
+DECLARE
+  v_price numeric;
+  v_package_id uuid;
+BEGIN
+  SELECT pi.package_id INTO v_package_id
+  FROM public.study_summary_package_items pi
+  WHERE pi.summary_id = NEW.summary_id
+  LIMIT 1;
+
+  IF v_package_id IS NOT NULL THEN
+    SELECT p.price INTO v_price
+    FROM public.study_summary_packages p
+    WHERE p.id = v_package_id AND p.is_active = true;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'الباقة غير متاحة للشراء';
+    END IF;
+  ELSE
+    SELECT s.price INTO v_price
+    FROM public.study_summaries s
+    WHERE s.id = NEW.summary_id
+      AND s.is_published = true
+      AND s.is_approved = true
+      AND (s.available_from IS NULL OR s.available_from <= now())
+      AND (s.available_until IS NULL OR s.available_until > now());
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'الملخص غير متاح للشراء';
+    END IF;
+  END IF;
+
+  -- Price is calculated server-side; never trust a client-supplied amount.
+  NEW.amount := v_price;
+  NEW.status := 'pending_payment';
+  NEW.payment_method := coalesce(nullif(trim(NEW.payment_method), ''), 'manual_transfer');
+
+  -- A transaction reference is intentionally optional at order creation.
+  -- It is recorded later by student_submit_study_summary_payment_reference.
+  NEW.payment_reference := nullif(trim(coalesce(NEW.payment_reference, '')), '');
+  NEW.payment_number := nullif(trim(coalesce(NEW.payment_number, '')), '');
+
+  RETURN NEW;
+END;
+$function$;
