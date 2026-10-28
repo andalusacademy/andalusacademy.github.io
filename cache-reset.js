@@ -1,1 +1,1 @@
-(()=>{try{if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))).catch(()=>{});}if('caches' in window){caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).catch(()=>{});}}catch(_){} })();
+(()=>{try{if(!('caches' in window))return;caches.keys().then(keys=>Promise.all(keys.filter(k=>k!=='andalus-v29-direct-student-portal').map(k=>caches.delete(k)))).catch(()=>{});}catch(_){} })();
