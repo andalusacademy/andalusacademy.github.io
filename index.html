@@ -16041,6 +16041,8 @@ async function reviewStudySummaryOrder(orderId,nextStatus){
 }
 
 async function goToPortalStudySummaries(){
+  const currentBox=document.getElementById('student-portal-content');
+  if(currentBox){currentBox.classList.remove('study-summary-reader');currentBox.oncontextmenu=null;currentBox.oncopy=null;currentBox.oncut=null;currentBox.onselectstart=null;}
   if(!unifiedPortalStudent||!studentPortalFaceToken){
     showToast('انتهت جلسة التحقق؛ سجّل الدخول وتحقق من الوجه مرة أخرى','error');
     showStudentPortalLoginStep();return;
@@ -16056,10 +16058,14 @@ async function goToPortalStudySummaries(){
   studySummaryStudentRows=data.summaries||[];
   const ordersResult=await sb.rpc('student_list_study_summary_orders',{p_session_token:studentPortalFaceToken});
   const orders=ordersResult.data?.ok?(ordersResult.data.orders||[]):[];
+  const purchasedRows=studySummaryStudentRows.filter(s=>s.has_access);
+  const availableRows=studySummaryStudentRows.filter(s=>!s.has_access);
+  const visibleOrders=orders.filter(o=>o.status!=='paid');
   box.innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><button class="btn btn-outline btn-sm" onclick="renderStudentPortalMenu()">← رجوع</button><strong style="color:var(--navy);font-size:17px">📚 ملخصات الامتحانات الشهرية</strong></div>
     <p style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:14px">تصفح الملخصات المتاحة واطلب شراء الملخص. الإدارة تراجع الدفع يدويًا، ولن يُفتح الملخص إلا بعد تأكيد الدفع ومنح الصلاحية.</p>
-    <div style="display:grid;gap:12px">${studySummaryStudentRows.length?studySummaryStudentRows.map(s=>`
+    <section style="margin-bottom:20px"><h3 style="font-size:15px;color:var(--navy);margin:0 0 10px">📖 ملخصاتي المتاحة (${purchasedRows.length})</h3><div style="display:grid;gap:10px">${purchasedRows.length?purchasedRows.map(s=>`<div style="border:1px solid #bbf7d0;border-radius:12px;padding:14px;background:#f0fdf4"><div style="font-weight:900;color:var(--navy);font-size:15px">${ssEsc(s.title)}</div><div style="font-size:12px;color:var(--muted);margin-top:4px">${ssEsc(s.subject_name||'ملخص عام')} · ${ssEsc(s.question_count)} سؤال · الصلاحية ${ssEsc(s.validity_days)} يومًا</div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px"><span style="font-size:12px;color:#15803d;font-weight:800">✓ تم الشراء — متاح للعرض</span><button class="btn btn-success btn-sm" onclick="openStudentStudySummary('${s.id}')">فتح الملخص كاملًا</button></div></div>`).join(''):'<div style="text-align:center;padding:18px;color:var(--muted);border:1px dashed var(--border);border-radius:12px">لا توجد ملخصات مشتراة ومفعّلة حتى الآن.</div>'}</div></section>
+    <section style="margin-bottom:20px"><h3 style="font-size:15px;color:var(--navy);margin:0 0 10px">🛍️ ملخصات متاحة للشراء</h3><div style="display:grid;gap:12px">${availableRows.length?availableRows.map(s=>`
       <div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff">
         <div style="font-weight:900;color:var(--navy);font-size:15px">${ssEsc(s.title)}</div>
         <div style="font-size:12px;color:var(--muted);margin-top:4px">${ssEsc(s.subject_name||'ملخص عام')} · ${ssEsc(s.question_count)} سؤال · صلاحية ${ssEsc(s.validity_days)} يومًا</div>
@@ -16069,7 +16075,7 @@ async function goToPortalStudySummaries(){
         </div>
       </div>`).join(''):'<div style="text-align:center;padding:28px;color:var(--muted);border:1px dashed var(--border);border-radius:12px">لا توجد ملخصات متاحة حاليًا.</div>'}</div>
     <div style="margin-top:18px"><h3 style="font-size:14px;color:var(--navy);margin-bottom:8px">🧾 طلباتي</h3>
-    ${orders.length?orders.map(o=>{const labels={pending_payment:'بانتظار مراجعة التحويل',paid:'تم الدفع — الملخص متاح لك',cancelled:'تم إلغاء الطلب',rejected:'تم رفض الطلب',expired:'انتهت مهلة الطلب'};const color=o.status==='paid'?'#15803d':o.status==='rejected'?'#b91c1c':o.status==='cancelled'||o.status==='expired'?'#64748b':'#b45309';return '<div style="border-bottom:1px solid var(--border);padding:12px 0;font-size:12px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span>'+ssEsc(o.summary_title)+' · كود الطلب <code>'+ssEsc(o.order_code||o.order_number||ssOrderNumber(o.id))+'</code></span><strong>'+ssMoney(o.amount)+' — <span style="color:'+color+'">'+ssEsc(o.status==='pending_payment'?(o.payment_reference?'تم إرسال بيانات التحويل — بانتظار مراجعة الإدارة':'بانتظار التحويل وإرسال مرجع العملية'):(labels[o.status]||o.status))+'</span></strong></div>'+(o.status==='pending_payment'?'<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;line-height:1.9"><strong>تعليمات التحويل</strong><div>الوسيلة: '+ssEsc(o.payment_provider||'محفظة إلكترونية')+'</div><div>حوّل المبلغ إلى: <strong>'+ssEsc(o.payment_wallet_number||'رقم المحفظة غير متاح؛ تواصل مع الإدارة')+'</strong></div><div>اكتب كود الطلب في رسالة التحويل أو مرجع العملية: <strong>'+ssEsc(o.order_code||o.order_number||ssOrderNumber(o.id))+'</strong></div><label style="display:block;margin-top:8px">رقم/مرجع التحويل</label><input id="ss-payment-reference-'+ssEsc(o.id)+'" class="search-input" maxlength="120" value="'+ssEsc(o.payment_reference||'')+'" placeholder="اكتب رقم العملية بعد التحويل" style="width:100%;margin:4px 0 4px"><div style="font-size:11px;color:#64748b;line-height:1.9;margin:0 0 10px">ما رقم المعاملة؟ هو الرقم الذي يظهر في تفاصيل التحويل أو الإيصال بعد إرسال الفلوس، وقد يسمى رقم العملية أو Transaction ID أو Reference Number. لا تكتب كود طلب الشراء هنا؛ كود الطلب هو الكود الظاهر أعلى الطلب، أما رقم المعاملة فتجده داخل تطبيق المحفظة في تفاصيل العملية الناجحة. إذا لم يظهر لك رقم معاملة، راجع تفاصيل الإيصال أو تواصل مع دعم وسيلة الدفع. إرسال الرقم لا يعني تأكيد الدفع تلقائيًا؛ الإدارة ستراجع وصول المبلغ.</div><button class="btn btn-gold btn-sm" onclick="submitStudySummaryPaymentReference(\''+ssEsc(o.id)+'\')">'+(o.payment_reference?'تحديث مرجع التحويل':'تم التحويل — إرسال للمراجعة')+'</button><div style="color:#92400e;margin-top:5px">لن يفتح الملخص إلا بعد مراجعة الإدارة وتأكيد وصول المبلغ.</div></div>':'')+'</div>';}).join(''):'<div style="font-size:12px;color:var(--muted)">لا توجد طلبات حتى الآن.</div>'}</div>`;
+    ${visibleOrders.length?visibleOrders.map(o=>{const labels={pending_payment:'بانتظار مراجعة التحويل',paid:'تم الدفع — الملخص متاح لك',cancelled:'تم إلغاء الطلب',rejected:'تم رفض الطلب',expired:'انتهت مهلة الطلب'};const color=o.status==='paid'?'#15803d':o.status==='rejected'?'#b91c1c':o.status==='cancelled'||o.status==='expired'?'#64748b':'#b45309';return '<div style="border-bottom:1px solid var(--border);padding:12px 0;font-size:12px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span>'+ssEsc(o.summary_title)+' · كود الطلب <code>'+ssEsc(o.order_code||o.order_number||ssOrderNumber(o.id))+'</code></span><strong>'+ssMoney(o.amount)+' — <span style="color:'+color+'">'+ssEsc(o.status==='pending_payment'?(o.payment_reference?'تم إرسال بيانات التحويل — بانتظار مراجعة الإدارة':'بانتظار التحويل وإرسال مرجع العملية'):(labels[o.status]||o.status))+'</span></strong></div>'+(o.status==='pending_payment'?'<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;line-height:1.9"><strong>تعليمات التحويل</strong><div>الوسيلة: '+ssEsc(o.payment_provider||'محفظة إلكترونية')+'</div><div>حوّل المبلغ إلى: <strong>'+ssEsc(o.payment_wallet_number||'رقم المحفظة غير متاح؛ تواصل مع الإدارة')+'</strong></div><div>اكتب كود الطلب في رسالة التحويل أو مرجع العملية: <strong>'+ssEsc(o.order_code||o.order_number||ssOrderNumber(o.id))+'</strong></div><label style="display:block;margin-top:8px">رقم/مرجع التحويل</label><input id="ss-payment-reference-'+ssEsc(o.id)+'" class="search-input" maxlength="120" value="'+ssEsc(o.payment_reference||'')+'" placeholder="اكتب رقم العملية بعد التحويل" style="width:100%;margin:4px 0 4px"><div style="font-size:11px;color:#64748b;line-height:1.9;margin:0 0 10px">ما رقم المعاملة؟ هو الرقم الذي يظهر في تفاصيل التحويل أو الإيصال بعد إرسال الفلوس، وقد يسمى رقم العملية أو Transaction ID أو Reference Number. لا تكتب كود طلب الشراء هنا؛ كود الطلب هو الكود الظاهر أعلى الطلب، أما رقم المعاملة فتجده داخل تطبيق المحفظة في تفاصيل العملية الناجحة. إذا لم يظهر لك رقم معاملة، راجع تفاصيل الإيصال أو تواصل مع دعم وسيلة الدفع. إرسال الرقم لا يعني تأكيد الدفع تلقائيًا؛ الإدارة ستراجع وصول المبلغ.</div><button class="btn btn-gold btn-sm" onclick="submitStudySummaryPaymentReference(\''+ssEsc(o.id)+'\')">'+(o.payment_reference?'تحديث مرجع التحويل':'تم التحويل — إرسال للمراجعة')+'</button><div style="color:#92400e;margin-top:5px">لن يفتح الملخص إلا بعد مراجعة الإدارة وتأكيد وصول المبلغ.</div></div>':'')+'</div>';}).join(''):'<div style="font-size:12px;color:var(--muted)">لا توجد طلبات حتى الآن.</div>'}</div>`;
 }
 async function requestStudentStudySummary(id){
   const s=studySummaryStudentRows.find(x=>x.id===id);if(!s)return;
@@ -16125,7 +16131,23 @@ async function renderStudentStudySummaryQuestion(){
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-outline" style="flex:1" ${data.question_number<=1?'disabled':''} onclick="changeStudySummaryQuestion(-1)">السابق</button><button class="btn btn-gold" style="flex:1" ${data.question_number>=data.total?'disabled':''} onclick="changeStudySummaryQuestion(1)">التالي</button></div>
-    <p style="font-size:10px;color:var(--muted);line-height:1.7;margin-top:10px">تُعرض الأسئلة واحدًا تلو الآخر. قد لا تمنع إعدادات المتصفح التقاط الشاشة أو التصوير الخارجي.</p>`;
+    <p style="font-size:10px;color:var(--muted);line-height:1.7;margin-top:10px">تُعرض الأسئلة واحدًا تلو الآخر. لا يمكن للمتصفح منع تصوير الشاشة من جهاز خارجي أو ضمان منع كل وسائل الالتقاط.</p>`;
+  box.classList.add('study-summary-reader');
+  box.oncontextmenu=e=>{e.preventDefault();return false;};
+  box.oncopy=e=>{e.preventDefault();showToast('نسخ محتوى الملخص غير متاح.','error');return false;};
+  box.oncut=e=>{e.preventDefault();return false;};
+  box.onselectstart=e=>{e.preventDefault();return false;};
+  if(!window.__studySummaryProtectionInstalled){
+    window.__studySummaryProtectionInstalled=true;
+    document.addEventListener('keydown',e=>{
+      const reader=document.getElementById('student-portal-content');
+      if(!reader?.classList.contains('study-summary-reader'))return;
+      const k=(e.key||'').toLowerCase();
+      if((e.ctrlKey||e.metaKey)&&['c','x','s','p','u','a'].includes(k)){e.preventDefault();e.stopPropagation();showToast('هذا الإجراء غير متاح أثناء عرض الملخص.','error');}
+      if(e.key==='PrintScreen'){e.preventDefault();}
+    },true);
+    document.addEventListener('contextmenu',e=>{const reader=document.getElementById('student-portal-content');if(reader?.classList.contains('study-summary-reader')&&reader.contains(e.target)){e.preventDefault();}},true);
+  }
 }
 async function changeStudySummaryQuestion(delta){
   if(!studySummaryActive)return;
