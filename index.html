@@ -13243,12 +13243,11 @@ async function loadCompetitionIdentityAdmin() {
 async function resetStudentFaceEnrollment(studentId, enrollmentNumber) {
   if (!currentUser || currentUser.role !== 'admin') { showToast('إعادة ضبط تسجيل الوجه متاحة للمدير فقط','error'); return; }
   if (!studentId) { showToast('لا يوجد معرّف طالب صالح لإعادة الضبط','error'); return; }
-  if (!confirm('تأكيد إعادة ضبط تسجيل الوجه للطالب رقم '+(enrollmentNumber || studentId)+'؟\nسيتم إلغاء التسجيل النشط والجلسات فقط، مع الاحتفاظ بسجل المحاولات والصور القديمة.')) return;
+  if (!confirm('تأكيد إعادة ضبط تسجيل الوجه للطالب رقم '+(enrollmentNumber || studentId)+'؟\nسيتم إلغاء التسجيل النشط وجلسات التحقق فقط، مع الاحتفاظ بسجل المحاولات والصور القديمة.')) return;
   try {
-    const { error: enrollError } = await sb.from('competition_face_enrollments').update({active:false, face_descriptor:null, updated_at:new Date().toISOString()}).eq('student_id', String(studentId));
-    if (enrollError) throw enrollError;
-    const { error: sessionsError } = await sb.from('competition_face_verified_sessions').delete().eq('student_id', String(studentId));
-    if (sessionsError) throw sessionsError;
+    const { data, error } = await sb.rpc('admin_reset_student_face_enrollment', { p_student_id: String(studentId) });
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.reason === 'student_not_found' ? 'الطالب غير موجود' : 'تعذر إعادة ضبط تسجيل الوجه');
     await logActivity('edit','إعادة ضبط تسجيل الوجه للطالب رقم '+(enrollmentNumber || studentId));
     await loadCompetitionIdentityAdmin();
     showToast('تمت إعادة ضبط تسجيل الوجه؛ سيحتاج الطالب إلى التسجيل من جديد.');
@@ -13260,10 +13259,9 @@ async function resetAllStudentFaceEnrollments() {
   if (typed !== 'RESET ALL') { if (typed !== null) showToast('لم يتم إجراء أي تغيير'); return; }
   if (!confirm('تأكيد نهائي: إلغاء كل تسجيلات الوجه النشطة وجلسات التحقق؟ لن تُحذف المحاولات أو الصور القديمة ولن تتغير كلمات المرور أو بيانات الطلاب.')) return;
   try {
-    const { error: enrollError } = await sb.from('competition_face_enrollments').update({active:false, face_descriptor:null, updated_at:new Date().toISOString()}).eq('active', true);
-    if (enrollError) throw enrollError;
-    const { error: sessionsError } = await sb.from('competition_face_verified_sessions').delete().gte('created_at','1970-01-01T00:00:00Z');
-    if (sessionsError) throw sessionsError;
+    const { data, error } = await sb.rpc('admin_reset_all_student_face_enrollments');
+    if (error) throw error;
+    if (!data?.ok) throw new Error('تعذر إعادة الضبط الجماعي');
     await logActivity('edit','إعادة ضبط تسجيلات الوجه لجميع الطلاب');
     await loadCompetitionIdentityAdmin();
     showToast('تمت إعادة ضبط تسجيلات الوجه النشطة وجلسات التحقق لجميع الطلاب.');
