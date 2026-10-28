@@ -30,11 +30,12 @@ function inject(){
   '<div class="form-group"><label><input id="ss-ai-essay-enabled" type="checkbox"> مقالي</label><input id="ss-ai-essay-count" class="search-input" type="number" min="1" max="100" placeholder="عدد الأسئلة المقالية" style="width:100%" disabled></div>'+
   '<div class="form-group" style="grid-column:1/-1"><label>ملف المادة PDF (ارفعه في الجزء الأول فقط)</label><input id="ss-ai-pdf" class="search-input" type="file" accept="application/pdf,.pdf" style="width:100%"><div id="ss-ai-file-info" style="margin-top:6px;color:var(--muted);font-size:12px"></div></div>'+
   '<div class="form-group" style="grid-column:1/-1"><label>وصف الملخص (اختياري)</label><textarea id="ss-ai-description" class="search-input" maxlength="3000" placeholder="وصف مختصر للمادة" style="width:100%;min-height:65px"></textarea></div></div>'+
-  '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" id="ss-ai-generate-btn" type="button">⬆️ حفظ المادة وتوليد الأسئلة</button></div>'+
+  '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" id="ss-ai-generate-btn" type="button">⬆️ حفظ المادة وتوليد الأسئلة</button><button class="btn btn-outline" id="ss-ai-new-btn" type="button">＋ ملخص جديد</button></div>'+
   '<div id="ss-ai-status" style="margin-top:12px"></div><div style="margin-top:8px;font-size:12px;color:var(--muted)">كل ضغطة تولّد جزءًا جديدًا مستقلًا وتحفظه فورًا. اختر نوعًا واحدًا أو أكثر وحدد عدد أسئلة كل نوع. يمكنك رفع المادة مرة واحدة ثم توليد أجزاء أخرى منها.</div></div>';
   const anchor=page.querySelector('.card');if(anchor)anchor.insertAdjacentElement('beforebegin',card);else page.prepend(card);
   document.getElementById('ss-ai-pdf').addEventListener('change',e=>{const f=e.target.files?.[0];document.getElementById('ss-ai-file-info').textContent=f?'📄 '+f.name+' — '+(f.size/1024/1024).toFixed(2)+' MB':'';});
   document.getElementById('ss-ai-generate-btn').addEventListener('click',generate);
+  document.getElementById('ss-ai-new-btn').addEventListener('click',startNewSummary);
   [['ss-ai-mc-enabled','ss-ai-mc-count'],['ss-ai-tf-enabled','ss-ai-tf-count'],['ss-ai-essay-enabled','ss-ai-essay-count']].forEach(([check,count])=>{const box=document.getElementById(check),input=document.getElementById(count);box.addEventListener('change',()=>{input.disabled=!box.checked;if(!box.checked)input.value='';else input.focus();});});
  }
  if(!document.getElementById('ss-question-review-card')){
@@ -42,10 +43,11 @@ function inject(){
   card.innerHTML='<div class="card-header"><h3>📝 ٢) مراجعة الأسئلة والإجابات ومصادر الصفحات</h3><span id="ss-question-counts" style="font-size:12px;color:var(--muted)">ارفع المادة أولًا</span></div>'+
   '<div style="padding:16px"><div class="form-group" style="margin-bottom:12px"><label>الملخصات المسجلة — افتح أي ملخص لمراجعة أسئلته</label><div id="ss-review-summary-cards" style="display:grid;gap:10px;margin:10px 0"></div><select id="ss-review-summary" class="search-input" style="display:none;width:100%"><option value="">—</option></select><div id="ss-review-status" style="font-size:12px;color:var(--muted);margin-top:6px"></div><div class="form-group" style="margin-top:10px"><label>عرض جزء الأسئلة</label><select id="ss-review-batch" class="search-input" style="width:100%"><option value="all">كل الأجزاء</option></select></div><button class="btn btn-outline btn-sm" id="ss-select-all-questions" type="button" style="margin-top:10px">☑️ تحديد كل الأسئلة</button></div><div id="ss-generated-list"><p style="color:var(--muted)">اختر ملخصًا لعرض أسئلته وإجاباته ومصادر الصفحات. هذه الشاشة إدارية فقط.</p></div>'+
   '<div style="margin:24px 0 12px;border-top:3px solid #c9a24c;padding-top:16px"><h3 style="margin-bottom:8px">⭐ الأسئلة التي اخترتها للملخص</h3><p style="color:var(--muted);font-size:12px;margin-bottom:12px">أي سؤال تعلّم عليه فوق ينتقل إلى هذه القائمة تلقائيًا.</p><div id="ss-selected-list"><p style="color:var(--muted)">لم تحدد أسئلة بعد.</p></div></div>'+
-  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-gold" id="ss-approve-summary-btn" disabled>✅ اعتماد الأسئلة المحددة والملخص بالكامل</button><button class="btn btn-outline" id="ss-export-questions-pdf-btn" type="button" disabled>📄 تصدير PDF</button><button class="btn btn-outline" id="ss-export-questions-word-btn" type="button" disabled>📝 تصدير Word</button></div><div id="ss-approve-status" style="margin-top:12px"></div></div>';
+  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-gold" id="ss-approve-summary-btn" disabled>✅ اعتماد الأسئلة المحددة</button><button class="btn btn-primary" id="ss-approve-all-summary-btn" type="button" disabled>🏅 اعتماد الملخص بالكامل (كل الأسئلة)</button><button class="btn btn-outline" id="ss-export-questions-pdf-btn" type="button" disabled>📄 تصدير PDF</button><button class="btn btn-outline" id="ss-export-questions-word-btn" type="button" disabled>📝 تصدير Word</button></div><div id="ss-approve-status" style="margin-top:12px"></div></div>';
   document.getElementById('ss-ai-generator-card').insertAdjacentElement('afterend',card);
   card.addEventListener('change',e=>{const box=e.target.closest('input[data-question-id]');if(!box)return;const id=box.dataset.questionId;if(box.checked)selectedIds.add(id);else selectedIds.delete(id);renderQuestionLists();});
   document.getElementById('ss-approve-summary-btn').addEventListener('click',approveSelected);
+  document.getElementById('ss-approve-all-summary-btn').addEventListener('click',approveAllSummaryQuestions);
   document.getElementById('ss-select-all-questions').addEventListener('click',()=>{if(reviewReadOnly)return;const visible=allQuestions.filter(q=>activeBatch==='all'||Number(q.batch_no)===Number(activeBatch));const allPicked=visible.length>0&&visible.every(q=>selectedIds.has(q.id));if(allPicked)visible.forEach(q=>selectedIds.delete(q.id));else visible.forEach(q=>selectedIds.add(q.id));renderQuestionLists();const b=document.getElementById('ss-select-all-questions');if(b)b.textContent=allPicked?'☑️ تحديد كل أسئلة الجزء':'☐ إلغاء تحديد أسئلة الجزء';});
   document.getElementById('ss-review-summary').addEventListener('change',e=>{activeBatch='all';reviewSummaryId=e.target.value;expandedReviewId=e.target.value;setReviewWorkspaceVisible(!!e.target.value);loadReviewSummaryQuestions(e.target.value);});
   document.getElementById('ss-review-batch').addEventListener('change',e=>{activeBatch=e.target.value;renderQuestionLists();});
@@ -108,7 +110,7 @@ async function generate(){
   const batchNo=(prior.data?.length?Number(prior.data[0].batch_no)||0:0)+1;if(batchNo>100)throw new Error('وصل الملخص إلى الحد الأقصى للأجزاء (100).');
   status('جاري توليد الجزء '+batchNo+' وحفظه فور اكتماله...',true);
   const response=await fetch(sbc.supabaseUrl+'/functions/v1/generate-study-summary',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+auth.data.session.access_token,apikey:sbc.supabaseKey},body:JSON.stringify({summary_id:draftId,pdf_path:path,subject,true_false_count:tf,mcq_count:mc,essay_count:essay,batch_no:batchNo})});
-  const result=await response.json().catch(()=>({}));if(!response.ok||!result.success)throw new Error('تعذر توليد الجزء '+batchNo+': '+(result.error||'خدمة التوليد لم تُكمل العدد المطلوب.'));
+  const result=await response.json().catch(()=>({}));if(!response.ok||!result.success)throw new Error('تعذر توليد الجزء '+batchNo+': '+(result.error||'خدمة التوليد لم تُكمل العدد المطلوب.'));const batchCheck=await sbc.from('study_summary_questions').select('question_type').eq('summary_id',draftId).eq('batch_no',batchNo);if(batchCheck.error)throw batchCheck.error;const actual={mcq:(batchCheck.data||[]).filter(q=>q.question_type==='mcq').length,true_false:(batchCheck.data||[]).filter(q=>q.question_type==='true_false').length,essay:(batchCheck.data||[]).filter(q=>q.question_type==='essay').length};if(actual.mcq!==mc||actual.true_false!==tf||actual.essay!==essay)throw new Error('تم حفظ الدفعة لكن العدد الفعلي لا يطابق المطلوب. المطلوب: '+mc+' اختياري، '+tf+' صح/خطأ، '+essay+' مقالي. المحفوظ: '+actual.mcq+' اختياري، '+actual.true_false+' صح/خطأ، '+actual.essay+' مقالي. راجع الدفعة قبل اعتمادها.');
   const count=await sbc.from('study_summary_questions').select('id',{count:'exact',head:true}).eq('summary_id',draftId);if(count.error)throw count.error;
   const save=await sbc.from('study_summaries').update({source_pdf_path:path,ai_generation_status:'ready',generated_question_count:count.count||result.totalQuestionCount||total,is_published:false,updated_at:new Date().toISOString()}).eq('id',draftId);if(save.error)throw save.error;
   const loaded=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');if(loaded.error)throw loaded.error;
@@ -124,6 +126,38 @@ async function generate(){
   if(draftId){try{const partial=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');if(!partial.error&&partial.data?.length){allQuestions=partial.data;selectedIds=new Set();selectedSummaryId=draftId;reviewSummaryId=draftId;const reviewSel=document.getElementById('ss-review-summary');if(reviewSel)reviewSel.value=draftId;document.getElementById('ss-question-counts').textContent='الأسئلة المحفوظة حتى الآن: '+allQuestions.length;renderQuestionLists();document.getElementById('ss-export-questions-pdf-btn').disabled=false;document.getElementById('ss-export-questions-word-btn').disabled=false;status('لم يكتمل الجزء الجديد: '+reason+' — تم الحفاظ على الأسئلة المحفوظة بالفعل.',false);}}catch(partialError){console.error('تعذر تحميل الأسئلة المحفوظة جزئيًا',partialError);}}
  }finally{btn.disabled=false;}
 }
+function startNewSummary(){
+ if(draftId&&!confirm('سيتم بدء ملخص جديد. الملخصات والأسئلة المحفوظة سابقًا لن تُحذف. هل تريد المتابعة؟'))return;
+ draftId=null;reviewSummaryId='';selectedSummaryId='';allQuestions=[];selectedIds.clear();reviewReadOnly=false;activeBatch='all';expandedReviewId='';
+ ['ss-ai-title','ss-ai-subject','ss-ai-description','ss-ai-pdf','ss-ai-mc-count','ss-ai-tf-count','ss-ai-essay-count'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+ ['ss-ai-mc-enabled','ss-ai-tf-enabled','ss-ai-essay-enabled'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
+ [['ss-ai-mc-enabled','ss-ai-mc-count'],['ss-ai-tf-enabled','ss-ai-tf-count'],['ss-ai-essay-enabled','ss-ai-essay-count']].forEach(([a,b])=>{const x=document.getElementById(a),y=document.getElementById(b);if(x&&y)y.disabled=!x.checked;});
+ const info=document.getElementById('ss-ai-file-info');if(info)info.textContent='';
+ const reviewSel=document.getElementById('ss-review-summary');if(reviewSel)reviewSel.value='';
+ const batchSel=document.getElementById('ss-review-batch');if(batchSel)batchSel.innerHTML='<option value="all">كل الأجزاء</option>';
+ const counts=document.getElementById('ss-question-counts');if(counts)counts.textContent='ارفع المادة أولًا';
+ const approval=document.getElementById('ss-approve-status');if(approval)approval.textContent='';
+ setReviewWorkspaceVisible(false);renderQuestionLists();status('تم فتح نموذج ملخص جديد. الملخصات السابقة ما زالت محفوظة.',true);refreshSummaries();
+}
+async function approveAllSummaryQuestions(){
+ const sbc=client(),targetId=reviewSummaryId||draftId;
+ if(!sbc||!targetId||reviewReadOnly)return;
+ if(!allQuestions.length){const el=document.getElementById('ss-approve-status');if(el)el.textContent='لا توجد أسئلة محفوظة لاعتمادها.';return;}
+ if(!confirm('سيتم اعتماد جميع أسئلة هذا الملخص وتحديدها ضمن الأسئلة المعتمدة للبيع. هل تريد المتابعة؟'))return;
+ const btn=document.getElementById('ss-approve-all-summary-btn');if(btn)btn.disabled=true;
+ try{
+  const auth=await sbc.auth.getSession();if(!auth.data?.session)throw new Error('انتهت جلسة المدير. سجّل الدخول مرة أخرى.');
+  const now=new Date().toISOString(),ids=allQuestions.map(q=>q.id);
+  const approved=await sbc.from('study_summary_questions').update({is_selected:true,is_approved:true,reviewed_at:now,reviewed_by:auth.data.session.user.id}).in('id',ids);
+  if(approved.error)throw approved.error;
+  const summary=await sbc.from('study_summaries').update({is_approved:true,approved_at:now,approved_by:auth.data.session.user.id,is_published:false,updated_at:now}).eq('id',targetId);
+  if(summary.error)throw summary.error;
+  selectedIds=new Set(ids);allQuestions=allQuestions.map(q=>({...q,is_selected:true,is_approved:true,reviewed_at:now,reviewed_by:auth.data.session.user.id}));
+  renderQuestionLists();const el=document.getElementById('ss-approve-status');if(el)el.innerHTML='<div style="background:#ecfdf5;color:#166534;padding:12px;border-radius:10px">✅ تم اعتماد الملخص بالكامل: '+allQuestions.length+' سؤالًا. انتقل الآن إلى المرحلة ٣ لإعداد السعر والإتاحة.</div>';
+  await refreshSummaries();await loadManageSummary();
+ }catch(e){const el=document.getElementById('ss-approve-status');if(el)el.textContent='❌ تعذر اعتماد الملخص بالكامل: '+(e?.message||e);}
+ finally{if(btn)btn.disabled=false;}
+}
 function renderQuestionLists(){
  const generated=document.getElementById('ss-generated-list'),selected=document.getElementById('ss-selected-list');if(!generated||!selected)return;
  const visibleQuestions=allQuestions.filter(q=>activeBatch==='all'||Number(q.batch_no)===Number(activeBatch));
@@ -133,7 +167,7 @@ function renderQuestionLists(){
  selected.innerHTML=picked.length?picked.map((q,i)=>'<div style="border:1px solid #86bda0;border-radius:10px;padding:12px;margin:8px 0;background:#f0fdf4"><strong>'+ (i+1)+'. '+esc(q.question_text)+'</strong><div style="font-size:12px;color:#166534;margin-top:4px">'+esc(typeLabel(q.question_type))+' — الإجابة: '+esc(q.answer_text)+'</div><button type="button" class="btn btn-outline btn-sm" data-unselect-id="'+esc(q.id)+'" '+(reviewReadOnly?'disabled':'')+' style="margin-top:8px">إزالة من الاختيار</button></div>').join(''):'<p style="color:var(--muted)">لم تحدد أسئلة بعد.</p>';
  selected.querySelectorAll('[data-unselect-id]').forEach(b=>b.addEventListener('click',()=>{selectedIds.delete(b.dataset.unselectId);renderQuestionLists();}));
  selected.querySelectorAll('[data-unselect-id]').forEach(b=>{const q=allQuestions.find(x=>x.id===b.dataset.unselectId);if(q){const d=document.createElement('div');d.style.cssText='font-size:12px;color:#92400e;margin-top:5px';d.textContent='صفحة المصدر (للمدير فقط): '+(q.source_reference||'غير محددة — راجع PDF');b.parentElement.appendChild(d);}});
- document.getElementById('ss-approve-summary-btn').disabled=reviewReadOnly||!picked.some(q=>!q.is_approved);const exportBtn=document.getElementById('ss-export-questions-pdf-btn');if(exportBtn)exportBtn.disabled=!allQuestions.length;const wordBtn=document.getElementById('ss-export-questions-word-btn');if(wordBtn)wordBtn.disabled=!allQuestions.length;
+ document.getElementById('ss-approve-summary-btn').disabled=reviewReadOnly||!picked.some(q=>!q.is_approved);const approveAllBtn=document.getElementById('ss-approve-all-summary-btn');if(approveAllBtn)approveAllBtn.disabled=reviewReadOnly||!allQuestions.length||allQuestions.every(q=>q.is_approved&&q.is_selected);const exportBtn=document.getElementById('ss-export-questions-pdf-btn');if(exportBtn)exportBtn.disabled=!allQuestions.length;const wordBtn=document.getElementById('ss-export-questions-word-btn');if(wordBtn)wordBtn.disabled=!allQuestions.length;
 }
 function exportQuestionsPdf(){
  if(!allQuestions.length){status('لا توجد أسئلة لتصديرها بعد.');return;}
@@ -173,9 +207,9 @@ async function approveSelected(){
   const auth=await sbc.auth.getSession();if(!auth.data?.session)throw new Error('انتهت جلسة المدير.');
   const ids=pendingPicked.map(q=>q.id);
   const selected=await sbc.from('study_summary_questions').update({is_selected:true,is_approved:true,reviewed_at:new Date().toISOString(),reviewed_by:auth.data.session.user.id}).in('id',ids);if(selected.error)throw selected.error;
-  const summary=await sbc.from('study_summaries').update({is_approved:true,approved_at:new Date().toISOString(),approved_by:auth.data.session.user.id,is_published:false,updated_at:new Date().toISOString()}).eq('id',targetId);if(summary.error)throw summary.error;
+  const summary=await sbc.from('study_summaries').update({is_published:false,updated_at:new Date().toISOString()}).eq('id',targetId);if(summary.error)throw summary.error;
   allQuestions=allQuestions.map(q=>selectedIds.has(q.id)?({...q,is_selected:true,is_approved:true,reviewed_at:new Date().toISOString(),reviewed_by:auth.data.session.user.id}):q);
-  const el=document.getElementById('ss-approve-status');el.innerHTML='<div style="background:#ecfdf5;color:#166534;padding:12px;border-radius:10px">✅ تم اعتماد '+pendingPicked.length+' سؤالًا جديدًا في '+(activeBatch==='all'?'الأجزاء المحددة':'الجزء '+String.fromCharCode(64+Number(activeBatch)))+'. يمكنك مراجعة جزء آخر ثم إعداد السعر والنشر.</div>';
+  const el=document.getElementById('ss-approve-status');el.innerHTML='<div style="background:#ecfdf5;color:#166534;padding:12px;border-radius:10px">✅ تم اعتماد '+pendingPicked.length+' سؤالًا جديدًا. هذا اعتماد للأسئلة المحددة فقط؛ لاعتماد الملخص بالكامل اضغط زر «اعتماد الملخص بالكامل (كل الأسئلة)».</div>';
   selectedSummaryId=targetId;document.getElementById('ss-manage-summary').value=targetId;selectedManageIds.add(targetId);await refreshSummaries();await loadManageSummary();
   if(typeof window.loadStudySummaryOrdersAdmin==='function')await window.loadStudySummaryOrdersAdmin();
  }catch(e){document.getElementById('ss-approve-status').textContent='❌ '+(e?.message||e);btn.disabled=false;}
@@ -194,7 +228,7 @@ function renderSummaryPickerCards(rows){
   manage.querySelectorAll('[data-manage-pick]').forEach(box=>box.addEventListener('change',async()=>{const id=box.dataset.managePick;if(box.checked){selectedManageIds.add(id);const sel=document.getElementById('ss-manage-summary');if(sel)sel.value=id;selectedSummaryId=id;await loadManageSummary();}else{selectedManageIds.delete(id);if(selectedSummaryId===id){const next=[...selectedManageIds][0]||'';const sel=document.getElementById('ss-manage-summary');if(sel)sel.value=next;selectedSummaryId=next;if(next)await loadManageSummary();}}}));
  }
 }
-function setReviewWorkspaceVisible(visible){['ss-review-batch','ss-select-all-questions','ss-generated-list','ss-selected-list','ss-approve-summary-btn','ss-export-questions-pdf-btn','ss-export-questions-word-btn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=visible?'':'none';});const selected=document.getElementById('ss-selected-list');if(selected?.parentElement)selected.parentElement.style.display=visible?'':'none';}
+function setReviewWorkspaceVisible(visible){['ss-review-batch','ss-select-all-questions','ss-generated-list','ss-selected-list','ss-approve-summary-btn','ss-approve-all-summary-btn','ss-export-questions-pdf-btn','ss-export-questions-word-btn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=visible?'':'none';});const selected=document.getElementById('ss-selected-list');if(selected?.parentElement)selected.parentElement.style.display=visible?'':'none';}
 function targetValues(value){if(!value)return [];try{const parsed=JSON.parse(value);if(Array.isArray(parsed))return parsed.map(x=>String(x));}catch{}return [String(value)];}
 function setTargetChecks(kind,value){const selected=new Set(targetValues(value)),root=document.getElementById('ss-manage-target-'+kind);if(!root)return;root.querySelectorAll('input[type=checkbox]').forEach(box=>box.checked=selected.has(box.value));}
 function getTargetChecks(kind){const root=document.getElementById('ss-manage-target-'+kind);return root?[...root.querySelectorAll('input[type=checkbox]:checked')].map(box=>box.value):[];}
