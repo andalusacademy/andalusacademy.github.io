@@ -1059,8 +1059,8 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>السؤال</th><th>الإجابة (معاينة)</th><th>إجراءات</th></tr></thead><tbody id="ss-questions-list"><tr><td colspan="4" style="text-align:center;color:var(--muted)">اختر ملخصًا لعرض أسئلته</td></tr></tbody></table></div>
           </div>
           <div class="card">
-            <div class="card-header"><h3>🧾 طلبات شراء الملخصات</h3><button class="btn btn-outline btn-sm" onclick="loadStudySummaryOrdersAdmin()">تحديث الطلبات</button></div>
-            <p style="padding:0 16px 12px;color:var(--muted);font-size:12px;line-height:1.8">طلبات الشراء لا تُفعّل تلقائيًا؛ راجع الدفع يدويًا ثم اختر «تم الدفع + إتاحة» لمنح الطالب الصلاحية.</p>
+            <div class="card-header"><h3>🧾 ٤) طلبات الشراء ومراجعة التحويلات</h3><button class="btn btn-outline btn-sm" onclick="loadStudySummaryOrdersAdmin()">تحديث الطلبات</button></div>
+            <p style="padding:0 16px 12px;color:var(--muted);font-size:12px;line-height:1.8">طلبات الشراء لا تُفعّل تلقائيًا؛ راجع كود الطلب ورقم القيد والمبلغ ورقم معاملة التحويل الذي أرسله الطالب، ثم اختر «تم الدفع + إتاحة» بعد التأكد من وصول المبلغ.</p>
             <div style="overflow-x:auto"><table><thead><tr><th>رقم الطلب</th><th>الطالب</th><th>رقم القيد</th><th>الملخص</th><th>المبلغ</th><th>الحالة</th><th>تاريخ الطلب</th><th>إجراءات الدفع والقرار</th></tr></thead><tbody id="ss-orders-list"><tr><td colspan="8" style="text-align:center">جاري التحميل...</td></tr></tbody></table></div>
           </div>
         </div>
@@ -16018,6 +16018,7 @@ async function loadStudySummaryOrdersAdmin(){
 }
 async function reviewStudySummaryOrder(orderId,nextStatus){
   const order=studySummaryOrderRows.find(o=>o.id===orderId);if(!order)return;
+  if(nextStatus==='paid'&&!String(order.payment_reference||'').trim()){showToast('لا يمكن تأكيد الدفع قبل أن يرسل الطالب رقم معاملة التحويل.','error');return;}
   const labels={paid:'تأكيد الدفع ومنح الطالب صلاحية الملخص',pending_payment:'تسجيل أن الدفع لم يتم بعد',cancelled:'إلغاء طلب الشراء',rejected:'رفض طلب الشراء'};
   if(!confirm(labels[nextStatus]+'؟'))return;
   const summary=studySummaryAdminRows.find(s=>s.id===order.summary_id);
@@ -16145,7 +16146,7 @@ async function changeStudySummaryQuestion(delta){
 </script>
 
 
-<script src="study-summary-ai.js?v=16"></script>
+<script src="study-summary-ai.js?v=17"></script>
 <script src="login-runtime-guard.js?v=1"></script>
 </body>
 </html>
