@@ -54,7 +54,7 @@ function inject(){
   card.innerHTML='<div class="card-header"><h3>📦 ٣) إعداد الملخص المعتمد ونشره</h3><span style="font-size:12px;color:var(--muted)">لا يظهر للطلاب إلا بعد النشر</span></div>'+
   '<div style="padding:18px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">'+
   '<div class="form-group" style="grid-column:1/-1"><label>اختر ملخصًا تم اعتماده</label><select id="ss-manage-summary" class="search-input" style="width:100%"><option value="">اختر الملخص</option></select></div>'+
-  '<div class="form-group"><label>السعر بالجنيه</label><input id="ss-manage-price" type="number" min="0" step="0.01" value="50" class="search-input" style="width:100%"></div>'+
+  '<div class="form-group"><label>السعر بالجنيه</label><input id="ss-manage-price" type="number" min="0" step="0.01" value="" class="search-input" style="width:100%" placeholder="أدخل السعر"></div>'+
   '<div class="form-group"><label>وسيلة التحويل</label><input id="ss-manage-payment-provider" type="text" maxlength="80" value="محفظة إلكترونية" class="search-input" style="width:100%" placeholder="مثال: محفظة إلكترونية"></div>'+
   '<div class="form-group"><label>رقم المحفظة المستقبِلة</label><input id="ss-manage-wallet-number" type="text" inputmode="tel" maxlength="40" class="search-input" style="width:100%" placeholder="أدخل رقم المحفظة قبل النشر"></div>'+
   '<div class="form-group"><label>مدة صلاحية الطالب بعد الشراء (بالأيام)</label><input id="ss-manage-validity" type="number" min="1" max="3650" value="30" class="search-input" style="width:100%"></div>'+
@@ -67,7 +67,7 @@ function inject(){
   document.getElementById('ss-manage-summary').addEventListener('change',loadManageSummary);
   document.getElementById('ss-manage-save').addEventListener('click',()=>saveManageSummary(false));
   document.getElementById('ss-manage-publish').addEventListener('click',()=>saveManageSummary(true));
-  const now=new Date(),endToday=new Date(now);endToday.setHours(23,59,0,0);document.getElementById('ss-manage-from').value=localDateTime(now);document.getElementById('ss-manage-until').value=localDateTime(endToday);
+  const now=new Date();document.getElementById('ss-manage-from').value=localDateTime(now);document.getElementById('ss-manage-until').value='';
  }
  hideLegacy();
 }
@@ -226,10 +226,10 @@ function renderSummaryTable(rows){
 async function loadManageSummary(){
  const id=document.getElementById('ss-manage-summary')?.value;if(!id)return;
  selectedSummaryId=id;const sbc=client();const {data,error}=await sbc.from('study_summaries').select('*').eq('id',id).single();if(error){document.getElementById('ss-manage-status').textContent=error.message;return;}
- document.getElementById('ss-manage-price').value=data.price??50;document.getElementById('ss-manage-validity').value=data.validity_days??30;
+ document.getElementById('ss-manage-price').value=data.price??'';document.getElementById('ss-manage-validity').value=data.validity_days??30;
  document.getElementById('ss-manage-payment-provider').value=data.payment_provider||'محفظة إلكترونية';document.getElementById('ss-manage-wallet-number').value=data.payment_wallet_number||'';
  document.getElementById('ss-manage-from').value=data.available_from?localDateTime(new Date(data.available_from)):localDateTime(new Date());
- const endToday=new Date();endToday.setHours(23,59,0,0);document.getElementById('ss-manage-until').value=data.available_until?localDateTime(new Date(data.available_until)):localDateTime(endToday);
+ document.getElementById('ss-manage-until').value=data.available_until?localDateTime(new Date(data.available_until)):'';
  const enabledBatches=Array.isArray(data.enabled_batches)?data.enabled_batches.map(Number):[1,2];
  document.getElementById('ss-manage-batch-a').checked=enabledBatches.includes(1);
  document.getElementById('ss-manage-batch-b').checked=enabledBatches.includes(2);
@@ -240,9 +240,11 @@ async function loadManageSummary(){
 }
 async function saveManageSummary(publish){
  const sbc=client(),id=document.getElementById('ss-manage-summary').value,el=document.getElementById('ss-manage-status');if(!id){el.textContent='اختر ملخصًا معتمدًا أولًا.';return;}
- const price=Number(document.getElementById('ss-manage-price').value),validity=Number(document.getElementById('ss-manage-validity').value),fromVal=document.getElementById('ss-manage-from').value,untilVal=document.getElementById('ss-manage-until').value;
+ const priceRaw=document.getElementById('ss-manage-price').value.trim(),price=Number(priceRaw),validity=Number(document.getElementById('ss-manage-validity').value),fromVal=document.getElementById('ss-manage-from').value,untilVal=document.getElementById('ss-manage-until').value;
  const paymentProvider=document.getElementById('ss-manage-payment-provider').value.trim(),walletNumber=document.getElementById('ss-manage-wallet-number').value.trim();
  if(!Number.isFinite(price)||price<0||!Number.isInteger(validity)||validity<1||validity>3650){el.textContent='راجع السعر ومدة الصلاحية.';return;}
+ if(!priceRaw||!Number.isFinite(price)||price<0){el.textContent='أدخل سعرًا صحيحًا للملخص.';return;}
+ if(!validity||validity<1||validity>3650){el.textContent='أدخل مدة إتاحة صحيحة بالأيام.';return;}
  if(!fromVal||!untilVal||new Date(untilVal)<=new Date(fromVal)){el.textContent='حدد بداية ونهاية صحيحتين للإتاحة.';return;}
  if(publish&&(!paymentProvider||!walletNumber)){el.textContent='أدخل وسيلة التحويل ورقم المحفظة قبل نشر الملخص للطلاب.';return;}
  if(walletNumber&&!/^[0-9+\s()-]{6,40}$/.test(walletNumber)){el.textContent='راجع رقم المحفظة؛ أدخل رقمًا صحيحًا فقط.';return;}
