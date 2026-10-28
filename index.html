@@ -16166,10 +16166,12 @@ async function renderStudentStudySummaryQuestion(){
   if(!window.__studySummaryProtectionInstalled){
     window.__studySummaryProtectionInstalled=true;
     const obscure=()=>{const reader=document.getElementById('student-portal-content');if(reader?.classList.contains('study-summary-reader'))reader.classList.add('study-summary-obscured');};
-    const reveal=()=>{const reader=document.getElementById('student-portal-content');if(reader?.classList.contains('study-summary-reader')&&document.visibilityState==='visible'&&document.hasFocus())reader.classList.remove('study-summary-obscured');};
-    window.addEventListener('blur',obscure,true);
-    window.addEventListener('focus',reveal,true);
+    const reveal=()=>{const reader=document.getElementById('student-portal-content');if(reader?.classList.contains('study-summary-reader'))reader.classList.remove('study-summary-obscured');};
+    // Do not blur the reader merely because WebView/window focus changes.
+    // Some Android WebViews do not reliably fire focus again, leaving questions blurred.
     document.addEventListener('visibilitychange',()=>document.hidden?obscure():reveal(),true);
+    window.addEventListener('focus',reveal,true);
+    window.addEventListener('pageshow',reveal,true);
     document.addEventListener('keydown',e=>{
       const reader=document.getElementById('student-portal-content');
       if(!reader?.classList.contains('study-summary-reader'))return;
