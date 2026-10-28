@@ -251,7 +251,7 @@ async function saveManageSummary(publish){
  const payload={price,validity_days:validity,payment_provider:paymentProvider||'محفظة إلكترونية',payment_wallet_number:walletNumber||null,enabled_batches:enabledBatches,available_from:new Date(fromVal).toISOString(),available_until:new Date(untilVal).toISOString(),is_published:!!publish,published_at:publish?new Date().toISOString():null,updated_at:new Date().toISOString()};
  const result=await sbc.from('study_summaries').update(payload).eq('id',id).eq('is_approved',true);if(result.error){el.textContent='تعذر الحفظ: '+result.error.message;return;}
  el.textContent=publish?'تم نشر الملخص للطلاب ضمن وقت الإتاحة المحدد.':'تم حفظ الإعدادات فقط. لم يتم نشر الملخص للطلاب.';
- if(publish&&typeof showToast==='function')showToast('تم نشر الملخص. ستظهر تعليمات الدفع للطالب بعد تجهيز واجهة الطلب.','success');
+ if(publish&&typeof showToast==='function')showToast('تم نشر الملخص وإتاحة تعليمات التحويل للطلاب المستهدفين.','success');
  await refreshSummaries();if(typeof window.loadStudySummaryOrdersAdmin==='function')await window.loadStudySummaryOrdersAdmin();
 }
 async function hardDeleteSummary(id){
