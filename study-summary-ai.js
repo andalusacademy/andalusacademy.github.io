@@ -72,54 +72,50 @@ function inject(){
  hideLegacy();
 }
 async function generate(){
- const sbc=client(),title=document.getElementById('ss-ai-title').value.trim(),subject=document.getElementById('ss-ai-subject').value.trim(),file=document.getElementById('ss-ai-pdf').files?.[0];
- const tf=Math.max(0,Math.min(100,Number(document.getElementById('ss-ai-tf-count').value||0))),mc=Math.max(0,Math.min(100,Number(document.getElementById('ss-ai-mc-count').value||0))),essay=Math.max(0,Math.min(100,Number(document.getElementById('ss-ai-essay-count').value||0))),total=tf+mc+essay,description=document.getElementById('ss-ai-description').value.trim();
+ const sbc=client(),file=document.getElementById('ss-ai-pdf').files?.[0],description=document.getElementById('ss-ai-description').value.trim();
+ const tf=document.getElementById('ss-ai-tf-enabled').checked?Math.max(0,Math.min(100,Number(document.getElementById('ss-ai-tf-count').value||0))):0;
+ const mc=document.getElementById('ss-ai-mc-enabled').checked?Math.max(0,Math.min(100,Number(document.getElementById('ss-ai-mc-count').value||0))):0;
+ const essay=document.getElementById('ss-ai-essay-enabled').checked?Math.max(0,Math.min(100,Number(document.getElementById('ss-ai-essay-count').value||0))):0;
+ const total=tf+mc+essay;
  if(!sbc)return status('اتصال قاعدة البيانات غير جاهز. أعد تحميل الصفحة.');
- if(title.length<2||!subject)return status('اكتب اسم الملخص واسم المادة أولًا.');
- if(total!==50)return status('يجب أن يكون إجمالي أسئلة كل مجموعة 50 سؤالًا بالضبط. عدّل توزيع الأنواع ليصبح الإجمالي 50.');
- if(!file||(!file.type.includes('pdf')&&!file.name.toLowerCase().endsWith('.pdf')))return status('اختر ملف PDF للمادة.');
- if(file.size>15*1024*1024)return status('حجم الملف يجب ألا يتجاوز 15 ميجابايت.');
+ if(total<1)return status('اختر نوع سؤال واحدًا على الأقل واكتب عدد الأسئلة المطلوبة.');
+ if(total>100)return status('إجمالي أسئلة الجزء الواحد لا يتجاوز 100 سؤال.');
+ if((document.getElementById('ss-ai-mc-enabled').checked&&mc<1)||(document.getElementById('ss-ai-tf-enabled').checked&&tf<1)||(document.getElementById('ss-ai-essay-enabled').checked&&essay<1))return status('اكتب عددًا صحيحًا لكل نوع اخترته.');
+ if(file&&(!file.type.includes('pdf')&&!file.name.toLowerCase().endsWith('.pdf')))return status('اختر ملف PDF للمادة.');
+ if(file&&file.size>15*1024*1024)return status('حجم الملف يجب ألا يتجاوز 15 ميجابايت.');
  const btn=document.getElementById('ss-ai-generate-btn');btn.disabled=true;
  try{
-  status('جاري حفظ المسودة ورفع المادة ثم توليد مجموعتين مستقلتين؛ 50 سؤالًا لكل مجموعة...',true);
   const auth=await sbc.auth.getSession();if(!auth.data?.session)throw new Error('جلسة المدير غير صالحة. سجّل الدخول مرة أخرى.');
-  if(draftId){const old=await sbc.from('study_summaries').update({title,subject_name:subject,description,is_published:false,is_approved:false,approved_at:null,approved_by:null,ai_generation_status:'processing',ai_generation_error:null,updated_at:new Date().toISOString()}).eq('id',draftId);if(old.error)throw old.error;}
+  const chosenDraft=draftId||document.getElementById('ss-review-summary')?.value||'';
+  let summary=null;
+  if(chosenDraft){const found=await sbc.from('study_summaries').select('id,title,subject_name,description,source_pdf_path,is_approved,is_published').eq('id',chosenDraft).single();if(found.error)throw found.error;summary=found.data;draftId=summary.id;if(summary.is_approved||summary.is_published)throw new Error('الملخص معتمد أو منشور. لا يمكن إضافة جزء جديد إليه قبل إلغاء الاعتماد والنشر.');}
+  const title=(document.getElementById('ss-ai-title').value.trim()||summary?.title||'').trim();
+  const subject=(document.getElementById('ss-ai-subject').value.trim()||summary?.subject_name||'').trim();
+  if(title.length<2||!subject)throw new Error('اكتب اسم الملخص واسم المادة أولًا.');
+  if(!summary&&!file)throw new Error('ارفع ملف PDF لإنشاء الجزء الأول.');
+  if(summary){const old=await sbc.from('study_summaries').update({title,subject_name:subject,description:description||summary.description||'',is_published:false,is_approved:false,approved_at:null,approved_by:null,ai_generation_status:'processing',ai_generation_error:null,updated_at:new Date().toISOString()}).eq('id',draftId);if(old.error)throw old.error;}
   else{const made=await sbc.from('study_summaries').insert({title,subject_name:subject,description,price:0,validity_days:30,is_published:false,is_approved:false,created_by:auth.data.session.user.id,ai_generation_status:'processing'}).select('id').single();if(made.error)throw made.error;draftId=made.data.id;}
-  const path='summary-'+draftId+'/'+Date.now()+'-source.pdf';
-  const upload=await sbc.storage.from('study-summary-pdfs').upload(path,file,{contentType:'application/pdf',upsert:false});if(upload.error)throw upload.error;
-  let latestResult=null;
-  for(const batchNo of [1,2]){
-   const batchLabel=batchNo===1?'A':'B';
-   status('جاري توليد المجموعة '+batchLabel+' من مجموعتين — 50 سؤالًا، مع استبعاد أسئلة المجموعة الأخرى...',true);
-   const response=await fetch(sbc.supabaseUrl+'/functions/v1/generate-study-summary',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+auth.data.session.access_token,apikey:sbc.supabaseKey},body:JSON.stringify({summary_id:draftId,pdf_path:path,subject,true_false_count:tf,mcq_count:mc,essay_count:essay,batch_no:batchNo})});
-   const result=await response.json().catch(()=>({}));
-   if(!response.ok||!result.success)throw new Error('تعذر إكمال المجموعة '+batchLabel+': '+(result.error||'خدمة التوليد لم تُكمل العدد المطلوب.'));
-   latestResult=result;
-  }
-  const save=await sbc.from('study_summaries').update({source_pdf_path:path,ai_generation_status:'ready',generated_question_count:latestResult?.totalQuestionCount||100,is_published:false,is_approved:false,approved_at:null,approved_by:null}).eq('id',draftId);if(save.error)throw save.error;
-  const loaded=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');
-  if(loaded.error)throw loaded.error;
-  allQuestions=loaded.data||[];selectedIds=new Set();selectedSummaryId=draftId;reviewSummaryId=draftId;reviewReadOnly=false;const reviewSel=document.getElementById('ss-review-summary');if(reviewSel)reviewSel.value=draftId;
-  document.getElementById('ss-question-counts').textContent='تم إنشاء '+allQuestions.length+' سؤالًا: '+allQuestions.filter(q=>q.question_type==='mcq').length+' اختياري، '+allQuestions.filter(q=>q.question_type==='true_false').length+' صح/خطأ، '+allQuestions.filter(q=>q.question_type==='essay').length+' مقالي';
+  let path=summary?.source_pdf_path||'';
+  if(file){path='summary-'+draftId+'/'+Date.now()+'-source.pdf';const upload=await sbc.storage.from('study-summary-pdfs').upload(path,file,{contentType:'application/pdf',upsert:false});if(upload.error)throw upload.error;}
+  if(!path)throw new Error('لم يتم العثور على ملف المادة المحفوظ. ارفع ملف PDF ثم أعد المحاولة.');
+  const prior=await sbc.from('study_summary_questions').select('batch_no').eq('summary_id',draftId).order('batch_no',{ascending:false}).limit(1);if(prior.error)throw prior.error;
+  const batchNo=(prior.data?.length?Number(prior.data[0].batch_no)||0:0)+1;if(batchNo>100)throw new Error('وصل الملخص إلى الحد الأقصى للأجزاء (100).');
+  status('جاري توليد الجزء '+batchNo+' وحفظه فور اكتماله...',true);
+  const response=await fetch(sbc.supabaseUrl+'/functions/v1/generate-study-summary',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+auth.data.session.access_token,apikey:sbc.supabaseKey},body:JSON.stringify({summary_id:draftId,pdf_path:path,subject,true_false_count:tf,mcq_count:mc,essay_count:essay,batch_no:batchNo})});
+  const result=await response.json().catch(()=>({}));if(!response.ok||!result.success)throw new Error('تعذر توليد الجزء '+batchNo+': '+(result.error||'خدمة التوليد لم تُكمل العدد المطلوب.'));
+  const count=await sbc.from('study_summary_questions').select('id',{count:'exact',head:true}).eq('summary_id',draftId);if(count.error)throw count.error;
+  const save=await sbc.from('study_summaries').update({source_pdf_path:path,ai_generation_status:'ready',generated_question_count:count.count||result.totalQuestionCount||total,is_published:false,is_approved:false,approved_at:null,approved_by:null,updated_at:new Date().toISOString()}).eq('id',draftId);if(save.error)throw save.error;
+  const loaded=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');if(loaded.error)throw loaded.error;
+  allQuestions=loaded.data||[];selectedIds=new Set();selectedSummaryId=draftId;reviewSummaryId=draftId;reviewReadOnly=false;
+  const reviewSel=document.getElementById('ss-review-summary');if(reviewSel)reviewSel.value=draftId;
+  document.getElementById('ss-question-counts').textContent='تم حفظ الجزء '+batchNo+' — إجمالي الأسئلة: '+allQuestions.length+' ('+allQuestions.filter(q=>q.question_type==='mcq').length+' اختياري، '+allQuestions.filter(q=>q.question_type==='true_false').length+' صح/خطأ، '+allQuestions.filter(q=>q.question_type==='essay').length+' مقالي)';
   renderQuestionLists();document.getElementById('ss-approve-summary-btn').disabled=false;
   document.getElementById('ss-export-questions-pdf-btn').disabled=!allQuestions.length;document.getElementById('ss-export-questions-word-btn').disabled=!allQuestions.length;
-  status('اكتمل توليد المجموعتين A وB (50 سؤالًا لكل مجموعة). الإجمالي 100 سؤال. لم يتم نشرها للطلاب؛ راجع الأسئلة والمراجع ثم اختر المناسب واضغط اعتماد.',true);
+  status('تم توليد الجزء '+batchNo+' وحفظه. يمكنك تحديد الأسئلة المناسبة أو توليد جزء جديد من نفس المادة؛ لم يتم النشر للطلاب.',true);
   await refreshSummaries();
-  }catch(e){
+ }catch(e){
   const reason=e?.message||String(e);status(reason);
-  if(draftId){
-   try{
-    const partial=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');
-    if(!partial.error&&partial.data?.length){
-     allQuestions=partial.data;selectedIds=new Set();selectedSummaryId=draftId;reviewSummaryId=draftId;reviewReadOnly=false;const reviewSel=document.getElementById('ss-review-summary');if(reviewSel)reviewSel.value=draftId;
-     document.getElementById('ss-question-counts').textContent='المحفوظ حتى الآن: '+allQuestions.length+' سؤالًا — المجموعة A: '+allQuestions.filter(q=>Number(q.batch_no)===1).length+'، المجموعة B: '+allQuestions.filter(q=>Number(q.batch_no)===2).length;
-     renderQuestionLists();
-     document.getElementById('ss-approve-summary-btn').disabled=true;
-     document.getElementById('ss-export-questions-pdf-btn').disabled=false;document.getElementById('ss-export-questions-word-btn').disabled=false;
-     status('لم تكتمل المجموعتان: '+reason+' — تم الحفاظ على الأسئلة التي حُفظت بالفعل. راجعها ثم أعد المحاولة لإكمال التوليد.',false);
-    }
-   }catch(partialError){console.error('تعذر تحميل الأسئلة المحفوظة جزئيًا',partialError);}
-  }
+  if(draftId){try{const partial=await sbc.from('study_summary_questions').select('*').eq('summary_id',draftId).order('batch_no').order('order_num');if(!partial.error&&partial.data?.length){allQuestions=partial.data;selectedIds=new Set();selectedSummaryId=draftId;reviewSummaryId=draftId;const reviewSel=document.getElementById('ss-review-summary');if(reviewSel)reviewSel.value=draftId;document.getElementById('ss-question-counts').textContent='الأسئلة المحفوظة حتى الآن: '+allQuestions.length;renderQuestionLists();document.getElementById('ss-export-questions-pdf-btn').disabled=false;document.getElementById('ss-export-questions-word-btn').disabled=false;status('لم يكتمل الجزء الجديد: '+reason+' — تم الحفاظ على الأسئلة المحفوظة بالفعل.',false);}}catch(partialError){console.error('تعذر تحميل الأسئلة المحفوظة جزئيًا',partialError);}}
  }finally{btn.disabled=false;}
 }
 function renderQuestionLists(){
