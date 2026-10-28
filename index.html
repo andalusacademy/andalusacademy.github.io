@@ -12809,11 +12809,26 @@ async function resetStudentDeviceBinding() {
 }
 
 async function getStudentDeviceStorageKey(nationalId) {
-  if (!window.crypto?.subtle) throw new Error('secure crypto unavailable');
-  const bytes = new TextEncoder().encode(String(nationalId || '').trim());
-  const digest = await window.crypto.subtle.digest('SHA-256', bytes);
-  const hashedId = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
-  return 'andalus_student_device_token_v1:' + hashedId;
+  const value = String(nationalId || '').trim();
+  // SHA-256 is preferred, but some older Android browsers/WebViews do not expose
+  // crypto.subtle in every context. This hash only names the localStorage entry;
+  // the actual device token below is still generated with cryptographic randomness.
+  if (window.crypto?.subtle && typeof TextEncoder !== 'undefined') {
+    try {
+      const bytes = new TextEncoder().encode(value);
+      const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+      const hashedId = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+      return 'andalus_student_device_token_v1:' + hashedId;
+    } catch (_) { /* use compatibility key below */ }
+  }
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193);
+    h2 = Math.imul(h2 ^ (c + i), 0x85ebca6b);
+  }
+  const localKey = (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+  return 'andalus_student_device_token_v1:compat:' + localKey;
 }
 
 async function getStudentDeviceToken(nationalId = '') {
@@ -12821,7 +12836,9 @@ async function getStudentDeviceToken(nationalId = '') {
   try {
     let tokenKey = '';
     if (String(nationalId || '').trim()) {
-      if (!window.crypto?.getRandomValues) throw new Error('secure crypto unavailable');
+      if (!window.crypto || typeof window.crypto.getRandomValues !== 'function') {
+        throw new Error('secure random unavailable');
+      }
       tokenKey = await getStudentDeviceStorageKey(nationalId);
     } else {
       tokenKey = localStorage.getItem(lastKeyName) || '';
@@ -12829,6 +12846,7 @@ async function getStudentDeviceToken(nationalId = '') {
     }
     let token = localStorage.getItem(tokenKey);
     if (!token && String(nationalId || '').trim()) {
+      // Never downgrade the security of the device token to Math.random().
       const random = new Uint8Array(32);
       window.crypto.getRandomValues(random);
       token = Array.from(random, b => b.toString(16).padStart(2, '0')).join('');
@@ -12836,7 +12854,13 @@ async function getStudentDeviceToken(nationalId = '') {
     }
     return token || null;
   } catch (e) {
-    throw new Error('تعذر إنشاء أو حفظ رمز الجهاز الآمن. تأكد من السماح ببيانات الموقع ثم أعد المحاولة.');
+    if (e?.name === 'QuotaExceededError') {
+      throw new Error('مساحة التخزين في المتصفح ممتلئة. امسح مساحة بسيطة من بيانات الموقع ثم حاول مرة أخرى.');
+    }
+    if (e?.message === 'secure random unavailable') {
+      throw new Error('المتصفح الحالي لا يدعم إنشاء رمز جهاز آمن. افتح رابط البوابة الرسمي عبر Chrome أو حدّث المتصفح ثم أعد المحاولة.');
+    }
+    throw new Error('تعذر حفظ رمز الجهاز في المتصفح. تأكد من السماح ببيانات الموقع وعدم استخدام وضع التصفح الخفي، ثم أعد المحاولة.');
   }
 }
 
