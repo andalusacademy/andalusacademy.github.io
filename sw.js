@@ -1,5 +1,5 @@
 /* Andalus Academy Service Worker — staged exam finalization v21 */
-const CACHE='andalus-v22-summary-template-fix';
+const CACHE='andalus-v23-my-summaries-only';;
 const ASSETS=['./','./index.html','./manifest.json','./face-camera-fix.js?v=4','./student-portal-logs-ui.js?v=4','./cache-reset.js?v=2','./daily-revenue-fix.js?v=1','./exam-essay-fix.js?v=1','./exam-student-render-fix.js?v=1'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim()});
