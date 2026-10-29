@@ -29,7 +29,7 @@ self.addEventListener('fetch',e=>{
         if(type.includes('text/html')){
           const text=await r.clone().text();
           if(!text.includes('student-portal-bootstrap.js')){
-            const injected=text.replace('</head>','<script src="./student-portal-bootstrap.js?v=1"></script>\n</head>');
+            const injected=text.replace('</head>','<script src="./student-portal-bootstrap.js?v=2"></script>\n</head>');
             const headers=new Headers(r.headers); headers.delete('content-length'); headers.delete('content-encoding'); headers.set('cache-control','no-store');
             return new Response(injected,{status:r.status,statusText:r.statusText,headers});
           }
