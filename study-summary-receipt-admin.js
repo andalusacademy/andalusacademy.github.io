@@ -9,6 +9,8 @@
   let selectedOrderId = '';
   let signedUrl = '';
   let wired = false;
+  let lastLoadedAt = 0;
+  let loadingOrders = false;
 
   const statusLabel = s => ({
     pending_payment: 'بانتظار مراجعة الدفع',
@@ -63,7 +65,9 @@
 
   async function loadOrders() {
     const sbc = client();
-    if (!sbc) return;
+    if (!sbc || loadingOrders) return;
+    loadingOrders = true;
+    lastLoadedAt = Date.now();
     card();
     const list = document.getElementById('ss-payment-order-list');
     const count = document.getElementById('ss-payment-review-count');
@@ -102,6 +106,8 @@
       }
     } catch (e) {
       if (list) list.innerHTML = '<div style="padding:15px;color:#991b1b">تعذر تحميل الطلبات: ' + esc(e?.message || e) + '</div>';
+    } finally {
+      loadingOrders = false;
     }
   }
 
@@ -238,7 +244,8 @@
         window.showPage = wrapped;
       }
     }
-    if (document.getElementById('page-study-summaries')?.style.display !== 'none') loadOrders();
+    const pageVisible = document.getElementById('page-study-summaries')?.style.display !== 'none';
+    if (pageVisible && Date.now() - lastLoadedAt >= 10000) loadOrders();
   }
 
   setInterval(wire, 1000);
