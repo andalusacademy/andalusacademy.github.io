@@ -11116,8 +11116,25 @@ async function loadFinanceHub() {
   const fmt = n => (Number(n) || 0).toLocaleString('ar-EG') + ' ج.م';
   const today = new Date().toISOString().slice(0,10), monthStart = today.slice(0,7) + '-01';
   if (statusEl) statusEl.textContent = 'جارٍ قراءة البيانات المالية الحالية…';
-  try { await loadFinancialReport(); if(summaryEl) summaryEl.innerHTML = document.getElementById('fin-summary')?.innerHTML || '<div class="empty-state"><h4>لا يتوفر ملخص حاليًا.</h4></div>'; }
-  catch(err) { if(summaryEl) summaryEl.innerHTML = '<div class="empty-state"><h4>تعذر تحميل الملخص المالي. افتح التقارير المالية للتفاصيل.</h4></div>'; console.error('loadFinanceHub summary',err); }
+  try {
+    const [{data: paymentRows, error: paymentError}, {data: expenseRows, error: expenseError}] = await Promise.all([
+      sb.from('payments').select('amount,paid,paid_date,student_id'),
+      sb.from('expenses').select('amount,expense_date')
+    ]);
+    if (paymentError) throw paymentError;
+    if (expenseError) throw expenseError;
+    const payments = paymentRows || [], expenses = expenseRows || [];
+    const paidInMonth = payments.filter(row => row.paid && row.paid_date && row.paid_date >= monthStart && row.paid_date <= today);
+    const revenueMonth = paidInMonth.reduce((sum,row) => sum + (Number(row.amount)||0),0);
+    const expenseMonth = expenses.filter(row => row.expense_date && row.expense_date >= monthStart && row.expense_date <= today).reduce((sum,row) => sum + (Number(row.amount)||0),0);
+    if(summaryEl) summaryEl.innerHTML = `
+      <div class="fin-card"><h4>💰 تحصيلات أقساط الطلاب هذا الشهر</h4><div class="big-num" style="color:#16a34a">${fmt(revenueMonth)}</div><div class="sub">${paidInMonth.length} قسطًا مسجلًا كمدفوع</div></div>
+      <div class="fin-card"><h4>💸 المصروفات هذا الشهر</h4><div class="big-num" style="color:#dc2626">${fmt(expenseMonth)}</div><div class="sub">من سجل المصروفات الحالي</div></div>
+      <div class="fin-card"><h4>📉 صافي الحركة من هذين السجلين</h4><div class="big-num" style="color:${revenueMonth-expenseMonth>=0?'#16a34a':'#dc2626'}">${fmt(revenueMonth-expenseMonth)}</div><div class="sub">لا يشمل الإيراد اليومي المسجل أدناه لتجنب ازدواج الحساب</div></div>`;
+  } catch(err) {
+    if(summaryEl) summaryEl.innerHTML = '<div class="empty-state"><h4>تعذر قراءة سجلات المدفوعات والمصروفات. لم يتم تعديل أي بيانات.</h4></div>';
+    console.error('loadFinanceHub summary',err);
+  }
   try {
     const {data,error}=await sb.from('daily_revenue').select('amount,revenue_date,branch').gte('revenue_date',monthStart).lte('revenue_date',today);
     if(error) throw error;
@@ -11141,7 +11158,16 @@ async function loadFinancialReport() {
   // إيرادات = مدفوعات الطلاب
   let totalRevenue = 0, totalDueAll = 0, totalPaidAll = 0;
   const payRows = [];
-  if (!Object.keys(allPayments).length) await loadPayments();
+  if (!Object.keys(allPayments).length) {
+    // التقارير تقرأ السجلات الموجودة فقط؛ لا تستدعِ loadPayments هنا لأنها قد تُنشئ أقساطًا ناقصة تلقائيًا.
+    const { data: reportPaymentRows, error: reportPaymentError } = await sb.from('payments').select('*');
+    if (reportPaymentError) throw reportPaymentError;
+    allPayments = {};
+    (reportPaymentRows || []).forEach(p => {
+      if (!allPayments[p.student_id]) allPayments[p.student_id] = {};
+      allPayments[p.student_id][p.payment_type] = p;
+    });
+  }
   allStudents.filter(s => s.program_id && (!branchFilter || s.branch === branchFilter)).forEach(s => {
     const schedule = getPaymentSchedule(s);
     const payments = allPayments[s.id] || {};
