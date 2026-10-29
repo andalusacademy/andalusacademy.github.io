@@ -151,8 +151,8 @@ $function$;
 DO $migration$
 DECLARE
   v_definition text;
-  v_old text := $old$  IF v_package_id IS NOT NULL THEN$old$;
-  v_new text := $new$  IF v_package_id IS NOT NULL AND NOT EXISTS (
+  v_old text := $old$IF v_package_id IS NOT NULL THEN$old$;
+  v_new text := $new$IF v_package_id IS NOT NULL AND NOT EXISTS (
     SELECT 1
     FROM public.study_summary_package_items pi
     WHERE pi.package_id = v_package_id
