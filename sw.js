@@ -1,6 +1,6 @@
-/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v36 */
-const CACHE='andalus-v36-clean-html';
-const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=2'];
+/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v37 */
+const CACHE='andalus-v37-clean-html';
+const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3'];
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));
@@ -12,10 +12,6 @@ self.addEventListener('activate',e=>{
     const keys=await caches.keys();
     await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));
     await self.clients.claim();
-    const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});
-    for(const client of clients){
-      try{ await client.navigate(client.url); }catch(_){ }
-    }
   })());
 });
 
