@@ -180,6 +180,7 @@
           '<div style="font-size:11px;color:#64748b;margin-top:4px;">'+esc(typeLabels[r.request_type]||r.request_type)+' · '+esc(formatDate(r.created_at))+' · أولوية '+esc(priorityLabels[r.priority]||r.priority)+'</div>'+
           '<div style="font-size:12px;line-height:1.8;margin-top:7px;white-space:pre-wrap;">'+esc(r.description)+'</div>'+
           (r.admin_response ? '<div style="margin-top:8px;padding:8px;background:#eff6ff;border-radius:8px;font-size:12px;"><strong>رد الإدارة:</strong> '+esc(r.admin_response)+'</div>' : '')+
+          (['resolved','closed'].includes(r.status) ? '<button type="button" class="btn btn-outline btn-sm" style="margin-top:9px;color:#b91c1c;border-color:#fecaca;" onclick="deleteCompletedStudentRequest(\''+esc(r.id)+'\')">🗑 حذف الطلب المنتهي</button>' : '<div style="font-size:10px;color:#94a3b8;margin-top:8px;">يتاح الحذف بعد إغلاق الطلب أو حلّه.</div>')+
           '</div>'
         ).join('')+'</div>' : '<div style="text-align:center;color:#64748b;padding:10px;">لا توجد شكاوى أو طلبات مسجلة حتى الآن.</div>')+
         '</div>';
@@ -187,6 +188,36 @@
       box.innerHTML = '<div style="padding:12px;border:1px solid #fecaca;border-radius:10px;color:#b91c1c;">تعذر تحميل الطلبات: '+esc(error?.message||'خطأ غير معروف')+'</div>';
     }
   }
+  window.deleteCompletedStudentRequest = async function(requestId) {
+    if (typeof unifiedPortalStudent === 'undefined' || !unifiedPortalStudent?.id || !unifiedPortalPhone) {
+      toast('انتهت جلسة الدخول. سجّل الدخول مرة أخرى.', 'error'); return;
+    }
+    const id = String(requestId || '');
+    if (!id || !window.confirm('هل تريد إخفاء هذا الطلب المنتهي من قائمة طلباتك؟ سيظل الطلب محفوظًا في سجل الإدارة.')) return;
+    try {
+      const client = getClient();
+      if (!client) throw new Error('تعذر الاتصال بالنظام.');
+      const { data, error } = await client.rpc('student_hide_completed_request', {
+        p_student_id: String(unifiedPortalStudent.id),
+        p_phone: String(unifiedPortalPhone),
+        p_request_id: id
+      });
+      if (error) throw error;
+      if (!data?.success) {
+        const messages = {
+          identity_not_verified: 'تعذر التحقق من بياناتك. سجّل الدخول مرة أخرى.',
+          request_not_found: 'لم يتم العثور على الطلب أو لا تملك صلاحية إخفائه.',
+          request_not_completed: 'لا يمكن إخفاء الطلب قبل حلّه أو إغلاقه.'
+        };
+        throw new Error(messages[data?.error] || 'تعذر إخفاء الطلب.');
+      }
+      toast('تم حذف الطلب من قائمتك، وسيظل محفوظًا في سجل الإدارة.', 'success');
+      await window.loadStudentPortalRequests();
+    } catch (error) {
+      toast(error?.message || 'حدث خطأ أثناء حذف الطلب.', 'error');
+    }
+  };
+
   window.loadStudentPortalRequests = async function() {
     const box = $('student-portal-requests');
     if (typeof unifiedPortalStudent === 'undefined' || !unifiedPortalStudent || !unifiedPortalPhone) return;
