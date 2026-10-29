@@ -16094,7 +16094,7 @@ function renderStudySummaryOrderDashboard(){
   const rows=studySummaryOrderRows.filter(o=>{
     const st=studentMap.get(String(o.student_id));const sm=summaryMap.get(o.summary_id);
     const hasProof=!!String(o.payment_reference||'').trim()||!!String(o.payment_proof_path||'').trim();
-    if(studySummaryOrderView==='review'&&!(o.status==='pending_payment'&&hasProof))return false;
+    if(studySummaryOrderView==='review'&&o.status!=='pending_payment')return false;
     if(studySummaryOrderView==='paid'&&o.status!=='paid')return false;
     if(studySummaryOrderView==='rejected'&&o.status!=='rejected')return false;
     if(q){
@@ -16103,7 +16103,7 @@ function renderStudySummaryOrderDashboard(){
     }
     return true;
   });
-  const statusLabel={pending_payment:'بانتظار المراجعة',paid:'مدفوع ومعتمد — المحتوى متاح',cancelled:'ملغي',rejected:'مرفوض',expired:'منتهي'};
+  const statusLabel={pending_payment:'بانتظار إثبات التحويل أو مراجعته',paid:'مدفوع ومعتمد — المحتوى متاح',cancelled:'ملغي',rejected:'مرفوض',expired:'منتهي'};
   body.innerHTML=rows.length?rows.map(o=>{
     const st=studentMap.get(String(o.student_id));const sm=summaryMap.get(o.summary_id);
     const statusClass=o.status==='paid'?'badge-success':o.status==='pending_payment'?'badge-warning':o.status==='rejected'?'badge-danger':'badge-gray';
