@@ -16282,7 +16282,7 @@ async function requestStudentStudySummary(id){
   const {data,error}=await sb.rpc('student_create_paid_study_summary_order',{p_session_token:studentPortalFaceToken,p_summary_id:id});
   if(error||!data?.ok){
     const reasons={already_has_access:'لديك صلاحية فعّالة لهذا الملخص.',session_expired:'انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.',payment_not_configured:'لم تُدخل الإدارة رقم المحفظة لهذا الملخص بعد. حاول لاحقًا.',summary_unavailable:'انتهت فترة إتاحة شراء الملخص أو أنه غير منشور.',pending_order_exists:'لديك طلب شراء قائم بالفعل؛ راجع قسم طلباتي.'};
-    showToast(reasons[data?.reason]||error?.message||'تعذر إنشاء الطلب.','error');if(data?.reason==='session_expired')studentPortalFaceToken=null;return;
+    if(data?.reason==='already_has_access'){showToast('تم العثور على صلاحية فعّالة بالفعل. جاري تحديث المكتبة...','success');await goToPortalStudySummaries();return;}showToast(reasons[data?.reason]||error?.message||'تعذر إنشاء الطلب.','error');if(data?.reason==='session_expired')studentPortalFaceToken=null;return;
   }
   showToast('تم تجهيز طلب الشراء. حوّل المبلغ ثم أرسل مرجع التحويل للمراجعة.','success');
   await goToPortalStudySummaries();
