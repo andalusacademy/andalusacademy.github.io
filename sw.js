@@ -1,5 +1,5 @@
 /* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v39 */
-const CACHE='andalus-v38-clean-html';
+const CACHE='andalus-v39-clean-html';
 const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3','./study-summary-receipt-admin.js?v=2'];
 
 self.addEventListener('install',e=>{
@@ -29,7 +29,7 @@ self.addEventListener('fetch',e=>{
             injected=injected.replace('</head>','<script src="./student-portal-bootstrap.js?v=2"></script>\n</head>');
           }
           if(!injected.includes('study-summary-receipt-admin.js')){
-            injected=injected.replace('</head>','<script src="./study-summary-receipt-admin.js?v=1"></script>\n</head>');
+            injected=injected.replace('</head>','<script src="./study-summary-receipt-admin.js?v=2"></script>\n</head>');
           }
           if(injected!==text){
             const headers=new Headers(r.headers); headers.delete('content-length'); headers.delete('content-encoding'); headers.set('cache-control','no-store');
