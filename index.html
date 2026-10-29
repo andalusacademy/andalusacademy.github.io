@@ -16112,7 +16112,7 @@ function renderStudySummaryOrderDashboard(){
     const proofAt=studySummaryOrderProofTimes[o.id]||null;
     const proofTime=proofAt?ssEsc(new Date(proofAt).toLocaleString('ar-EG')):'غير مسجل';
     const actions=[];
-    if(o.payment_proof_path)actions.push('<button class="btn btn-outline btn-sm" onclick="openStudySummaryPaymentProof(\\''+o.id+'\\')">عرض إثبات الدفع</button>');
+    if(o.payment_proof_path)actions.push('<button class="btn btn-outline btn-sm" onclick="openStudySummaryPaymentProof(\''+o.id+'\')">عرض إثبات الدفع</button>');
     if(o.status==='pending_payment'&&(o.payment_reference||o.payment_proof_path)){
       actions.push('<button class="btn btn-success btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'paid\')">اعتماد الدفع وإتاحة المحتوى</button>');
       actions.push('<button class="btn btn-danger btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'rejected\')">رفض الإثبات</button>');
