@@ -1,6 +1,6 @@
-/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v39 */
-const CACHE='andalus-v39-clean-html';
-const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3','./study-summary-receipt-admin.js?v=2'];
+/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v40 */
+const CACHE='andalus-v40-student-auth-refresh';
+const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3','./student-passkey.js?v=2','./study-summary-receipt-admin.js?v=2'];
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));
@@ -26,7 +26,7 @@ self.addEventListener('fetch',e=>{
           const text=await r.clone().text();
           let injected=text;
           if(!text.includes('student-portal-bootstrap.js')){
-            injected=injected.replace('</head>','<script src="./student-portal-bootstrap.js?v=2"></script>\n</head>');
+            injected=injected.replace('</head>','<script src="./student-portal-bootstrap.js?v=3"></script>\n</head>');
           }
           if(!injected.includes('study-summary-receipt-admin.js')){
             injected=injected.replace('</head>','<script src="./study-summary-receipt-admin.js?v=2"></script>\n</head>');
