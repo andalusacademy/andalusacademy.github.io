@@ -1,0 +1,58 @@
+/* Andalus Academy — student portal emergency bootstrap */
+(function(){
+  'use strict';
+  function isDirect(){
+    try{
+      const q=new URLSearchParams(location.search);
+      return q.get('student-portal')==='1' || location.hash==='#student-portal';
+    }catch(_){ return false; }
+  }
+  if(!isDirect()) return;
+
+  function setDirectView(){
+    const login=document.getElementById('login-screen');
+    const portal=document.getElementById('student-portal-screen');
+    if(login) login.style.display='none';
+    if(portal) portal.style.display='block';
+  }
+
+  function renderFallback(){
+    const box=document.getElementById('student-portal-content');
+    if(!box) return false;
+    const loading=box.textContent && box.textContent.indexOf('جاري التحميل')!==-1;
+    if(!loading && box.querySelector('input,button')) return true;
+    box.innerHTML=`
+      <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أول دخول يربط الحساب بهذا الجهاز. بعد ذلك يمكنك فتح البوابة من الجهاز نفسه.</p>
+      <div class="form-group"><label>كود الطالب / رقم القيد</label><input type="text" id="student-portal-id-input" autocomplete="username" placeholder="كود الطالب أو رقم القيد" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
+      <div class="form-group"><label>الرقم القومي للطالب</label><input type="password" inputmode="numeric" autocomplete="off" id="student-portal-phone-input" placeholder="أدخل الرقم القومي" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div>
+      <div id="student-portal-login-err" role="alert" style="color:#dc2626;font-size:12px;margin-top:6px;display:none;"></div>
+      <button id="student-portal-fallback-login" class="btn btn-gold" style="width:100%;padding:13px;margin-top:12px;">تسجيل الدخول وربط الجهاز</button>
+    `;
+    const go=()=>{
+      if(typeof window.enterStudentPortal==='function') return window.enterStudentPortal();
+      const err=document.getElementById('student-portal-login-err');
+      if(err){err.textContent='جاري تجهيز نظام الدخول، حاول مرة أخرى بعد لحظات.';err.style.display='block';}
+    };
+    document.getElementById('student-portal-fallback-login')?.addEventListener('click',go);
+    document.getElementById('student-portal-id-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+    document.getElementById('student-portal-phone-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+    return true;
+  }
+
+  function boot(){
+    setDirectView();
+    let tries=0;
+    const timer=setInterval(()=>{
+      setDirectView();
+      if(typeof window.showStudentPortalLoginStep==='function'){
+        try{ window.showStudentPortalLoginStep(); clearInterval(timer); return; }catch(e){ console.warn('Student portal boot:',e); }
+      }
+      if(renderFallback()) clearInterval(timer);
+      if(++tries>=20) clearInterval(timer);
+    },250);
+    setTimeout(()=>{ setDirectView(); renderFallback(); },50);
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
+  else boot();
+})();
