@@ -16109,14 +16109,14 @@ function renderStudySummaryOrderDashboard(){
     const statusClass=o.status==='paid'?'badge-success':o.status==='pending_payment'?'badge-warning':o.status==='rejected'?'badge-danger':'badge-gray';
     const reviewed=o.reviewed_at?'<div style="margin-top:5px;font-size:11px;color:var(--muted)">وقت المراجعة: '+ssEsc(new Date(o.reviewed_at).toLocaleString('ar-EG'))+'</div>':'';
     const reason=o.reviewed_reason?'<div style="margin-top:4px;font-size:11px;color:#b91c1c">سبب الرفض/المراجعة: '+ssEsc(o.reviewed_reason)+'</div>':'';
-    const proofAt=studySummaryOrderProofTimes[o.id]||(o.payment_reference?o.updated_at:null);
+    const proofAt=studySummaryOrderProofTimes[o.id]||null;
     const proofTime=proofAt?ssEsc(new Date(proofAt).toLocaleString('ar-EG')):'غير مسجل';
     const actions=[];
     if(o.status==='pending_payment'&&(o.payment_reference||o.payment_proof_path)){
-      actions.push('<button class="btn btn-success btn-sm" onclick="reviewStudySummaryOrder(\\''+o.id+'\\',\\'paid\\')">اعتماد الدفع وإتاحة المحتوى</button>');
-      actions.push('<button class="btn btn-danger btn-sm" onclick="reviewStudySummaryOrder(\\''+o.id+'\\',\\'rejected\\')">رفض الإثبات</button>');
+      actions.push('<button class="btn btn-success btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'paid\')">اعتماد الدفع وإتاحة المحتوى</button>');
+      actions.push('<button class="btn btn-danger btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'rejected\')">رفض الإثبات</button>');
     }
-    actions.push('<button class="btn btn-outline btn-sm" onclick="archiveStudySummaryOrder(\\''+o.id+'\\')">حذف من القائمة</button>');
+    actions.push('<button class="btn btn-outline btn-sm" onclick="archiveStudySummaryOrder(\''+o.id+'\')">حذف من القائمة</button>');
     const proof=o.payment_proof_path?'<div style="font-size:11px;color:#0f766e;margin-top:4px">يوجد مسار مرفق إثبات</div>':'';
     return '<tr><td><code>'+ssEsc(o.order_code||ssOrderNumber(o.id))+'</code><div style="font-size:10px;color:var(--muted);margin-top:3px">'+ssEsc(o.id)+'</div></td>'+
       '<td>'+ssEsc(st?.name||'—')+'</td><td>'+ssEsc(st?.enrollment_number||st?.id||o.student_id)+'</td>'+
