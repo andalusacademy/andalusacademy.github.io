@@ -1,1 +1,1 @@
-(()=>{try{if('caches' in window){caches.keys().then(keys=>Promise.all(keys.filter(k=>k!=='andalus-v31-direct-portal-cache-reset').map(k=>caches.delete(k)))).catch(()=>{});}}catch(_){} })();
+(()=>{try{if('caches' in window){caches.keys().then(keys=>Promise.all(keys.filter(k=>k!=='andalus-v32-direct-portal-cache-reset').map(k=>caches.delete(k)))).catch(()=>{});}}catch(_){} })();
