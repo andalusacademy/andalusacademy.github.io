@@ -1,5 +1,5 @@
-/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v35 */
-const CACHE='andalus-v35-clean-html';
+/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v36 */
+const CACHE='andalus-v36-clean-html';
 const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=1'];
 
 self.addEventListener('install',e=>{
