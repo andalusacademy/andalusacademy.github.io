@@ -1090,8 +1090,15 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           </div>
           <div class="card">
             <div class="card-header"><h3>🧾 ٤) طلبات الشراء ومراجعة التحويلات</h3><button class="btn btn-outline btn-sm" onclick="loadStudySummaryOrdersAdmin()">تحديث الطلبات</button></div>
-            <p style="padding:0 16px 12px;color:var(--muted);font-size:12px;line-height:1.8">طلبات الشراء لا تُفعّل تلقائيًا؛ راجع كود الطلب ورقم القيد والمبلغ ورقم معاملة التحويل الذي أرسله الطالب، ثم اختر «تم الدفع + إتاحة» بعد التأكد من وصول المبلغ.</p>
-            <div style="overflow-x:auto"><table><thead><tr><th>رقم الطلب</th><th>الطالب</th><th>رقم القيد</th><th>الملخص</th><th>المبلغ</th><th>الحالة</th><th>تاريخ الطلب</th><th>إجراءات الدفع والقرار</th></tr></thead><tbody id="ss-orders-list"><tr><td colspan="8" style="text-align:center">جاري التحميل...</td></tr></tbody></table></div>
+            <p style="padding:0 16px 12px;color:var(--muted);font-size:12px;line-height:1.8">كل طلب يظهر كسجل مستقل. لا تُتاح الملخصات أو الباقات إلا بعد اعتماد الدفع يدويًا. رقم الطلب ورقم معاملة التحويل معروضان كلٌّ في خانة مستقلة.</p>
+            <div style="padding:0 16px 12px"><input id="ss-orders-search" type="search" placeholder="بحث بالطالب أو رقم القيد أو رقم الطلب أو رقم المعاملة..." oninput="renderStudySummaryOrderDashboard()" style="width:100%;max-width:650px"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 14px">
+              <button id="ss-orders-tab-review" class="btn btn-primary btn-sm" onclick="setStudySummaryOrderView('review')">📥 طلبات المراجعة</button>
+              <button id="ss-orders-tab-paid" class="btn btn-outline btn-sm" onclick="setStudySummaryOrderView('paid')">✅ مدفوعات معتمدة</button>
+              <button id="ss-orders-tab-rejected" class="btn btn-outline btn-sm" onclick="setStudySummaryOrderView('rejected')">⛔ إثباتات مرفوضة</button>
+              <button id="ss-orders-tab-all" class="btn btn-outline btn-sm" onclick="setStudySummaryOrderView('all')">🔎 البحث والمتابعة</button>
+            </div>
+            <div style="overflow-x:auto"><table><thead><tr><th>رقم الطلب</th><th>الطالب</th><th>رقم القيد</th><th>الملخص / الباقة</th><th>السعر</th><th>رقم معاملة التحويل</th><th>وقت إرسال الإثبات</th><th>الحالة وسجل المراجعة</th><th>إجراءات</th></tr></thead><tbody id="ss-orders-list"><tr><td colspan="9" style="text-align:center">جاري تحميل الطلبات...</td></tr></tbody></table></div>
           </div>
         </div>
 
@@ -16058,33 +16065,82 @@ async function deleteStudySummaryQuestion(id){
   if(error){showToast('تعذر حذف السؤال: '+error.message,'error');return;}
   showToast('تم حذف السؤال','success');await loadStudySummaryQuestions(studySummarySelectedId);
 }
+let studySummaryOrderView='review';
+let studySummaryOrderProofTimes={};
+function setStudySummaryOrderView(view){
+  studySummaryOrderView=view;
+  ['review','paid','rejected','all'].forEach(v=>{const b=document.getElementById('ss-orders-tab-'+v);if(b)b.className='btn btn-sm '+(v===view?'btn-primary':'btn-outline');});
+  renderStudySummaryOrderDashboard();
+}
 async function loadStudySummaryOrdersAdmin(){
   const body=document.getElementById('ss-orders-list');if(!body)return;
-  body.innerHTML='<tr><td colspan="8" style="text-align:center">جاري تحميل الطلبات...</td></tr>';
-  const {data,error}=await sb.from('study_summary_orders').select('*').order('created_at',{ascending:false}).limit(500);
-  if(error){body.innerHTML='<tr><td colspan="8" style="color:#b91c1c;text-align:center">تعذر تحميل الطلبات: '+ssEsc(error.message)+'</td></tr>';return;}
+  body.innerHTML='<tr><td colspan="9" style="text-align:center">جاري تحميل الطلبات...</td></tr>';
+  const {data,error}=await sb.from('study_summary_orders').select('*').is('admin_deleted_at',null).order('created_at',{ascending:false}).limit(500);
+  if(error){body.innerHTML='<tr><td colspan="9" style="color:#b91c1c;text-align:center">تعذر تحميل الطلبات: '+ssEsc(error.message)+'</td></tr>';return;}
   studySummaryOrderRows=data||[];
+  studySummaryOrderProofTimes={};
+  const ids=studySummaryOrderRows.map(o=>o.id);
+  if(ids.length){
+    const audit=await sb.from('study_summary_activity').select('order_id,event_type,created_at').in('order_id',ids).eq('event_type','payment_reference_submitted');
+    if(!audit.error)(audit.data||[]).forEach(a=>{if(a.order_id&&!studySummaryOrderProofTimes[a.order_id])studySummaryOrderProofTimes[a.order_id]=a.created_at;});
+  }
+  setStudySummaryOrderView(studySummaryOrderView);
+}
+function renderStudySummaryOrderDashboard(){
+  const body=document.getElementById('ss-orders-list');if(!body)return;
   const studentMap=new Map((allStudents||[]).map(s=>[String(s.id),s]));
   const summaryMap=new Map(studySummaryAdminRows.map(s=>[s.id,s]));
-  body.innerHTML=studySummaryOrderRows.length?studySummaryOrderRows.map(o=>{
+  const q=String(document.getElementById('ss-orders-search')?.value||'').trim().toLocaleLowerCase('ar');
+  const rows=studySummaryOrderRows.filter(o=>{
     const st=studentMap.get(String(o.student_id));const sm=summaryMap.get(o.summary_id);
-    const statusLabel={pending_payment:'لم يتم الدفع / بانتظار المراجعة',paid:'تم الدفع — متاح للطالب',cancelled:'ملغي',rejected:'مرفوض'}[o.status]||o.status;
-    const statusClass=o.status==='paid'?'badge-success':o.status==='pending_payment'?'badge-warning': 'badge-gray';
-    const actions='<div style="display:flex;gap:5px;flex-wrap:wrap;min-width:220px">'+
-      (o.status==='paid'?'<span class="badge badge-success">تم تفعيل الصلاحية</span>':'<button class="btn btn-success btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'paid\')">تم الدفع + إتاحة</button>')+
-      '<button class="btn btn-outline btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'pending_payment\')">لم يتم الدفع</button>'+
-      '<button class="btn btn-outline btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'cancelled\')">إلغاء الطلب</button>'+
-      '<button class="btn btn-danger btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'rejected\')">رفض الطلب</button></div>';
-    return '<tr><td><code>'+ssEsc(o.order_code||ssOrderNumber(o.id))+'</code>'+(o.payment_reference?'<div style="margin-top:5px;font-size:11px;color:#92400e">مرجع التحويل: '+ssEsc(o.payment_reference)+'</div>':'<div style="margin-top:5px;font-size:11px;color:var(--muted)">لم يرسل مرجع التحويل</div>')+'</td><td>'+ssEsc(st?.name||'—')+'</td><td>'+ssEsc(st?.enrollment_number||st?.id||o.student_id)+'</td><td>'+ssEsc(sm?.title||'ملخص محذوف')+'</td><td>'+ssMoney(o.amount)+'</td><td><span class="badge '+statusClass+'">'+ssEsc(statusLabel)+'</span></td><td>'+ssEsc(new Date(o.created_at).toLocaleString('ar-EG'))+'</td><td>'+actions+'</td></tr>';
-  }).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px">لا توجد طلبات شراء حتى الآن.</td></tr>';
+    const hasProof=!!String(o.payment_reference||'').trim()||!!String(o.payment_proof_path||'').trim();
+    if(studySummaryOrderView==='review'&&!(o.status==='pending_payment'&&hasProof))return false;
+    if(studySummaryOrderView==='paid'&&o.status!=='paid')return false;
+    if(studySummaryOrderView==='rejected'&&o.status!=='rejected')return false;
+    if(q){
+      const hay=[st?.name,st?.enrollment_number,st?.id,o.order_code,o.id,o.payment_reference,sm?.title,o.amount].map(x=>String(x??'').toLocaleLowerCase('ar')).join(' ');
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  });
+  const statusLabel={pending_payment:'بانتظار المراجعة',paid:'مدفوع ومعتمد — المحتوى متاح',cancelled:'ملغي',rejected:'مرفوض',expired:'منتهي'};
+  body.innerHTML=rows.length?rows.map(o=>{
+    const st=studentMap.get(String(o.student_id));const sm=summaryMap.get(o.summary_id);
+    const statusClass=o.status==='paid'?'badge-success':o.status==='pending_payment'?'badge-warning':o.status==='rejected'?'badge-danger':'badge-gray';
+    const reviewed=o.reviewed_at?'<div style="margin-top:5px;font-size:11px;color:var(--muted)">وقت المراجعة: '+ssEsc(new Date(o.reviewed_at).toLocaleString('ar-EG'))+'</div>':'';
+    const reason=o.reviewed_reason?'<div style="margin-top:4px;font-size:11px;color:#b91c1c">سبب الرفض/المراجعة: '+ssEsc(o.reviewed_reason)+'</div>':'';
+    const proofAt=studySummaryOrderProofTimes[o.id]||(o.payment_reference?o.updated_at:null);
+    const proofTime=proofAt?ssEsc(new Date(proofAt).toLocaleString('ar-EG')):'غير مسجل';
+    const actions=[];
+    if(o.status==='pending_payment'&&(o.payment_reference||o.payment_proof_path)){
+      actions.push('<button class="btn btn-success btn-sm" onclick="reviewStudySummaryOrder(\\''+o.id+'\\',\\'paid\\')">اعتماد الدفع وإتاحة المحتوى</button>');
+      actions.push('<button class="btn btn-danger btn-sm" onclick="reviewStudySummaryOrder(\\''+o.id+'\\',\\'rejected\\')">رفض الإثبات</button>');
+    }
+    actions.push('<button class="btn btn-outline btn-sm" onclick="archiveStudySummaryOrder(\\''+o.id+'\\')">حذف من القائمة</button>');
+    const proof=o.payment_proof_path?'<div style="font-size:11px;color:#0f766e;margin-top:4px">يوجد مسار مرفق إثبات</div>':'';
+    return '<tr><td><code>'+ssEsc(o.order_code||ssOrderNumber(o.id))+'</code><div style="font-size:10px;color:var(--muted);margin-top:3px">'+ssEsc(o.id)+'</div></td>'+
+      '<td>'+ssEsc(st?.name||'—')+'</td><td>'+ssEsc(st?.enrollment_number||st?.id||o.student_id)+'</td>'+
+      '<td>'+ssEsc(sm?.title||'ملخص محذوف')+'</td><td><strong>'+ssMoney(o.amount)+'</strong></td>'+
+      '<td><code>'+ssEsc(o.payment_reference||'—')+'</code>'+proof+'</td><td>'+proofTime+'</td>'+
+      '<td><span class="badge '+statusClass+'">'+ssEsc(statusLabel[o.status]||o.status)+'</span>'+reviewed+reason+'</td>'+
+      '<td><div style="display:flex;gap:5px;flex-wrap:wrap;min-width:180px">'+actions.join('')+'</div></td></tr>';
+  }).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:18px">لا توجد طلبات مطابقة لهذا القسم.</td></tr>';
 }
 async function reviewStudySummaryOrder(orderId,nextStatus){
   const order=studySummaryOrderRows.find(o=>o.id===orderId);if(!order)return;
-  if(nextStatus==='paid'&&!String(order.payment_reference||'').trim()){showToast('لا يمكن تأكيد الدفع قبل أن يرسل الطالب رقم معاملة التحويل.','error');return;}
-  const labels={paid:'تأكيد الدفع ومنح الطالب صلاحية الملخص أو الباقة كاملة',pending_payment:'تسجيل أن الدفع لم يتم بعد',cancelled:'إلغاء طلب الشراء',rejected:'رفض طلب الشراء'};
-  if(!confirm(labels[nextStatus]+'؟'))return;
+  if(nextStatus==='paid'&&!String(order.payment_reference||'').trim()){showToast('لا يمكن تأكيد الدفع قبل تسجيل رقم معاملة التحويل.','error');return;}
+  let reason=null;
+  if(nextStatus==='rejected'){
+    reason=prompt('اكتب سبب رفض إثبات الدفع (سيظهر في سجل المراجعة):');
+    if(reason===null)return;
+    reason=reason.trim();
+    if(reason.length<3){showToast('اكتب سببًا واضحًا للرفض لا يقل عن 3 أحرف.','error');return;}
+  }
+  const labels={paid:'اعتماد الدفع وإتاحة الملخص أو الباقة كاملة',rejected:'رفض إثبات الدفع'};
+  if(!confirm((labels[nextStatus]||'تحديث حالة الطلب')+'؟'))return;
   if(nextStatus==='paid'){
-    const {data:member}=await sb.from('study_summary_package_items').select('package_id').eq('summary_id',order.summary_id).maybeSingle();
+    const {data:member,error:memberError}=await sb.from('study_summary_package_items').select('package_id').eq('summary_id',order.summary_id).maybeSingle();
+    if(memberError){showToast('تعذر فحص الباقة: '+memberError.message,'error');return;}
     let summaryIds=[order.summary_id];
     if(member?.package_id){
       const {data:items,error:itemsError}=await sb.from('study_summary_package_items').select('summary_id').eq('package_id',member.package_id);
@@ -16095,12 +16151,20 @@ async function reviewStudySummaryOrder(orderId,nextStatus){
       const {data:questions,error:qError}=await sb.from('study_summary_questions').select('id,is_approved,is_selected').eq('summary_id',summaryId);
       if(qError){showToast('تعذر فحص أسئلة الملخص: '+qError.message,'error');return;}
       const chosen=(questions||[]).filter(q=>q.is_selected);
-      if(!chosen.length||chosen.some(q=>!q.is_approved)){showToast('لا يمكن تأكيد الدفع قبل اعتماد جميع الأسئلة المختارة في كل أجزاء الباقة.','error');return;}
+      if(!chosen.length||chosen.some(q=>!q.is_approved)){showToast('لا يمكن اعتماد الدفع قبل اعتماد جميع الأسئلة المختارة في كل أجزاء الباقة.','error');return;}
     }
   }
-  const {data,error}=await sb.rpc('admin_review_study_summary_order',{p_order_id:orderId,p_status:nextStatus,p_reason:null});
+  const {data,error}=await sb.rpc('admin_review_study_summary_order',{p_order_id:orderId,p_status:nextStatus,p_reason:reason});
   if(error){showToast('تعذر مراجعة الطلب: '+error.message,'error');return;}
-  showToast(nextStatus==='paid'?'تم تأكيد الدفع وإتاحة جميع أجزاء الباقة للطالب.':nextStatus==='pending_payment'?'تم تسجيل أن الدفع لم يتم.':nextStatus==='cancelled'?'تم إلغاء الطلب.':'تم رفض الطلب.','success');
+  showToast(nextStatus==='paid'?'تم اعتماد الدفع وإتاحة جميع أجزاء الباقة.':'تم رفض الإثبات وحفظ سبب الرفض.','success');
+  await loadStudySummaryOrdersAdmin();
+}
+async function archiveStudySummaryOrder(orderId){
+  const order=studySummaryOrderRows.find(o=>o.id===orderId);if(!order)return;
+  if(!confirm('سيتم إخفاء الطلب من لوحة الإدارة مع الاحتفاظ بسجل الدفع والمراجعة لأغراض المتابعة. هل تريد المتابعة؟'))return;
+  const {data,error}=await sb.rpc('admin_archive_study_summary_order',{p_order_id:orderId});
+  if(error||!data?.ok){showToast('تعذر حذف الطلب من القائمة: '+(error?.message||data?.reason||'خطأ غير معروف'),'error');return;}
+  showToast('تم إخفاء الطلب من القائمة مع الاحتفاظ بسجله.','success');
   await loadStudySummaryOrdersAdmin();
 }
 
