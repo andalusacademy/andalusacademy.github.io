@@ -1,0 +1,1 @@
+UPDATE storage.buckets SET allowed_mime_types=ARRAY['application/pdf','image/jpeg','image/png','image/webp'], file_size_limit=15728640 WHERE id='study-summary-pdfs';
