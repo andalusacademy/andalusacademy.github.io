@@ -1,6 +1,6 @@
-/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v37 */
-const CACHE='andalus-v37-clean-html';
-const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3'];
+/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v38 */
+const CACHE='andalus-v38-clean-html';
+const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3','./study-summary-receipt-admin.js?v=1'];
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));
@@ -24,8 +24,14 @@ self.addEventListener('fetch',e=>{
         const type=r.headers.get('content-type')||'';
         if(type.includes('text/html')){
           const text=await r.clone().text();
+          let injected=text;
           if(!text.includes('student-portal-bootstrap.js')){
-            const injected=text.replace('</head>','<script src="./student-portal-bootstrap.js?v=2"></script>\n</head>');
+            injected=injected.replace('</head>','<script src="./student-portal-bootstrap.js?v=2"></script>\n</head>');
+          }
+          if(!injected.includes('study-summary-receipt-admin.js')){
+            injected=injected.replace('</head>','<script src="./study-summary-receipt-admin.js?v=1"></script>\n</head>');
+          }
+          if(injected!==text){
             const headers=new Headers(r.headers); headers.delete('content-length'); headers.delete('content-encoding'); headers.set('cache-control','no-store');
             return new Response(injected,{status:r.status,statusText:r.statusText,headers});
           }
