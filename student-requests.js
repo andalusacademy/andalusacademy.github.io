@@ -157,7 +157,7 @@
     }
   };
 
-  async function loadRequestsFor(studentId, phone, box) {
+  async function loadRequestsFor(studentId, phone, box, requesterType='student') {
     if (!box || !studentId || !phone) return;
     box.innerHTML = '<div style="padding:12px;color:#64748b;text-align:center;">جاري تحميل الشكاوى والطلبات...</div>';
     try {
@@ -180,7 +180,7 @@
           '<div style="font-size:11px;color:#64748b;margin-top:4px;">'+esc(typeLabels[r.request_type]||r.request_type)+' · '+esc(formatDate(r.created_at))+' · أولوية '+esc(priorityLabels[r.priority]||r.priority)+'</div>'+
           '<div style="font-size:12px;line-height:1.8;margin-top:7px;white-space:pre-wrap;">'+esc(r.description)+'</div>'+
           (r.admin_response ? '<div style="margin-top:8px;padding:8px;background:#eff6ff;border-radius:8px;font-size:12px;"><strong>رد الإدارة:</strong> '+esc(r.admin_response)+'</div>' : '')+
-          (['resolved','closed'].includes(r.status) ? '<button type="button" class="btn btn-outline btn-sm" style="margin-top:9px;color:#b91c1c;border-color:#fecaca;" onclick="deleteCompletedStudentRequest(\''+esc(r.id)+'\')">🗑 حذف الطلب المنتهي</button>' : '<div style="font-size:10px;color:#94a3b8;margin-top:8px;">يتاح الحذف بعد إغلاق الطلب أو حلّه.</div>')+
+          (requesterType === 'student' ? (['resolved','closed'].includes(r.status) ? '<button type="button" class="btn btn-outline btn-sm" style="margin-top:9px;color:#b91c1c;border-color:#fecaca;" onclick="deleteCompletedStudentRequest(\''+esc(r.id)+'\')">🗑 حذف الطلب المنتهي</button>' : '<div style="font-size:10px;color:#94a3b8;margin-top:8px;">يتاح الحذف بعد إغلاق الطلب أو حلّه.</div>') : '')+
           '</div>'
         ).join('')+'</div>' : '<div style="text-align:center;color:#64748b;padding:10px;">لا توجد شكاوى أو طلبات مسجلة حتى الآن.</div>')+
         '</div>';
@@ -221,12 +221,12 @@
   window.loadStudentPortalRequests = async function() {
     const box = $('student-portal-requests');
     if (typeof unifiedPortalStudent === 'undefined' || !unifiedPortalStudent || !unifiedPortalPhone) return;
-    await loadRequestsFor(unifiedPortalStudent.id, unifiedPortalPhone, box);
+    await loadRequestsFor(unifiedPortalStudent.id, unifiedPortalPhone, box, 'student');
   };
   window.loadParentPortalRequests = async function() {
     const box = $('pp-request-widget');
     if (typeof ppStudent === 'undefined' || !ppStudent || typeof ppPortalPhone === 'undefined' || !ppPortalPhone) return;
-    await loadRequestsFor(ppStudent.id, ppPortalPhone, box);
+    await loadRequestsFor(ppStudent.id, ppPortalPhone, box, 'parent');
   };
 
   window.loadStudentRequestsAdmin = async function() {
