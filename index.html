@@ -831,10 +831,8 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div class="nav-card c2" onclick="showPage('attendance')"><span class="nav-card-icon">✅</span><span>الحضور والغياب</span></div>
             <div class="nav-card c1" onclick="showPage('leads')"><span class="nav-card-icon">📞</span><span>الحجوزات والاستفسارات</span></div>
             <div class="nav-card c1" onclick="showPage('campaigns')"><span class="nav-card-icon">📢</span><span>الحملات التسويقية</span></div>
-            <div class="nav-card c8" onclick="showPage('payments')"><span class="nav-card-icon">💰</span><span>المدفوعات</span></div>
-            <div class="nav-card c7" onclick="showPage('expenses')"><span class="nav-card-icon">💸</span><span>المصروفات</span></div>
+            <div class="nav-card c8" onclick="showPage('finance')" style="background:linear-gradient(135deg,#123b63,#087e8b);color:#fff;"><span class="nav-card-icon">💼</span><span>الشؤون المالية</span><small style="display:block;opacity:.88;margin-top:4px;">التحصيلات والمصروفات والتقارير</small></div>
             <div class="nav-card c6" onclick="showPage('reports')"><span class="nav-card-icon">📊</span><span>التقارير</span></div>
-            <div class="nav-card c5" onclick="showPage('financial')"><span class="nav-card-icon">💹</span><span>التقارير المالية</span></div>
             <div class="nav-card c12" onclick="showPage('schedule')"><span class="nav-card-icon">📅</span><span>جدول الكورسات</span></div>
             <div class="nav-card c11 admin-only" onclick="showPage('subjects')"><span class="nav-card-icon">📝</span><span>المواد الدراسية</span></div>
             <div class="nav-card c2" onclick="showPage('exams')" style="background:linear-gradient(135deg,#0891b2,#0e7490);"><span class="nav-card-icon">💻</span><span>الامتحانات الإلكترونية</span></div>
@@ -1418,6 +1416,20 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             </div>
           </div>
           <div id="dream-content"></div>
+        </div>
+
+        <!-- FINANCE HUB -->
+        <div id="page-finance" class="page">
+          <div class="card" style="border:1px solid var(--border);margin-bottom:18px;"><div class="card-header"><h3>💼 الشؤون المالية</h3><span style="font-size:12px;color:var(--muted)">لوحة موحدة للمتابعة المالية</span></div><p style="padding:0 16px 14px;margin:0;color:var(--muted);line-height:1.8;">كل أجزاء الحسابات في مكان واحد. هذه الصفحة تقرأ السجلات الحالية فقط، ولا تُنشئ أو تعدّل أو تحذف بيانات عند فتحها.</p></div>
+          <div class="nav-cards-grid no-print" style="margin-bottom:18px;">
+            <div class="nav-card c8" onclick="showPage('payments')"><span class="nav-card-icon">💰</span><span>التحصيلات والمدفوعات</span><small style="display:block;margin-top:4px;">أقساط الطلاب والمبالغ المحصلة</small></div>
+            <div class="nav-card c7" onclick="showPage('expenses')"><span class="nav-card-icon">🧾</span><span>المصروفات</span><small style="display:block;margin-top:4px;">سجل المصروفات وإضافتها</small></div>
+            <div class="nav-card c7" onclick="showPage('cashregister')"><span class="nav-card-icon">💵</span><span>الإيراد اليومي</span><small style="display:block;margin-top:4px;">الإيرادات المسجلة يدويًا</small></div>
+            <div class="nav-card c5" onclick="showPage('financial')"><span class="nav-card-icon">📈</span><span>التقارير المالية</span><small style="display:block;margin-top:4px;">تحليل حسب الفترة والفرع</small></div>
+          </div>
+          <div class="card" style="margin-bottom:18px;"><div class="card-header"><h3>📊 ملخص التحصيلات والمصروفات</h3><button class="btn btn-outline btn-sm" onclick="loadFinanceHub()">↻ تحديث الملخص</button></div><div id="finance-hub-summary" class="fin-summary-grid" style="padding:14px;"><div class="empty-state"><h4>جارٍ تحميل الملخص المالي…</h4></div></div></div>
+          <div class="card" style="margin-bottom:18px;"><div class="card-header"><h3>💵 الإيراد اليومي المسجل</h3><span id="finance-hub-daily-date" style="font-size:12px;color:var(--muted)"></span></div><div id="finance-hub-daily-summary" class="stats-grid" style="padding:14px;"><div class="empty-state"><h4>جارٍ تحميل الإيراد اليومي…</h4></div></div><p style="padding:0 16px 14px;margin:0;color:var(--muted);font-size:12px;line-height:1.7;">الإيراد اليومي معروض منفصلًا عن أقساط الطلاب لتجنب جمع المبلغ مرتين إذا كان مسجلًا في المصدرين.</p></div>
+          <div id="finance-hub-status" role="status" style="color:var(--muted);font-size:12px;margin-top:8px;"></div>
         </div>
 
         <!-- PAYMENTS -->
@@ -4993,7 +5005,8 @@ function showPage(page) {
       showToast('⚠️ لا تملك صلاحية الوصول لهذه الصفحة', 'error');
       page = 'dashboard';
     } else if (Array.isArray(currentUser.allowed_pages) && page !== 'dashboard' && page !== 'profile') {
-      if (!currentUser.allowed_pages.includes(page)) {
+      const financeAllowed = page === 'finance' && ['payments','expenses','financial','cashregister'].some(p => currentUser.allowed_pages.includes(p));
+       if (!currentUser.allowed_pages.includes(page) && !financeAllowed) {
         showToast('⚠️ لا تملك صلاحية الوصول لهذه الصفحة', 'error');
         page = 'dashboard';
       }
@@ -5010,13 +5023,14 @@ function showPage(page) {
   const titles = {
     dashboard: 'لوحة التحكم', students: 'الطلاب', programs: 'البرامج والكورسات',
     attendance: 'الحضور والغياب', leads: 'الحجوزات والاستفسارات', payments: 'المدفوعات',
-    expenses: 'المصروفات',
+    finance: 'الشؤون المالية', expenses: 'المصروفات',
     reports: 'التقارير',
     subjects: 'المواد الدراسية', employees: 'الموظفين', logs: 'سجل النشاط', profile: 'بروفايل الطالب', exams: 'الامتحانات الإلكترونية', 'exam-grades': 'درجات الامتحانات', breakeven: 'نقطة التعادل', court: 'محكمة الأداء', dream: 'النظام يحلم', campaigns: 'الحملات التسويقية', achievements: 'إنجازات وترتيب المتدربين', requests: 'الشكاوى والطلبات', 'competition-security': 'أمان المسابقات والتحقق والهوية', 'dismissed-students': 'الطلاب المفصولون', 'study-summaries': 'مكتبة ملخصات الامتحانات'
   };
   document.getElementById('page-title').textContent = titles[page] || '';
   if (page === 'leads') { loadLeads(); loadCampaigns(); }
   if (page === 'campaigns') loadCampaigns();
+  if (page === 'finance') loadFinanceHub();
   if (page === 'payments') loadPayments();
   if (page === 'expenses') loadExpenses();
   if (page === 'employees') loadEmployees();
@@ -11092,6 +11106,27 @@ function renderRevenueForecast() {
       <span>📍 فرع اسكندرية: <strong style="color:var(--navy);">${byBranch['فرع اسكندرية'].toLocaleString('ar-EG')} ج</strong></span>
     </div>` : ''}
   `;
+}
+
+/* FINANCE HUB — read-only aggregation */
+async function loadFinanceHub() {
+  const summaryEl = document.getElementById('finance-hub-summary');
+  const dailyEl = document.getElementById('finance-hub-daily-summary');
+  const statusEl = document.getElementById('finance-hub-status');
+  const fmt = n => (Number(n) || 0).toLocaleString('ar-EG') + ' ج.م';
+  const today = new Date().toISOString().slice(0,10), monthStart = today.slice(0,7) + '-01';
+  if (statusEl) statusEl.textContent = 'جارٍ قراءة البيانات المالية الحالية…';
+  try { await loadFinancialReport(); if(summaryEl) summaryEl.innerHTML = document.getElementById('fin-summary')?.innerHTML || '<div class="empty-state"><h4>لا يتوفر ملخص حاليًا.</h4></div>'; }
+  catch(err) { if(summaryEl) summaryEl.innerHTML = '<div class="empty-state"><h4>تعذر تحميل الملخص المالي. افتح التقارير المالية للتفاصيل.</h4></div>'; console.error('loadFinanceHub summary',err); }
+  try {
+    const {data,error}=await sb.from('daily_revenue').select('amount,revenue_date,branch').gte('revenue_date',monthStart).lte('revenue_date',today);
+    if(error) throw error;
+    const rows=data||[], todayRows=rows.filter(row=>row.revenue_date===today);
+    const todayTotal=todayRows.reduce((sum,row)=>sum+(Number(row.amount)||0),0), monthTotal=rows.reduce((sum,row)=>sum+(Number(row.amount)||0),0);
+    if(dailyEl) dailyEl.innerHTML=`<div class="stat-card"><div class="stat-label">الإيراد اليومي المسجل اليوم</div><div class="stat-value" style="color:#16a34a">${fmt(todayTotal)}</div><div class="stat-sub">${todayRows.length} عملية</div></div><div class="stat-card"><div class="stat-label">الإيراد اليومي المسجل هذا الشهر</div><div class="stat-value" style="color:#0f766e">${fmt(monthTotal)}</div><div class="stat-sub">${rows.length} عملية</div></div>`;
+    const label=document.getElementById('finance-hub-daily-date'); if(label) label.textContent='حتى '+new Date(today+'T00:00:00').toLocaleDateString('ar-EG');
+  } catch(err) { if(dailyEl) dailyEl.innerHTML='<div class="empty-state"><h4>تعذر قراءة سجل الإيراد اليومي. لم يتم تعديل أي بيانات.</h4></div>'; console.error('loadFinanceHub daily revenue',err); }
+  if(statusEl) statusEl.textContent='تم تحديث الملخص من السجلات الموجودة. الإيراد اليومي منفصل عن أقساط الطلاب لتجنب ازدواج الحساب.';
 }
 
 async function loadFinancialReport() {
