@@ -16081,7 +16081,7 @@ async function loadStudySummaryOrdersAdmin(){
   studySummaryOrderProofTimes={};
   const ids=studySummaryOrderRows.map(o=>o.id);
   if(ids.length){
-    const audit=await sb.from('study_summary_activity').select('order_id,event_type,created_at').in('order_id',ids).eq('event_type','payment_reference_submitted');
+    const audit=await sb.from('study_summary_activity').select('order_id,event_type,created_at').in('order_id',ids).in('event_type',['payment_reference_submitted','payment_proof_submitted']).order('created_at',{ascending:false});
     if(!audit.error)(audit.data||[]).forEach(a=>{if(a.order_id&&!studySummaryOrderProofTimes[a.order_id])studySummaryOrderProofTimes[a.order_id]=a.created_at;});
   }
   setStudySummaryOrderView(studySummaryOrderView);
