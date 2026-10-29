@@ -453,6 +453,30 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
   .badge{border:1px solid #ccc !important;}
 }
 
+
+/* Student portal refresh v36 */
+#student-portal-screen .exam-portal-card-wrap{min-height:100svh;padding:clamp(14px,3vw,34px);background:radial-gradient(circle at 15% 15%,rgba(201,162,76,.18),transparent 34%),linear-gradient(145deg,#0b1730 0%,#1b3764 55%,#10213e 100%);}
+#student-portal-card{width:min(100%,560px);padding:clamp(22px,4vw,38px);border:1px solid rgba(255,255,255,.45);box-shadow:0 24px 70px rgba(0,0,0,.28);}
+#student-portal-card .login-logo{margin-bottom:24px;}
+#student-portal-card .login-logo h1{font-size:clamp(21px,4vw,28px);letter-spacing:0;}
+#student-portal-card .login-logo p{font-size:14px;}
+#student-portal-card #student-portal-content>p:first-child{line-height:1.9;color:#475569!important;}
+#student-portal-content .form-group{margin-bottom:15px;}
+#student-portal-content .form-group input{min-height:48px;font-size:15px;background:#f8fafc;border-color:#d8dfeb;}
+#student-portal-content .btn{border-radius:12px;min-height:46px;font-family:'Cairo',sans-serif;font-weight:800;transition:transform .18s,box-shadow .18s;}
+#student-portal-content .btn:focus-visible{outline:3px solid #e8c87a;outline-offset:2px;}
+.student-portal-welcome{padding:17px 18px;margin-bottom:18px;border-radius:15px;color:#fff;background:linear-gradient(125deg,#142744,#284b7e);box-shadow:0 10px 24px rgba(21,34,56,.14);}
+.student-portal-welcome .welcome-title{font-size:19px;font-weight:900;line-height:1.7;}
+.student-portal-welcome .welcome-sub{font-size:12px;color:#dbeafe;margin-top:3px;}
+.student-portal-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px!important;}
+.student-portal-tile{position:relative;min-width:0;min-height:132px;padding:17px 10px!important;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center!important;white-space:normal;line-height:1.65;border:1px solid #e5eaf3!important;border-radius:15px!important;color:#173052!important;background:linear-gradient(145deg,#fff,#f5f8fd)!important;box-shadow:0 4px 13px rgba(20,40,75,.06);}
+.student-portal-tile:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(20,40,75,.13);border-color:#c9a24c!important;}
+.student-portal-tile .tile-icon{width:52px;height:52px;display:flex;align-items:center;justify-content:center;border-radius:16px;background:#e8eef8;font-size:27px;line-height:1;}
+.student-portal-tile .tile-label{font-size:13px;font-weight:900;}
+.student-portal-tile .tile-hint{font-size:10px;font-weight:600;color:#748198;}
+#student-portal-requests,#student-portal-achievements{min-width:0;}
+@media(max-width:380px){#student-portal-card{padding:20px 15px}.student-portal-grid{gap:8px!important}.student-portal-tile{min-height:118px;padding:12px 7px!important}.student-portal-tile .tile-icon{width:44px;height:44px;font-size:23px}.student-portal-tile .tile-label{font-size:12px}}
+@media(min-width:540px){.student-portal-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}.student-portal-tile{min-height:140px}}
 </style>
 </head>
 <body>
@@ -12874,7 +12898,17 @@ async function getStudentDeviceToken(nationalId = '') {
 async function completeStudentDeviceLogin(studentCode = '', nationalId = '') {
   const token = await getStudentDeviceToken(nationalId);
   if (!token) throw new Error('لم يتم العثور على جلسة جهاز محفوظة. أدخل كود الطالب والرقم القومي أولًا.');
-  const { data, error } = await sb.rpc('student_device_auth', { p_student_code: studentCode, p_national_id: nationalId, p_device_token: token });
+  let loginResult;
+  try {
+    loginResult = await Promise.race([
+      sb.rpc('student_device_auth', { p_student_code: studentCode, p_national_id: nationalId, p_device_token: token }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('استغرق التحقق وقتًا أطول من المعتاد. تأكد من الإنترنت ثم حاول مرة أخرى.')), 15000))
+    ]);
+  } catch (e) {
+    if (e?.message?.includes('وقتًا أطول')) throw e;
+    throw new Error('تعذر الاتصال بخدمة تسجيل الدخول. تأكد من الإنترنت ثم أعد المحاولة.');
+  }
+  const { data, error } = loginResult;
   if (error) throw new Error('خدمة تسجيل الجهاز غير مفعلة بعد أو تعذر الاتصال. حاول لاحقًا.');
   if (!data?.ok) {
     if (data?.reason === 'device_mismatch') throw new Error('هذا الحساب مربوط بجهاز آخر. تواصل مع إدارة المركز لإعادة ربط الجهاز.');
@@ -13079,25 +13113,24 @@ function closeStudentLoginNotificationDialog() {
 }
 
 function renderStudentPortalMenu() {
+  const name = escapeHtml(unifiedPortalStudent?.name || 'الطالب');
   document.getElementById('student-portal-content').innerHTML = `
-    <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أهلاً ${escapeHtml(unifiedPortalStudent.name)} 👋</p>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;" onclick="goToPortalExams()">📝 الامتحانات الإلكترونية</button>
-      <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;background:linear-gradient(135deg,#0f766e,#164e63);" onclick="goToPortalStudySummaries()">📚 ملخصات الامتحانات الشهرية</button>
-      <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;" onclick="loadPortalNotifications('student')">🔔 الإشعارات والتنبيهات</button>
-      <button class="btn btn-gold" style="width:100%;padding:14px;text-align:right;background:linear-gradient(135deg,#b45309,#78350f);" onclick="goToPortalWeeklyQuiz()">🏆 المسابقة الأسبوعية</button>
-      <button class="btn btn-outline" style="width:100%;padding:14px;text-align:right;" onclick="openStudentRequestForm()">🎫 الشكاوى والطلبات</button>
+    <section class="student-portal-welcome">
+      <div class="welcome-title">أهلًا بك، ${name} 👋</div>
+      <div class="welcome-sub">بوابتك التعليمية — اختر الخدمة التي تريدها</div>
+    </section>
+    <div class="student-portal-grid">
+      <button class="btn student-portal-tile" onclick="goToPortalExams()" aria-label="الامتحانات الإلكترونية"><span class="tile-icon">📝</span><span class="tile-label">الامتحانات الإلكترونية</span><span class="tile-hint">ابدأ أو تابع امتحاناتك</span></button>
+      <button class="btn student-portal-tile" onclick="goToPortalStudySummaries()" aria-label="ملخصات الامتحانات"><span class="tile-icon">📚</span><span class="tile-label">ملخصات الامتحانات</span><span class="tile-hint">راجع المواد والأسئلة</span></button>
+      <button class="btn student-portal-tile" onclick="loadPortalNotifications('student')" aria-label="الإشعارات والتنبيهات"><span class="tile-icon">🔔</span><span class="tile-label">الإشعارات والتنبيهات</span><span class="tile-hint">آخر أخبار المركز</span></button>
+      <button class="btn student-portal-tile" onclick="goToPortalWeeklyQuiz()" aria-label="المسابقة الأسبوعية"><span class="tile-icon">🏆</span><span class="tile-label">المسابقة الأسبوعية</span><span class="tile-hint">شارك واجمع النقاط</span></button>
+      <button class="btn student-portal-tile" onclick="openStudentRequestForm()" aria-label="الشكاوى والطلبات"><span class="tile-icon">🎫</span><span class="tile-label">الشكاوى والطلبات</span><span class="tile-hint">تابع طلباتك ورد الإدارة</span></button>
     </div>
     <div id="student-portal-requests" style="margin-top:14px;"></div>
     <div id="student-portal-achievements" style="margin-top:14px;"></div>
   `;
-  if (typeof loadStudentPortalAchievements === 'function') {
-    loadStudentPortalAchievements(unifiedPortalPhone || '');
-  }
-  if (typeof loadStudentPortalRequests === 'function') {
-    loadStudentPortalRequests();
-  }
-  // Surface unread important notices immediately after successful face verification.
+  if (typeof loadStudentPortalAchievements === 'function') loadStudentPortalAchievements(unifiedPortalPhone || '');
+  if (typeof loadStudentPortalRequests === 'function') loadStudentPortalRequests();
   void checkStudentLoginNotifications();
 }
 
