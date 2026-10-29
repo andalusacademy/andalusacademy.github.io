@@ -1,18 +1,35 @@
-/* Andalus Academy Service Worker — direct student portal + cache reset v32 */
-const CACHE='andalus-v32-direct-portal-cache-reset';
-const ASSETS=['./','./index.html','./manifest.json','./face-camera-fix.js?v=5','./student-portal-logs-ui.js?v=5','./cache-reset.js?v=6','./student-portal-login-fix.js?v=1','./daily-revenue-fix.js?v=2','./exam-essay-fix.js?v=2','./exam-student-render-fix.js?v=2'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));self.skipWaiting()});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim()});
-async function inject(response){try{if(!response||!response.ok)return response;const type=response.headers.get('content-type')||'';if(!type.includes('text/html'))return response;let text=await response.clone().text();
-const headBootstrap='<script>(function(){try{var h=location.hash||"";var q=new URLSearchParams(location.search);if(h==="#student-portal"||q.get("student-portal")==="1"){document.documentElement.setAttribute("data-student-portal-direct","1");}}catch(_){}})();</script>';
-if(!text.includes('data-student-portal-direct')||!text.includes('location.hash||""'))text=text.replace('</head>',headBootstrap+'\n</head>');
-const add=(needle,tag)=>{if(!text.includes(needle))text=text.replace('</body>',tag+'\n</body>')};
-add('cache-reset.js','<script src="./cache-reset.js?v=6"></script>');
-add('student-portal-login-fix.js','<script src="./student-portal-login-fix.js?v=1"></script>');
-add('face-camera-fix.js','<script src="./face-camera-fix.js?v=5"></script>');
-add('student-portal-logs-ui.js','<script src="./student-portal-logs-ui.js?v=5"></script>');
-add('daily-revenue-fix.js','<script src="./daily-revenue-fix.js?v=2"></script>');
-add('exam-essay-fix.js','<script src="./exam-essay-fix.js?v=2"></script>');
-add('exam-student-render-fix.js','<script src="./exam-student-render-fix.js?v=2"></script>');
-return new Response(text,{status:response.status,statusText:response.statusText,headers:response.headers})}catch(_){return response}}
-self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const html=e.request.mode==='navigate'||e.request.destination==='document'||e.request.url.endsWith('/index.html');e.respondWith((async()=>{try{const r=await fetch(e.request,{cache:'no-store'});if(r?.ok&&e.request.url.startsWith(self.location.origin)&&!html){const c=await caches.open(CACHE);c.put(e.request,r.clone()).catch(()=>{})}return html?inject(r):r}catch(_){const c=await caches.match(e.request);return html?inject(c):c}})())});
+/* Andalus Academy Service Worker — clean HTML delivery + cache reset v33 */
+const CACHE='andalus-v33-clean-html';
+const ASSETS=['./','./index.html','./manifest.json'];
+
+self.addEventListener('install',e=>{
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate',e=>{
+  e.waitUntil(
+    caches.keys().then(keys=>Promise.all(
+      keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))
+    ))
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch',e=>{
+  if(e.request.method!=='GET') return;
+  e.respondWith((async()=>{
+    try{
+      // Never rewrite HTML. This prevents JavaScript/source from being rendered
+      // into the student portal and keeps the original document intact.
+      const r=await fetch(e.request,{cache:'no-store'});
+      if(r?.ok && e.request.url.startsWith(self.location.origin) && e.request.destination!=='document'){
+        const c=await caches.open(CACHE);
+        c.put(e.request,r.clone()).catch(()=>{});
+      }
+      return r;
+    }catch(_){
+      return await caches.match(e.request) || Response.error();
+    }
+  })());
+});
