@@ -1,6 +1,6 @@
-/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v38 */
+/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v39 */
 const CACHE='andalus-v38-clean-html';
-const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3','./study-summary-receipt-admin.js?v=1'];
+const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3','./study-summary-receipt-admin.js?v=2'];
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));
