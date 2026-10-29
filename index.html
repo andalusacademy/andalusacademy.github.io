@@ -16112,6 +16112,7 @@ function renderStudySummaryOrderDashboard(){
     const proofAt=studySummaryOrderProofTimes[o.id]||null;
     const proofTime=proofAt?ssEsc(new Date(proofAt).toLocaleString('ar-EG')):'غير مسجل';
     const actions=[];
+    if(o.payment_proof_path)actions.push('<button class="btn btn-outline btn-sm" onclick="openStudySummaryPaymentProof(\\''+o.id+'\\')">عرض إثبات الدفع</button>');
     if(o.status==='pending_payment'&&(o.payment_reference||o.payment_proof_path)){
       actions.push('<button class="btn btn-success btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'paid\')">اعتماد الدفع وإتاحة المحتوى</button>');
       actions.push('<button class="btn btn-danger btn-sm" onclick="reviewStudySummaryOrder(\''+o.id+'\',\'rejected\')">رفض الإثبات</button>');
@@ -16128,7 +16129,7 @@ function renderStudySummaryOrderDashboard(){
 }
 async function reviewStudySummaryOrder(orderId,nextStatus){
   const order=studySummaryOrderRows.find(o=>o.id===orderId);if(!order)return;
-  if(nextStatus==='paid'&&!String(order.payment_reference||'').trim()){showToast('لا يمكن تأكيد الدفع قبل تسجيل رقم معاملة التحويل.','error');return;}
+  if(nextStatus==='paid'&&!String(order.payment_reference||'').trim()&&!String(order.payment_proof_path||'').trim()){showToast('لا يمكن اعتماد الدفع دون رقم معاملة أو ملف إثبات مرفق.','error');return;}
   let reason=null;
   if(nextStatus==='rejected'){
     reason=prompt('اكتب سبب رفض إثبات الدفع (سيظهر في سجل المراجعة):');
@@ -16158,6 +16159,13 @@ async function reviewStudySummaryOrder(orderId,nextStatus){
   if(error){showToast('تعذر مراجعة الطلب: '+error.message,'error');return;}
   showToast(nextStatus==='paid'?'تم اعتماد الدفع وإتاحة جميع أجزاء الباقة.':'تم رفض الإثبات وحفظ سبب الرفض.','success');
   await loadStudySummaryOrdersAdmin();
+}
+async function openStudySummaryPaymentProof(orderId){
+  const order=studySummaryOrderRows.find(o=>o.id===orderId);
+  if(!order?.payment_proof_path){showToast('لا يوجد ملف إثبات مرفق بهذا الطلب.','error');return;}
+  const {data,error}=await sb.storage.from('study-summary-pdfs').createSignedUrl(order.payment_proof_path,300);
+  if(error||!data?.signedUrl){showToast('تعذر فتح إثبات الدفع: '+(error?.message||'الملف غير متاح'),'error');return;}
+  window.open(data.signedUrl,'_blank','noopener');
 }
 async function archiveStudySummaryOrder(orderId){
   const order=studySummaryOrderRows.find(o=>o.id===orderId);if(!order)return;
