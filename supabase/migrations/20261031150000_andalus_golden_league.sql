@@ -57,11 +57,7 @@ AS $
       (date_trunc('month',p_date - interval '1 month')::date
         + ((6-extract(dow FROM date_trunc('month',p_date - interval '1 month')::date)::integer+7)%7))::date AS previous_anchor
   )
-  SELECT CASE
-    WHEN p_date>=previous_anchor AND p_date<previous_anchor+28 THEN previous_anchor
-    WHEN p_date>=current_anchor AND p_date<current_anchor+28 THEN current_anchor
-    ELSE current_anchor
-  END FROM anchors;
+  SELECT CASE WHEN p_date>=current_anchor THEN current_anchor ELSE previous_anchor END FROM anchors;
 $;
 
 CREATE OR REPLACE FUNCTION public.golden_league_week_number(p_date date)
@@ -121,7 +117,7 @@ DECLARE
   v_today date := (now() AT TIME ZONE 'Africa/Cairo')::date;
   v_now time := (now() AT TIME ZONE 'Africa/Cairo')::time;
   v_cycle date; v_week integer; v_week_start date; v_threshold integer; v_seconds integer;
-  v_my_week integer:=0; v_month integer:=0; v_correct integer:=0; v_week_breakdown jsonb;
+  v_my_week integer:=0; v_month integer:=0; v_correct integer:=0; v_week_breakdown jsonb; v_completed_weeks integer:=0;
   v_board jsonb; v_window text; v_eligible boolean:=true; v_i integer; v_points integer;
 BEGIN
   SELECT * INTO v_student FROM public.students WHERE id=btrim(coalesce(p_student_id,'')) AND deleted_at IS NULL AND student_status='active';
@@ -167,12 +163,14 @@ BEGIN
   FROM generate_series(1,4) w
   LEFT JOIN public.quiz_weekly_scores q ON q.student_id=v_student.id AND q.week_start=v_cycle+(w-1)*7;
 
-  FOR v_i IN 1..4 LOOP
+  v_completed_weeks:=CASE
+    WHEN v_week=0 AND v_today>=v_cycle+28 THEN 4
+    WHEN v_week BETWEEN 1 AND 4 THEN greatest(0,v_week-1)+CASE WHEN v_today>=v_week_start+6 THEN 1 ELSE 0 END
+    ELSE 0 END;
+  FOR v_i IN 1..v_completed_weeks LOOP
     SELECT coalesce(total_points,0) INTO v_points FROM public.quiz_weekly_scores
       WHERE student_id=v_student.id AND week_start=v_cycle+(v_i-1)*7;
-    IF coalesce(v_points,0)<v_settings.weekly_thresholds[v_i] THEN
-      IF v_i < v_week OR (v_i=v_week AND v_today>=v_week_start+6) THEN v_eligible:=false; END IF;
-    END IF;
+    IF coalesce(v_points,0)<v_settings.weekly_thresholds[v_i] THEN v_eligible:=false; END IF;
   END LOOP;
 
   SELECT coalesce(jsonb_agg(jsonb_build_object('rank',r.rn,'student_name',r.student_name,
@@ -197,11 +195,10 @@ BEGIN
             WHERE qa.student_id=s.id AND qa.quiz_date>=v_week_start AND qa.quiz_date<v_week_start+7),0)
         ELSE 0 END AS week_points,
         NOT EXISTS (
-          SELECT 1 FROM generate_series(1,least(4,greatest(1,v_week))) w
+          SELECT 1 FROM generate_series(1,v_completed_weeks) w
           WHERE (SELECT coalesce(q3.total_points,0) FROM public.quiz_weekly_scores q3
             WHERE q3.student_id=s.id AND q3.week_start=v_cycle+(w-1)*7)
             < v_settings.weekly_thresholds[w]
-            AND (w<v_week OR (w=v_week AND v_today>=v_week_start+6))
         ) AS eligible
       FROM public.students s WHERE s.deleted_at IS NULL AND s.student_status='active'
         AND EXISTS (SELECT 1 FROM public.quiz_answers qa0 WHERE qa0.student_id=s.id
