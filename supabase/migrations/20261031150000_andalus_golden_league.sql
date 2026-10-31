@@ -72,6 +72,25 @@ AS $$
   END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.golden_league_get_settings_admin()
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER STABLE
+SET search_path TO 'public'
+AS $
+DECLARE s public.golden_league_settings%rowtype;
+BEGIN
+  IF auth.uid() IS NULL OR NOT EXISTS (
+    SELECT 1 FROM public.user_profiles up WHERE up.id=auth.uid() AND up.is_active IS TRUE AND up.role='admin'
+  ) THEN RAISE EXCEPTION 'not authorized' USING ERRCODE='42501'; END IF;
+  SELECT * INTO s FROM public.golden_league_settings WHERE id=1;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'reason','settings_missing'); END IF;
+  RETURN jsonb_build_object('ok',true,'settings',jsonb_build_object(
+    'daily_start',s.daily_start,'daily_end',s.daily_end,'questions_per_day',s.questions_per_day,
+    'points_per_question',s.points_per_question,'weekly_thresholds',s.weekly_thresholds,
+    'weekly_seconds',s.weekly_seconds,'active',s.active,'timezone',s.timezone));
+END;
+$;
+
 CREATE OR REPLACE FUNCTION public.golden_league_update_settings(
   p_daily_start text DEFAULT '19:00',
   p_daily_end text DEFAULT '20:00',
@@ -476,7 +495,9 @@ GRANT EXECUTE ON FUNCTION public.weekly_quiz_start_question(text,date,uuid,uuid)
 GRANT EXECUTE ON FUNCTION public.weekly_quiz_submit_answer(date,text,uuid,text,uuid) TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.ensure_weekly_quiz_session() TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.weekly_quiz_get_public_questions() TO anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.golden_league_get_settings_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.golden_league_update_settings(text,text,integer,integer,integer[],integer[]) TO authenticated;
+GRANT SELECT ON public.golden_league_settings TO authenticated;
 GRANT EXECUTE ON FUNCTION public.golden_league_admin_report(date) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.get_portal_notifications(p_student_id text,p_phone text,p_portal_type text DEFAULT 'student')
