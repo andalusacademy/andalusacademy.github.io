@@ -1721,46 +1721,23 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
         <!-- WEEKLY QUIZ ADMIN -->
         <div id="page-weekly-quiz-admin" class="page">
           <div class="card" style="margin-bottom:16px;">
-            <div class="card-header"><h3>🏆 إعدادات دوري الأندلس الذهبي</h3></div>
+            <div class="card-header"><h3>⚙️ إعدادات المسابقة</h3></div>
             <div style="padding:14px 16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-              <div class="form-group2"><label>بداية المسابقة</label><input type="time" id="wq-daily-time" value="19:00" style="max-width:140px;"></div>
-              <div class="form-group2"><label>نهاية المسابقة</label><input type="time" id="wq-daily-end" value="20:00" style="max-width:140px;"></div>
-              <div class="form-group2"><label>عدد الأسئلة يوميًا</label><input type="number" id="wq-questions-count" value="5" readonly style="max-width:90px;"></div>
-              <div class="form-group2"><label>نقاط السؤال</label><input type="number" id="wq-points-per-question" value="10" readonly style="max-width:90px;"></div>
-              <button class="btn btn-gold" onclick="saveQuizSettings()">💾 حفظ إعدادات الدوري</button>
-              <button class="btn btn-outline" onclick="manuallyActivateWeeklyQuiz()">🔄 تجهيز أسئلة اليوم داخل الموعد</button>
+              <div class="form-group2"><label>ميعاد التفعيل اليومي</label><input type="time" id="wq-daily-time" style="max-width:140px;"></div>
+              <div class="form-group2"><label>عدد الأسئلة يوميًا</label><input type="number" id="wq-questions-count" min="1" max="20" style="max-width:100px;"></div>
+              <button class="btn btn-gold" onclick="saveQuizSettings()">💾 حفظ الإعدادات</button>
+              <button class="btn btn-outline" onclick="manuallyActivateWeeklyQuiz()">⚡ فعّل مسابقة النهاردة الآن</button>
             </div>
-            <div style="padding:4px 16px 14px;">
-              <strong style="display:block;margin:8px 0;">حدود التأهل الأسبوعية (من 300 نقطة)</strong>
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;">
-                <label>الأسبوع الأول<input id="wq-target-1" type="number" min="0" max="300" value="200"></label>
-                <label>الأسبوع الثاني<input id="wq-target-2" type="number" min="0" max="300" value="230"></label>
-                <label>الأسبوع الثالث<input id="wq-target-3" type="number" min="0" max="300" value="260"></label>
-                <label>الأسبوع الرابع<input id="wq-target-4" type="number" min="0" max="300" value="280"></label>
-              </div>
-              <strong style="display:block;margin:12px 0 8px;">زمن الإجابة لكل سؤال</strong>
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;">
-                <label>الأسبوع الأول<input id="wq-seconds-1" type="number" min="1" max="60" value="20"></label>
-                <label>الأسبوع الثاني<input id="wq-seconds-2" type="number" min="1" max="60" value="15"></label>
-                <label>الأسبوع الثالث<input id="wq-seconds-3" type="number" min="1" max="60" value="10"></label>
-                <label>الأسبوع الرابع<input id="wq-seconds-4" type="number" min="1" max="60" value="5"></label>
-              </div>
-              <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-top:10px;">المسابقة تعمل من السبت إلى الخميس فقط، من 7:00 إلى 8:00 مساءً بتوقيت القاهرة. يوم الجمعة لإعلان النتائج. التوقيت وعدّاد السؤال يتحقق منهما الخادم، وليس ساعة جهاز الطالب.</p>
-            </div>
+            <p style="font-size:11px;color:var(--muted);padding:0 16px 12px;">💡 المسابقة بتتفعل تلقائيًا لأول طالب يفتح البوابة بعد الميعاد ده — مفيش سيرفر منفصل ولا إعدادات إضافية. زرار "فعّل الآن" للاختبار أو لو حبيت تبدأها قبل ميعادها.</p>
           </div>
 
           <div class="card" style="margin-bottom:16px;">
             <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-              <h3>📊 ترتيب الأسبوع</h3>
+              <h3>🏆 لوحة الصدارة</h3>
               <select id="wq-week-picker" onchange="loadWeeklyQuizLeaderboardAdmin(this.value)" style="max-width:200px;"></select>
             </div>
             <table><thead><tr><th>#</th><th>الطالب</th><th>رقم القيد</th><th>النقاط</th><th>عدد الإجابات الصحيحة</th></tr></thead>
             <tbody id="wq-leaderboard-table"></tbody></table>
-          </div>
-          <div class="card" style="margin-bottom:16px;">
-            <div class="card-header"><h3>👑 الترتيب الشهري والتأهل النهائي</h3></div>
-            <div style="padding:8px 14px;color:var(--muted);font-size:12px;">يعرض مجموع الأسابيع الأربعة، ويحدد من استوفى كل حد أسبوعي للدخول في ترتيب الفائزين.</div>
-            <div style="overflow-x:auto;"><table><thead><tr><th>#</th><th>الطالب</th><th>الأسبوع 1</th><th>الأسبوع 2</th><th>الأسبوع 3</th><th>الأسبوع 4</th><th>الإجمالي</th><th>التأهل</th></tr></thead><tbody id="wq-monthly-leaderboard"><tr><td colspan="8">جاري التحميل...</td></tr></tbody></table></div>
           </div>
 
           <div class="card">
@@ -7444,7 +7421,9 @@ async function createDismissalDecisionTest() {
   const reasonHtml = reasons.map((x,i) => '<div class="reason"><span class="arrow">➢</span><span>' + esc(x) + '</span></div>').join('');
   const w = window.open('', '_blank');
   if (!w) { showToast('المتصفح منع نافذة المستند؛ اسمح بالنوافذ المنبثقة لهذا الموقع ثم حاول مجددًا.', 'error'); return; }
-  const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قرار إداري رقم ' + esc(no) + '</title><style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#142c54;line-height:1.75;font-size:14px;margin:0;background:white}.page{min-height:270mm;border:5px double #244a83;padding:18mm 16mm 14mm;position:relative}.top{text-align:center;border-bottom:2px solid #c49a42;padding-bottom:10px;margin-bottom:14px}.brand{font-size:26px;font-weight:bold;color:#173b70}.sub{font-size:12px;color:#9b7628}.title{text-align:center;font-size:20px;font-weight:bold;text-decoration:underline;text-underline-offset:5px;margin:15px 0 20px}.intro{color:#222}.intro p{margin:5px 0}.section{text-align:center;font-weight:bold;font-size:18px;margin:17px 0 8px}.student{text-align:center;font-size:21px;font-weight:bold;color:#164782;margin:12px 0 20px}.reason{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:bold;color:#163a70}.arrow{color:#b18a37;font-size:18px}.sign{display:flex;justify-content:space-between;align-items:flex-end;margin-top:45px;font-weight:bold;text-align:center}.seal{border:3px double #b28b3e;border-radius:50%;width:85px;height:85px;display:flex;align-items:center;justify-content:center;color:#a17a2c;font-size:11px;padding:10px}.footer{position:absolute;bottom:5mm;left:12mm;right:12mm;text-align:center;border-top:1px solid #c6a35b;padding-top:5px;font-size:10px;color:#5c6680}.date{text-align:left;color:#333;margin:0 0 12px}</style></head><body><div class="page"><div class="top"><div class="brand">الأندلس</div><div class="sub">مركز الأندلس للتدريب</div></div><div class="title">قرار إداري رقم (' + esc(no) + ') لسنة ' + now.getFullYear() + '</div><div class="date">التاريخ: ' + esc(dateText) + '</div><div class="intro"><b>بعد الاطلاع على:</b><p>• النظام الداخلي للمركز المعتمد من مجلس الإدارة.</p><p>• قرار مجلس الإدارة بشأن اللائحة التنفيذية وتنظيم سير العملية التدريبية.</p><p>• اللائحة العامة للتدريب والتأهيل.</p><p>• العقد وبنوده الموقع بين مركز الأندلس والمتدرب.</p><p>• مقتضيات مصلحة العملية التدريبية.</p></div><div class="section">تقرر الآتي:</div><div class="section">فصل المتدرب /</div><div class="student">' + esc(student.name || '') + '</div><b>وذلك للآتي ذكره:</b>' + reasonHtml + '<div class="sign"><div>مدير مركز الأندلس<br><br>د / إسلام صبري العشري</div><div class="seal">ختم<br>مركز الأندلس</div></div><div class="footer">مركز الأندلس للتدريب — قرار إداري داخلي</div></div><script>window.onload=()=>setTimeout(()=>window.print(),400);<\\/script>\n</body></html>';
+  const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قرار إداري رقم ' + esc(no) + '</title><style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#142c54;line-height:1.75;font-size:14px;margin:0;background:white}.page{min-height:270mm;border:5px double #244a83;padding:18mm 16mm 14mm;position:relative}.top{text-align:center;border-bottom:2px solid #c49a42;padding-bottom:10px;margin-bottom:14px}.brand{font-size:26px;font-weight:bold;color:#173b70}.sub{font-size:12px;color:#9b7628}.title{text-align:center;font-size:20px;font-weight:bold;text-decoration:underline;text-underline-offset:5px;margin:15px 0 20px}.intro{color:#222}.intro p{margin:5px 0}.section{text-align:center;font-weight:bold;font-size:18px;margin:17px 0 8px}.student{text-align:center;font-size:21px;font-weight:bold;color:#164782;margin:12px 0 20px}.reason{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-weight:bold;color:#163a70}.arrow{color:#b18a37;font-size:18px}.sign{display:flex;justify-content:space-between;align-items:flex-end;margin-top:45px;font-weight:bold;text-align:center}.seal{border:3px double #b28b3e;border-radius:50%;width:85px;height:85px;display:flex;align-items:center;justify-content:center;color:#a17a2c;font-size:11px;padding:10px}.footer{position:absolute;bottom:5mm;left:12mm;right:12mm;text-align:center;border-top:1px solid #c6a35b;padding-top:5px;font-size:10px;color:#5c6680}.date{text-align:left;color:#333;margin:0 0 12px}</style></head><body><div class="page"><div class="top"><div class="brand">الأندلس</div><div class="sub">مركز الأندلس للتدريب</div></div><div class="title">قرار إداري رقم (' + esc(no) + ') لسنة ' + now.getFullYear() + '</div><div class="date">التاريخ: ' + esc(dateText) + '</div><div class="intro"><b>بعد الاطلاع على:</b><p>• النظام الداخلي للمركز المعتمد من مجلس الإدارة.</p><p>• قرار مجلس الإدارة بشأن اللائحة التنفيذية وتنظيم سير العملية التدريبية.</p><p>• اللائحة العامة للتدريب والتأهيل.</p><p>• العقد وبنوده الموقع بين مركز الأندلس والمتدرب.</p><p>• مقتضيات مصلحة العملية التدريبية.</p></div><div class="section">تقرر الآتي:</div><div class="section">فصل المتدرب /</div><div class="student">' + esc(student.name || '') + '</div><b>وذلك للآتي ذكره:</b>' + reasonHtml + '<div class="sign"><div>مدير مركز الأندلس<br><br>د / إسلام صبري العشري</div><div class="seal">ختم<br>مركز الأندلس</div></div><div class="footer">مركز الأندلس للتدريب — قرار إداري داخلي</div></div><script>window.onload=()=>setTimeout(()=>window.print(),400);<\\/script>\n
+<script src="andalus-golden-league.js?v=1"></script>
+</body></html>';
   w.document.open(); w.document.write(html); w.document.close();
   const { error } = await sb.from('procedures').insert({
     student_id: currentProfileId,
@@ -13313,21 +13292,12 @@ let weeklyQuizAnswered = false;
 let weeklyQuizTimerInterval = null;
 
 // ✅ بداية الأسبوع الحالي (السبت) — نفس منطق تجميع النقاط والتصفير التلقائي
-function getCairoDateString(dateValue = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit'
-  }).formatToParts(dateValue);
-  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
-  return p.year + '-' + p.month + '-' + p.day;
-}
-
 function getWeekStartDate(d) {
-  const dateText = d instanceof Date ? getCairoDateString(d) : String(d).slice(0, 10);
-  const parts = dateText.split('-').map(Number);
-  const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
-  const diff = (date.getUTCDay() + 1) % 7;
-  date.setUTCDate(date.getUTCDate() - diff);
-  return date.toISOString().slice(0, 10);
+  const date = new Date(d);
+  const day = date.getDay(); // 0=Sunday ... 6=Saturday
+  const diff = (day + 1) % 7; // المسافة بالأيام من آخر يوم سبت
+  date.setDate(date.getDate() - diff);
+  return date.toISOString().split('T')[0];
 }
 
 async function goToPortalWeeklyQuiz() {
@@ -13616,7 +13586,17 @@ async function loadWeeklyQuizAuditAdmin() {
 }
 
 async function ensureTodayQuizActivated() {
-  // الخادم هو المرجع الوحيد للتاريخ والتوقيت ونافذة المسابقة.
+  const todayStr = new Date().toISOString().split('T')[0];
+  const { data: existing } = await sb.from('quiz_daily_sessions').select('id').eq('quiz_date', todayStr).maybeSingle();
+  if (existing) return;
+
+  const { data: settings } = await sb.from('quiz_settings').select('id,daily_time,questions_per_day,updated_at').eq('id', 1).maybeSingle();
+  const dailyTime = settings?.daily_time || '19:00';
+  const [h, m] = dailyTime.split(':').map(Number);
+  const now = new Date();
+  const target = new Date(); target.setHours(h, m, 0, 0);
+  if (now < target) return; // لسه معاش ميعادها
+
   await activateTodayQuizNow();
 }
 
@@ -13634,188 +13614,108 @@ async function activateTodayQuizNow() {
 
 async function loadWeeklyQuizSection() {
   const contentEl = document.getElementById('weekly-quiz-content');
-  contentEl.innerHTML = '<p style="text-align:center;padding:20px;color:var(--muted);">جاري تحميل دوري الأندلس الذهبي...</p>';
+  contentEl.innerHTML = '<p style="text-align:center;padding:20px;color:var(--muted);">جاري التحميل...</p>';
 
-  try {
-    await ensureTodayQuizActivated();
-    const today = getCairoDateString();
-    const weekStart = getWeekStartDate(today);
+  await ensureTodayQuizActivated();
 
-    const { data: league, error: leagueError } = await sb.rpc('golden_league_get_student_dashboard', {
-      p_student_id: weeklyQuizStudent.id,
-      p_face_token: weeklyQuizFaceToken
-    });
-    if (leagueError || !league?.ok) {
-      throw new Error(leagueError?.message || 'تعذر تحميل بيانات دوري الأندلس الذهبي. أعد التحقق من الهوية.');
-    }
-
-    const { data: sessions, error: sessionsError } = await sb.from('quiz_daily_sessions')
-      .select('quiz_date,question_ids').eq('quiz_date', today).maybeSingle();
-    if (sessionsError) throw sessionsError;
-
-    const { data: answeredResult, error: answeredError } = await sb.rpc('weekly_quiz_get_answered_questions', {
-      p_student_id: weeklyQuizStudent.id,
-      p_face_token: weeklyQuizFaceToken,
-      p_week_start: weekStart
-    });
-    if (answeredError || !answeredResult?.ok) {
-      throw new Error('انتهت صلاحية التحقق أو تعذر تحميل حالة الإجابات. أعد تسجيل الدخول للمسابقة.');
-    }
-    const answeredKeys = new Set((answeredResult.answers || []).map(a => a.quiz_date + '|' + a.question_id));
-
-    const { data: allQs, error: questionsError } = await sb.rpc('weekly_quiz_get_public_questions');
-    if (questionsError) throw questionsError;
-    const qMap = {};
-    (allQs || []).forEach(q => { qMap[q.id] = q; });
-
-    weeklyQuizPendingList = [];
-    if (league.window_status === 'open' && sessions?.question_ids) {
-      sessions.question_ids.forEach(qid => {
-        if (!answeredKeys.has(today + '|' + qid) && qMap[qid]) {
-          weeklyQuizPendingList.push({ quiz_date: today, question: qMap[qid] });
-        }
-      });
-    }
-
-    const myScore = {
-      total_points: Number(league.week_points || 0),
-      correct_count: Number(league.correct_count || 0),
-      month_points: Number(league.month_points || 0),
-      weekly_threshold: Number(league.weekly_threshold || 0),
-      week_number: Number(league.week_number || 0),
-      week_breakdown: league.week_breakdown || [],
-      eligible: league.eligible === true
-    };
-    renderWeeklyQuizHome(myScore, league.leaderboard || [], league);
-  } catch (e) {
-    console.error('Golden League load failed:', e);
-    contentEl.innerHTML = '<div role="alert" style="text-align:center;padding:20px;"><p style="color:#b91c1c;">' +
-      escapeHtml(e?.message || 'تعذر تحميل المسابقة.') +
-      '</p><button class="btn btn-gold" onclick="goToPortalWeeklyQuiz()">إعادة التحقق والدخول</button></div>';
+  const weekStart = getWeekStartDate(new Date());
+  const { data: sessions } = await sb.from('quiz_daily_sessions').select('*').gte('quiz_date', weekStart).order('quiz_date', { ascending: true });
+  const { data: answeredResult, error: answeredError } = await sb.rpc('weekly_quiz_get_answered_questions', {
+    p_student_id: weeklyQuizStudent.id,
+    p_face_token: weeklyQuizFaceToken,
+    p_week_start: weekStart
+  });
+  if (answeredError || !answeredResult?.ok) {
+    console.warn('Weekly quiz answered-history lookup failed:', answeredError || answeredResult?.reason);
+    contentEl.innerHTML = '<div role="alert" style="text-align:center;padding:20px;"><p style="color:#b91c1c;">انتهت صلاحية التحقق أو تعذر تحميل حالة الإجابات.</p><button class="btn btn-gold" onclick="goToPortalWeeklyQuiz()">إعادة تسجيل الدخول من الجهاز المسجل</button></div>';
+    return;
   }
+  const answered = answeredResult.answers || [];
+  const answeredKeys = new Set(answered.map(a => a.quiz_date + '|' + a.question_id));
+
+  const { data: allQs, error: questionsError } = await sb.rpc('weekly_quiz_get_public_questions');
+  if (questionsError) throw questionsError;
+  const qMap = {}; (allQs || []).forEach(q => qMap[q.id] = q);
+
+  weeklyQuizPendingList = [];
+  (sessions || []).forEach(s => {
+    (s.question_ids || []).forEach(qid => {
+      if (!answeredKeys.has(s.quiz_date + '|' + qid) && qMap[qid]) {
+        weeklyQuizPendingList.push({ quiz_date: s.quiz_date, question: qMap[qid] });
+      }
+    });
+  });
+
+  const { data: scoreResult, error: scoreError } = await sb.rpc('weekly_quiz_get_public_scores', {
+    p_student_id: weeklyQuizStudent.id,
+    p_face_token: weeklyQuizFaceToken,
+    p_week_start: weekStart
+  });
+  if (scoreError || !scoreResult?.ok) {
+    console.warn('Weekly quiz score lookup failed:', scoreError || scoreResult?.reason);
+    contentEl.innerHTML = '<div role="alert" style="text-align:center;padding:20px;"><p style="color:#b91c1c;">تعذر تحميل النقاط ولوحة الصدارة. سجّل الدخول مجددًا من الجهاز المسجل.</p><button class="btn btn-gold" onclick="goToPortalWeeklyQuiz()">إعادة التحقق بالوجه</button></div>';
+    return;
+  }
+  renderWeeklyQuizHome(scoreResult.my_score, scoreResult.leaderboard || []);
 }
-function renderWeeklyQuizHome(myScore, leaderboard, leagueStatus = {}) {
+
+function renderWeeklyQuizHome(myScore, leaderboard) {
   const contentEl = document.getElementById('weekly-quiz-content');
-  const rows = Array.isArray(leaderboard) ? leaderboard : [];
-  const podiumItems = [rows[1], rows[0], rows[2]].filter(Boolean);
-  const medals = {1:'🥇',2:'🥈',3:'🥉'};
-  const podiumCards = podiumItems.map(function(item) {
-    const rank = Number(item.rank || rows.indexOf(item) + 1);
-    const isMe = !!item.is_me;
-    const height = rank === 1 ? '174px' : (rank === 2 ? '145px' : '128px');
-    const color = rank === 1 ? '#f4c84a' : (rank === 2 ? '#cbd5e1' : '#d99a62');
-    return '<div class="agl-podium-card ' + (isMe ? 'is-me' : '') + '" style="--podium-height:' + height + ';--podium-color:' + color + ';">' +
-      '<div class="agl-medal">' + (medals[rank] || '🏅') + '</div>' +
-      '<div class="agl-podium-name">' + escapeHtml(item.student_name || (isMe ? weeklyQuizStudent.name : 'متسابق')) + '</div>' +
-      '<div class="agl-podium-score">' + Number(item.total_points || 0) + '<small>نقطة</small></div>' +
-      '<div class="agl-podium-base">المركز ' + rank + '</div>' +
-      (isMe ? '<span class="agl-you-tag">أنت</span>' : '') +
-    '</div>';
-  }).join('');
-  const remainingRows = rows.filter(function(item) { return Number(item.rank || 0) > 3; });
-  const rankingRows = remainingRows.map(function(item) {
-    const rank = Number(item.rank || 0);
-    return '<div class="agl-rank-row ' + (item.is_me ? 'is-me' : '') + '">' +
-      '<span class="agl-rank-number">' + rank + '</span>' +
-      '<span class="agl-rank-name">' + escapeHtml(item.student_name || (item.is_me ? weeklyQuizStudent.name : 'متسابق')) +
-        (item.is_me ? '<small>أنت</small>' : '') + '</span>' +
-      '<strong class="agl-rank-points">' + Number(item.total_points || 0) + ' نقطة</strong>' +
-    '</div>';
-  }).join('');
-  const podiumMarkup = podiumCards
-    ? '<div class="agl-podium">' + podiumCards + '</div>'
-    : '<div class="agl-empty">🏆<br>لسه مفيش ترتيب — أول مشاركة هتظهر هنا</div>';
-  const rankingMarkup = rankingRows
-    ? '<div class="agl-ranking-list">' + rankingRows + '</div>'
-    : '';
-  contentEl.innerHTML =
-    '<style>' +
-      '.agl-shell{direction:rtl;background:radial-gradient(circle at 50% 0%,#29436d 0,#14243d 48%,#0b1527 100%);color:#fff;border-radius:22px;padding:18px 14px 16px;overflow:hidden;position:relative;box-shadow:0 14px 34px rgba(8,20,40,.24);}' +
-      '.agl-shell:before,.agl-shell:after{content:"";position:absolute;border:1px solid rgba(232,200,122,.12);border-radius:50%;pointer-events:none;}' +
-      '.agl-shell:before{width:230px;height:230px;top:-150px;right:-75px}.agl-shell:after{width:190px;height:190px;bottom:-135px;left:-65px}' +
-      '.agl-head{position:relative;text-align:center;margin-bottom:14px}.agl-kicker{font-size:10px;letter-spacing:2px;color:#e8c87a;font-weight:900}.agl-title{font-size:21px;font-weight:900;color:#f4d27c;margin:3px 0}.agl-subtitle{font-size:11px;color:#d7e0ee}' +
-      '.agl-my-score{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0 14px}.agl-stat{background:rgba(255,255,255,.075);border:1px solid rgba(232,200,122,.2);border-radius:13px;padding:10px;text-align:center}.agl-stat strong{display:block;color:#f4d27c;font-size:22px;font-weight:900}.agl-stat span{font-size:10px;color:#d5deeb}.agl-progress{position:relative;background:rgba(255,255,255,.07);border:1px solid rgba(232,200,122,.18);border-radius:13px;padding:12px;margin:8px 0 14px}.agl-progress-line{height:8px;border-radius:20px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:7px}.agl-progress-line span{display:block;height:100%;background:linear-gradient(90deg,#b8892f,#f4d27c);border-radius:20px}.agl-weekchips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:10px}.agl-weekchip{background:rgba(255,255,255,.07);border-radius:8px;padding:7px 3px;text-align:center;font-size:9px;color:#d7e0ee}.agl-weekchip strong{display:block;color:#f4d27c;font-size:11px;margin-top:3px}' +
-      '.agl-podium{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:7px;min-height:200px;padding:8px 2px 0}.agl-podium-card{height:var(--podium-height);flex:1;max-width:31%;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:10px 5px 0;border:1px solid color-mix(in srgb,var(--podium-color) 60%,transparent);border-bottom:0;border-radius:13px 13px 0 0;background:linear-gradient(180deg,color-mix(in srgb,var(--podium-color) 22%,#14243d),rgba(255,255,255,.035));text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}' +
-      '.agl-podium-card.is-me{outline:2px solid #fff;outline-offset:2px}.agl-medal{font-size:26px;line-height:1.1}.agl-podium-name{font-size:11px;font-weight:900;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:5px}.agl-podium-score{font-size:16px;color:#f4d27c;font-weight:900;margin-top:5px}.agl-podium-score small{font-size:9px;margin-right:3px;color:#d7e0ee}.agl-podium-base{margin-top:auto;width:100%;padding:5px 2px;background:var(--podium-color);color:#17243a;font-size:10px;font-weight:900;border-radius:7px 7px 0 0}.agl-you-tag{position:absolute;top:5px;left:5px;background:#fff;color:#14243d;border-radius:20px;padding:1px 6px;font-size:8px;font-weight:900}' +
-      '.agl-ranking-list{position:relative;margin-top:12px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);border-radius:13px;padding:4px 10px}.agl-rank-row{display:flex;align-items:center;gap:9px;padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.09)}.agl-rank-row:last-child{border-bottom:0}.agl-rank-row.is-me{background:rgba(244,210,124,.1);border-radius:9px;padding-right:8px;padding-left:8px}.agl-rank-number{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.1);color:#f4d27c;font-size:11px;font-weight:900;flex-shrink:0}.agl-rank-name{flex:1;min-width:0;font-size:12px;font-weight:700}.agl-rank-name small{margin-right:6px;color:#f4d27c;font-size:9px}.agl-rank-points{font-size:11px;color:#f4d27c;white-space:nowrap}.agl-section-label{position:relative;margin:14px 0 6px;color:#f4d27c;font-size:12px;font-weight:900}.agl-empty{position:relative;text-align:center;padding:28px 10px;color:#d5deeb;font-size:13px;line-height:2}.agl-quiz-action{position:relative;margin-top:14px}.agl-footer{text-align:center;color:#9eacc1;font-size:9px;margin-top:12px}' +
-      '@media(max-width:380px){.agl-title{font-size:18px}.agl-podium{gap:4px}.agl-podium-name{font-size:10px}.agl-podium-score{font-size:14px}}' +
-    '</style>' +
-    '<button class="btn btn-outline btn-sm" style="margin-bottom:12px;" onclick="backToPortalFromWeeklyQuiz()">◀ رجوع</button>' +
-    '<section class="agl-shell">' +
-      '<header class="agl-head"><div class="agl-kicker">ANDALUS GOLDEN LEAGUE</div><div class="agl-title">🏆 دوري الأندلس الذهبي</div><div class="agl-subtitle">المعرفة منافسة، والتميز بطولة</div></header>' +
-      '<div class="agl-my-score">' +
-        '<div class="agl-stat"><strong>' + Number(myScore && myScore.total_points || 0) + '</strong><span>نقاطك هذا الأسبوع</span></div>' +
-        '<div class="agl-stat"><strong>' + Number(myScore && myScore.month_points || 0) + '</strong><span>نقاطك الشهرية</span></div>' +
-        '<div class="agl-stat"><strong>' + Number(myScore && myScore.correct_count || 0) + '</strong><span>إجابات صحيحة</span></div>' +
-        '<div class="agl-stat"><strong>' + (Number(myScore && myScore.week_number || 0) || '—') + ' / 4</strong><span>الأسبوع الحالي</span></div>' +
-      '</div>' +
-      '<div class="agl-progress">' +
-        '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:900;"><span>🎯 هدف التأهل لهذا الأسبوع</span><span>' + Number(myScore && myScore.total_points || 0) + ' / ' + Number(myScore && myScore.weekly_threshold || 0) + '</span></div>' +
-        '<div class="agl-progress-line"><span style="width:' + Math.min(100, Number(myScore && myScore.weekly_threshold ? (myScore.total_points / myScore.weekly_threshold * 100) : 0)) + '%"></span></div>' +
-        '<div class="agl-weekchips">' + (myScore.week_breakdown || []).map(w => '<div class="agl-weekchip">الأسبوع ' + w.week + '<strong>' + Number(w.points || 0) + ' / ' + Number(w.threshold || 0) + '</strong></div>').join('') + '</div>' +
-      '</div>' +
-      '<div class="agl-section-label">👑 منصة الأبطال — الترتيب الشهري</div>' +
-      podiumMarkup +
-      (rankingMarkup ? '<div class="agl-section-label">ترتيب بقية المتنافسين</div>' + rankingMarkup : '') +
-      '<div class="agl-footer">يتم تحديث لوحة الصدارة وفق النتائج المسجلة للمسابقة</div>' +
-    '</section>' +
-    '<div class="agl-quiz-action">' +
-      (leagueStatus.window_status === 'open' && weeklyQuizPendingList.length
-        ? '<button class="btn btn-gold" style="width:100%;padding:13px;" onclick="startNextWeeklyQuizQuestion()">🎯 ابدأ المسابقة — (' + weeklyQuizPendingList.length + ' سؤال متاح)</button>'
-        : '<div style="text-align:center;color:var(--muted);font-size:13px;line-height:1.9;margin-top:12px;">' +
-          (leagueStatus.window_status === 'not_started' ? '🔒 المسابقة تفتح الساعة 7:00 مساءً' :
-           leagueStatus.window_status === 'ended' ? '⛔ انتهت المسابقة اليومية الساعة 8:00 مساءً' :
-           leagueStatus.window_status === 'closed_day' ? '📊 اليوم مخصص للنتائج والراحة — نلتقي السبت' :
-           leagueStatus.window_status === 'off_cycle' ? '📅 لا توجد دورة شهرية نشطة في هذا اليوم' :
-           weeklyQuizPendingList.length ? 'تمت الإجابة عن أسئلة اليوم كلها' : 'لم يتم تجهيز أسئلة اليوم بعد؛ تأكد من وجود 5 أسئلة نشطة في بنك المسابقة') +
-          '</div>') +
-    '</div>';
+  contentEl.innerHTML = `
+    <button class="btn btn-outline btn-sm" style="margin-bottom:12px;" onclick="backToPortalFromWeeklyQuiz()">◀ رجوع</button>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:13px;color:var(--muted);">أهلاً ${escapeHtml(weeklyQuizStudent.name)} 👋</div>
+      <div style="font-size:32px;font-weight:900;color:var(--gold);margin-top:4px;">${myScore?.total_points || 0} نقطة</div>
+      <div style="font-size:11px;color:var(--muted);">نقاطك هذا الأسبوع</div>
+    </div>
+    ${weeklyQuizPendingList.length ? `
+      <button class="btn btn-gold" style="width:100%;padding:13px;margin-bottom:16px;" onclick="startNextWeeklyQuizQuestion()">🎯 جاوب على سؤال (${weeklyQuizPendingList.length} متاح)</button>
+    ` : `<p style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:16px;">مفيش أسئلة متاحة دلوقتي — تعالى بعد ميعاد المسابقة النهاردة</p>`}
+    <div class="card">
+      <div class="card-header"><h3 style="font-size:14px;">🏆 لوحة الصدارة (هذا الأسبوع)</h3></div>
+      <div style="padding:10px 14px;">
+        ${(leaderboard && leaderboard.length) ? leaderboard.map((l, i) => `
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;${l.is_me ? 'font-weight:800;color:var(--navy);' : ''}">
+            <span>${i + 1}. ${escapeHtml(l.student_name || (l.is_me ? weeklyQuizStudent.name : 'متدرب'))}</span>
+            <span>${l.total_points} نقطة</span>
+          </div>`).join('') : '<p style="text-align:center;color:var(--muted);font-size:12px;">لسه محدش جاوب الأسبوع ده</p>'}
+      </div>
+    </div>`;
 }
+
 function backToPortalFromWeeklyQuiz() {
   document.getElementById('weekly-quiz-screen').style.display = 'none';
   document.getElementById('student-portal-screen').style.display = 'block';
   renderStudentPortalMenu();
 }
 
-async function startNextWeeklyQuizQuestion() {
-  if (!weeklyQuizPendingList.length) { await loadWeeklyQuizSection(); return; }
+function startNextWeeklyQuizQuestion() {
+  if (!weeklyQuizPendingList.length) { loadWeeklyQuizSection(); return; }
   const item = weeklyQuizPendingList[0];
   weeklyQuizCurrentDate = item.quiz_date;
   weeklyQuizAnswered = false;
   const q = item.question;
-  const content = document.getElementById('weekly-quiz-content');
-  content.innerHTML = '<p style="text-align:center;padding:24px;">جاري بدء السؤال وتأمين الوقت...</p>';
-  let seconds = 0;
-  try {
-    const { data, error } = await sb.rpc('weekly_quiz_start_question', {
-      p_student_id: weeklyQuizStudent.id, p_quiz_date: weeklyQuizCurrentDate,
-      p_question_id: q.id, p_face_token: weeklyQuizFaceToken
-    });
-    if (error) throw error;
-    if (!data?.ok) {
-      const messages = { not_started:'المسابقة تفتح الساعة 7:00 مساءً.', ended:'انتهت المسابقة اليومية الساعة 8:00 مساءً.', closed_day:'المسابقة متاحة من السبت إلى الخميس فقط.', off_cycle:'لا توجد دورة شهرية نشطة الآن.', already_answered:'تم تسجيل إجابتك عن هذا السؤال بالفعل.', question_not_scheduled:'هذا السؤال غير موجود ضمن أسئلة اليوم.', session_expired:'انتهت جلسة التحقق. أعد الدخول للمسابقة.' };
-      throw new Error(messages[data?.reason] || 'تعذر بدء السؤال.');
-    }
-    seconds = Number(data.remaining_seconds ?? data.seconds ?? 0);
-    if (seconds <= 0) { await answerWeeklyQuizQuestion(null); return; }
-  } catch (e) {
-    content.innerHTML = '<div style="text-align:center;padding:20px;color:#991b1b;">' + escapeHtml(e?.message || 'تعذر بدء السؤال.') + '</div><button class="btn btn-outline" style="width:100%;" onclick="loadWeeklyQuizSection()">رجوع للوحة الدوري</button>';
-    return;
-  }
-  const options = [{key:'a',text:q.option_a},{key:'b',text:q.option_b},{key:'c',text:q.option_c},{key:'d',text:q.option_d}];
-  content.innerHTML = '<p style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:4px;">' + (q.category ? escapeHtml(q.category) + ' — ' : '') + '10 نقاط</p>' +
-    '<div id="weekly-quiz-timer" style="text-align:center;font-size:32px;font-weight:900;color:var(--navy);margin-bottom:12px;">⏱ ' + seconds + '</div>' +
-    '<h3 style="text-align:center;color:var(--navy);margin-bottom:16px;line-height:1.6;">' + escapeHtml(q.question) + '</h3>' +
-    '<div id="weekly-quiz-options" style="display:flex;flex-direction:column;gap:8px;">' + options.map(o => '<button class="btn btn-outline" style="width:100%;text-align:right;padding:12px;" onclick="answerWeeklyQuizQuestion(\'' + o.key + '\')">' + escapeHtml(o.text) + '</button>').join('') + '</div>';
-  let remaining = seconds;
+  const options = [
+    { key: 'a', text: q.option_a }, { key: 'b', text: q.option_b },
+    { key: 'c', text: q.option_c }, { key: 'd', text: q.option_d }
+  ];
+  document.getElementById('weekly-quiz-content').innerHTML = `
+    <p style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:4px;">${q.category ? escapeHtml(q.category) + ' — ' : ''}${q.points || 10} نقطة</p>
+    <div id="weekly-quiz-timer" style="text-align:center;font-size:32px;font-weight:900;color:var(--navy);margin-bottom:12px;">⏱ 15</div>
+    <h3 style="text-align:center;color:var(--navy);margin-bottom:16px;line-height:1.6;">${escapeHtml(q.question)}</h3>
+    <div id="weekly-quiz-options" style="display:flex;flex-direction:column;gap:8px;">
+      ${options.map(o => `<button class="btn btn-outline" style="width:100%;text-align:right;padding:12px;" onclick="answerWeeklyQuizQuestion('${o.key}')">${escapeHtml(o.text)}</button>`).join('')}
+    </div>`;
+  let remaining = 15;
   const timerEl = document.getElementById('weekly-quiz-timer');
   clearInterval(weeklyQuizTimerInterval);
   weeklyQuizTimerInterval = setInterval(() => {
     remaining--;
-    if (timerEl) { timerEl.textContent = '⏱ ' + Math.max(0, remaining); timerEl.style.color = remaining <= 5 ? '#dc2626' : 'var(--navy)'; }
+    if (timerEl) { timerEl.textContent = '⏱ ' + remaining; timerEl.style.color = remaining <= 5 ? '#dc2626' : 'var(--navy)'; }
     if (remaining <= 0) { clearInterval(weeklyQuizTimerInterval); if (!weeklyQuizAnswered) answerWeeklyQuizQuestion(null); }
   }, 1000);
 }
+
 async function answerWeeklyQuizQuestion(selectedKey) {
   if (weeklyQuizAnswered) return;
   weeklyQuizAnswered = true;
@@ -13828,7 +13728,7 @@ async function answerWeeklyQuizQuestion(selectedKey) {
   let pointsEarned = 0;
   let correctOption = null;
   try {
-    let { data, error } = await sb.rpc('weekly_quiz_submit_answer', {
+    const { data, error } = await sb.rpc('weekly_quiz_submit_answer', {
       p_quiz_date: weeklyQuizCurrentDate,
       p_student_id: weeklyQuizStudent.id,
       p_question_id: q.id,
@@ -13836,28 +13736,12 @@ async function answerWeeklyQuizQuestion(selectedKey) {
       p_face_token: weeklyQuizFaceToken
     });
     if (error) throw error;
-    // If the browser submits a fraction late, the server converts it to a timeout (zero points).
-    if (data?.reason === 'time_expired' && selectedKey !== null) {
-      selectedKey = null;
-      const timeoutResult = await sb.rpc('weekly_quiz_submit_answer', {
-        p_quiz_date: weeklyQuizCurrentDate,
-        p_student_id: weeklyQuizStudent.id,
-        p_question_id: q.id,
-        p_selected_option: null,
-        p_face_token: weeklyQuizFaceToken
-      });
-      data = timeoutResult.data;
-      error = timeoutResult.error;
-    }
-    if (error) throw error;
     if (!data?.ok) {
       const messages = {
-        face_verification_required: 'انتهت صلاحية التحقق أو سجل الدخول غير موجود. أعد التحقق بالوجه.',
+        face_verification_required: 'انتهت صلاحية التحقق أو سجل الدخول غير موجود. اخرج من المسابقة وأعد التحقق بالوجه.',
         question_not_scheduled: 'السؤال غير مدرج في جلسة المسابقة الحالية.',
         already_answered: 'تم تسجيل إجابتك عن هذا السؤال بالفعل.',
-        question_unavailable: 'السؤال غير متاح حاليًا.',
-        outside_time_window: 'انتهت المسابقة اليومية الساعة 8:00 مساءً.',
-        time_expired: 'انتهى وقت السؤال.'
+        question_unavailable: 'السؤال غير متاح حاليًا.'
       };
       throw new Error(messages[data?.reason] || 'تعذر تسجيل الإجابة في قاعدة البيانات.');
     }
@@ -13890,14 +13774,9 @@ async function answerWeeklyQuizQuestion(selectedKey) {
    المسابقة الأسبوعية — إدارة (v6.2)
    ============================================================ */
 async function loadWeeklyQuizAdmin() {
-  const { data: settings, error: settingsError } = await sb.from('golden_league_settings').select('*').eq('id', 1).maybeSingle();
-  if (settingsError) { showToast('تعذر تحميل إعدادات دوري الأندلس الذهبي: ' + settingsError.message, 'error'); return; }
-  document.getElementById('wq-daily-time').value = (settings?.daily_start || '19:00').slice(0, 5);
-  document.getElementById('wq-daily-end').value = (settings?.daily_end || '20:00').slice(0, 5);
-  document.getElementById('wq-questions-count').value = 5;
-  document.getElementById('wq-points-per-question').value = 10;
-  (settings?.weekly_thresholds || [200,230,260,280]).forEach((v,i) => { const el=document.getElementById('wq-target-'+(i+1)); if(el) el.value=v; });
-  (settings?.weekly_seconds || [20,15,10,5]).forEach((v,i) => { const el=document.getElementById('wq-seconds-'+(i+1)); if(el) el.value=v; });
+  const { data: settings } = await sb.from('quiz_settings').select('id,daily_time,questions_per_day,updated_at').eq('id', 1).maybeSingle();
+  document.getElementById('wq-daily-time').value = (settings?.daily_time || '19:00').slice(0, 5);
+  document.getElementById('wq-questions-count').value = settings?.questions_per_day || 5;
 
   // بناء قائمة الأسابيع (آخر 8 أسابيع بما فيهم الحالي)
   const weekPicker = document.getElementById('wq-week-picker');
@@ -13909,7 +13788,6 @@ async function loadWeeklyQuizAdmin() {
   weekPicker.innerHTML = weeks.map((w, i) => `<option value="${w}">${i === 0 ? 'الأسبوع الحالي' : 'أسبوع ' + w}</option>`).join('');
   await loadWeeklyQuizLeaderboardAdmin(weeks[0]);
   await loadWeeklyQuizAuditAdmin();
-  await loadGoldenLeagueMonthlyAdmin();
 
   const { data: bank, error: bankError } = await sb.rpc('admin_get_weekly_quiz_bank');
   if (bankError) { showToast('تعذر تحميل بنك الأسئلة: ' + bankError.message, 'error'); return; }
@@ -13927,30 +13805,18 @@ async function loadWeeklyQuizAdmin() {
 }
 
 async function saveQuizSettings() {
-  const daily_start = document.getElementById('wq-daily-time').value || '19:00';
-  const daily_end = document.getElementById('wq-daily-end').value || '20:00';
-  const weekly_thresholds = [1,2,3,4].map(i => Number(document.getElementById('wq-target-'+i).value));
-  const weekly_seconds = [1,2,3,4].map(i => Number(document.getElementById('wq-seconds-'+i).value));
-  if (daily_start >= daily_end || weekly_thresholds.some(v => !Number.isInteger(v) || v < 0 || v > 300) ||
-      weekly_seconds.some(v => !Number.isInteger(v) || v < 1 || v > 60)) {
-    showToast('راجع وقت البداية والنهاية وحدود التأهل وزمن الأسئلة.', 'error'); return;
-  }
-  const { data: updateResult, error } = await sb.rpc('golden_league_update_settings', {
-    p_daily_start: daily_start, p_daily_end: daily_end,
-    p_questions_per_day: 5, p_points_per_question: 10,
-    p_weekly_thresholds, p_weekly_seconds
-  });
-  if (error || !updateResult?.ok) { showToast('خطأ: ' + (error?.message || updateResult?.reason || 'تعذر حفظ إعدادات الدوري'), 'error'); return; }
-  await logActivity('edit', 'تعديل إعدادات دوري الأندلس الذهبي: ' + daily_start + '–' + daily_end +
-    '؛ التأهل ' + weekly_thresholds.join('/') + '؛ زمن الأسئلة ' + weekly_seconds.join('/'));
-  showToast('🏆 تم حفظ إعدادات دوري الأندلس الذهبي بنجاح');
-  await loadWeeklyQuizAdmin();
+  const daily_time = document.getElementById('wq-daily-time').value || '19:00';
+  const questions_per_day = parseInt(document.getElementById('wq-questions-count').value) || 5;
+  const { data: updateResult, error } = await sb.rpc('admin_update_weekly_quiz_settings', { p_daily_time: daily_time, p_questions_per_day: questions_per_day });
+  if (error || !updateResult?.ok) { showToast('خطأ: ' + (error?.message || updateResult?.reason || 'تعذر حفظ الإعدادات'), 'error'); return; }
+  await logActivity('edit', `تعديل إعدادات المسابقة الأسبوعية: الميعاد ${daily_time}، ${questions_per_day} سؤال/يوم`);
+  showToast('✅ تم حفظ الإعدادات — هتتطبق من التفعيل الجاي');
 }
 
 async function manuallyActivateWeeklyQuiz() {
-  if (!confirm('تجهيز أسئلة مسابقة اليوم؟ لن يسمح النظام بالدخول قبل الساعة 7 أو بعد الساعة 8 مساءً.')) return;
+  if (!confirm('تفعيل مسابقة النهاردة الآن؟ (لو مفعّلة بالفعل مش هيتغير حاجة)')) return;
   await activateTodayQuizNow();
-  showToast('تم إرسال طلب تجهيز أسئلة اليوم. يظل الدخول مقيدًا بموعد المسابقة 7–8 مساءً.');
+  showToast('✅ تم — لو مفيش مسابقة مفعّلة للنهاردة قبل كده هتظهر دلوقتي للطلاب');
 }
 
 async function loadWeeklyQuizLeaderboardAdmin(weekStart) {
