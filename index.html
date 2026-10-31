@@ -13805,7 +13805,7 @@ async function answerWeeklyQuizQuestion(selectedKey) {
   let pointsEarned = 0;
   let correctOption = null;
   try {
-    const { data, error } = await sb.rpc('weekly_quiz_submit_answer', {
+    let { data, error } = await sb.rpc('weekly_quiz_submit_answer', {
       p_quiz_date: weeklyQuizCurrentDate,
       p_student_id: weeklyQuizStudent.id,
       p_question_id: q.id,
@@ -13813,12 +13813,28 @@ async function answerWeeklyQuizQuestion(selectedKey) {
       p_face_token: weeklyQuizFaceToken
     });
     if (error) throw error;
+    // If the browser submits a fraction late, the server converts it to a timeout (zero points).
+    if (data?.reason === 'time_expired' && selectedKey !== null) {
+      selectedKey = null;
+      const timeoutResult = await sb.rpc('weekly_quiz_submit_answer', {
+        p_quiz_date: weeklyQuizCurrentDate,
+        p_student_id: weeklyQuizStudent.id,
+        p_question_id: q.id,
+        p_selected_option: null,
+        p_face_token: weeklyQuizFaceToken
+      });
+      data = timeoutResult.data;
+      error = timeoutResult.error;
+    }
+    if (error) throw error;
     if (!data?.ok) {
       const messages = {
-        face_verification_required: 'انتهت صلاحية التحقق أو سجل الدخول غير موجود. اخرج من المسابقة وأعد التحقق بالوجه.',
+        face_verification_required: 'انتهت صلاحية التحقق أو سجل الدخول غير موجود. أعد التحقق بالوجه.',
         question_not_scheduled: 'السؤال غير مدرج في جلسة المسابقة الحالية.',
         already_answered: 'تم تسجيل إجابتك عن هذا السؤال بالفعل.',
-        question_unavailable: 'السؤال غير متاح حاليًا.'
+        question_unavailable: 'السؤال غير متاح حاليًا.',
+        outside_time_window: 'انتهت المسابقة اليومية الساعة 8:00 مساءً.',
+        time_expired: 'انتهى وقت السؤال.'
       };
       throw new Error(messages[data?.reason] || 'تعذر تسجيل الإجابة في قاعدة البيانات.');
     }
