@@ -1721,23 +1721,46 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
         <!-- WEEKLY QUIZ ADMIN -->
         <div id="page-weekly-quiz-admin" class="page">
           <div class="card" style="margin-bottom:16px;">
-            <div class="card-header"><h3>⚙️ إعدادات المسابقة</h3></div>
+            <div class="card-header"><h3>🏆 إعدادات دوري الأندلس الذهبي</h3></div>
             <div style="padding:14px 16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-              <div class="form-group2"><label>ميعاد التفعيل اليومي</label><input type="time" id="wq-daily-time" style="max-width:140px;"></div>
-              <div class="form-group2"><label>عدد الأسئلة يوميًا</label><input type="number" id="wq-questions-count" min="1" max="20" style="max-width:100px;"></div>
-              <button class="btn btn-gold" onclick="saveQuizSettings()">💾 حفظ الإعدادات</button>
-              <button class="btn btn-outline" onclick="manuallyActivateWeeklyQuiz()">⚡ فعّل مسابقة النهاردة الآن</button>
+              <div class="form-group2"><label>بداية المسابقة</label><input type="time" id="wq-daily-time" value="19:00" style="max-width:140px;"></div>
+              <div class="form-group2"><label>نهاية المسابقة</label><input type="time" id="wq-daily-end" value="20:00" style="max-width:140px;"></div>
+              <div class="form-group2"><label>عدد الأسئلة يوميًا</label><input type="number" id="wq-questions-count" value="5" readonly style="max-width:90px;"></div>
+              <div class="form-group2"><label>نقاط السؤال</label><input type="number" id="wq-points-per-question" value="10" readonly style="max-width:90px;"></div>
+              <button class="btn btn-gold" onclick="saveQuizSettings()">💾 حفظ إعدادات الدوري</button>
+              <button class="btn btn-outline" onclick="manuallyActivateWeeklyQuiz()">🔄 تجهيز أسئلة اليوم داخل الموعد</button>
             </div>
-            <p style="font-size:11px;color:var(--muted);padding:0 16px 12px;">💡 المسابقة بتتفعل تلقائيًا لأول طالب يفتح البوابة بعد الميعاد ده — مفيش سيرفر منفصل ولا إعدادات إضافية. زرار "فعّل الآن" للاختبار أو لو حبيت تبدأها قبل ميعادها.</p>
+            <div style="padding:4px 16px 14px;">
+              <strong style="display:block;margin:8px 0;">حدود التأهل الأسبوعية (من 300 نقطة)</strong>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;">
+                <label>الأسبوع الأول<input id="wq-target-1" type="number" min="0" max="300" value="200"></label>
+                <label>الأسبوع الثاني<input id="wq-target-2" type="number" min="0" max="300" value="230"></label>
+                <label>الأسبوع الثالث<input id="wq-target-3" type="number" min="0" max="300" value="260"></label>
+                <label>الأسبوع الرابع<input id="wq-target-4" type="number" min="0" max="300" value="280"></label>
+              </div>
+              <strong style="display:block;margin:12px 0 8px;">زمن الإجابة لكل سؤال</strong>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;">
+                <label>الأسبوع الأول<input id="wq-seconds-1" type="number" min="1" max="60" value="20"></label>
+                <label>الأسبوع الثاني<input id="wq-seconds-2" type="number" min="1" max="60" value="15"></label>
+                <label>الأسبوع الثالث<input id="wq-seconds-3" type="number" min="1" max="60" value="10"></label>
+                <label>الأسبوع الرابع<input id="wq-seconds-4" type="number" min="1" max="60" value="5"></label>
+              </div>
+              <p style="font-size:11px;color:var(--muted);line-height:1.8;margin-top:10px;">المسابقة تعمل من السبت إلى الخميس فقط، من 7:00 إلى 8:00 مساءً بتوقيت القاهرة. يوم الجمعة لإعلان النتائج. التوقيت وعدّاد السؤال يتحقق منهما الخادم، وليس ساعة جهاز الطالب.</p>
+            </div>
           </div>
 
           <div class="card" style="margin-bottom:16px;">
             <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-              <h3>🏆 لوحة الصدارة</h3>
+              <h3>📊 ترتيب الأسبوع</h3>
               <select id="wq-week-picker" onchange="loadWeeklyQuizLeaderboardAdmin(this.value)" style="max-width:200px;"></select>
             </div>
             <table><thead><tr><th>#</th><th>الطالب</th><th>رقم القيد</th><th>النقاط</th><th>عدد الإجابات الصحيحة</th></tr></thead>
             <tbody id="wq-leaderboard-table"></tbody></table>
+          </div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>👑 الترتيب الشهري والتأهل النهائي</h3></div>
+            <div style="padding:8px 14px;color:var(--muted);font-size:12px;">يعرض مجموع الأسابيع الأربعة، ويحدد من استوفى كل حد أسبوعي للدخول في ترتيب الفائزين.</div>
+            <div style="overflow-x:auto;"><table><thead><tr><th>#</th><th>الطالب</th><th>الأسبوع 1</th><th>الأسبوع 2</th><th>الأسبوع 3</th><th>الأسبوع 4</th><th>الإجمالي</th><th>التأهل</th></tr></thead><tbody id="wq-monthly-leaderboard"><tr><td colspan="8">جاري التحميل...</td></tr></tbody></table></div>
           </div>
 
           <div class="card">
@@ -13867,9 +13890,14 @@ async function answerWeeklyQuizQuestion(selectedKey) {
    المسابقة الأسبوعية — إدارة (v6.2)
    ============================================================ */
 async function loadWeeklyQuizAdmin() {
-  const { data: settings } = await sb.from('quiz_settings').select('id,daily_time,questions_per_day,updated_at').eq('id', 1).maybeSingle();
-  document.getElementById('wq-daily-time').value = (settings?.daily_time || '19:00').slice(0, 5);
-  document.getElementById('wq-questions-count').value = settings?.questions_per_day || 5;
+  const { data: settings, error: settingsError } = await sb.from('golden_league_settings').select('*').eq('id', 1).maybeSingle();
+  if (settingsError) { showToast('تعذر تحميل إعدادات دوري الأندلس الذهبي: ' + settingsError.message, 'error'); return; }
+  document.getElementById('wq-daily-time').value = (settings?.daily_start || '19:00').slice(0, 5);
+  document.getElementById('wq-daily-end').value = (settings?.daily_end || '20:00').slice(0, 5);
+  document.getElementById('wq-questions-count').value = 5;
+  document.getElementById('wq-points-per-question').value = 10;
+  (settings?.weekly_thresholds || [200,230,260,280]).forEach((v,i) => { const el=document.getElementById('wq-target-'+(i+1)); if(el) el.value=v; });
+  (settings?.weekly_seconds || [20,15,10,5]).forEach((v,i) => { const el=document.getElementById('wq-seconds-'+(i+1)); if(el) el.value=v; });
 
   // بناء قائمة الأسابيع (آخر 8 أسابيع بما فيهم الحالي)
   const weekPicker = document.getElementById('wq-week-picker');
@@ -13881,6 +13909,7 @@ async function loadWeeklyQuizAdmin() {
   weekPicker.innerHTML = weeks.map((w, i) => `<option value="${w}">${i === 0 ? 'الأسبوع الحالي' : 'أسبوع ' + w}</option>`).join('');
   await loadWeeklyQuizLeaderboardAdmin(weeks[0]);
   await loadWeeklyQuizAuditAdmin();
+  await loadGoldenLeagueMonthlyAdmin();
 
   const { data: bank, error: bankError } = await sb.rpc('admin_get_weekly_quiz_bank');
   if (bankError) { showToast('تعذر تحميل بنك الأسئلة: ' + bankError.message, 'error'); return; }
@@ -13898,18 +13927,30 @@ async function loadWeeklyQuizAdmin() {
 }
 
 async function saveQuizSettings() {
-  const daily_time = document.getElementById('wq-daily-time').value || '19:00';
-  const questions_per_day = parseInt(document.getElementById('wq-questions-count').value) || 5;
-  const { data: updateResult, error } = await sb.rpc('admin_update_weekly_quiz_settings', { p_daily_time: daily_time, p_questions_per_day: questions_per_day });
-  if (error || !updateResult?.ok) { showToast('خطأ: ' + (error?.message || updateResult?.reason || 'تعذر حفظ الإعدادات'), 'error'); return; }
-  await logActivity('edit', `تعديل إعدادات المسابقة الأسبوعية: الميعاد ${daily_time}، ${questions_per_day} سؤال/يوم`);
-  showToast('✅ تم حفظ الإعدادات — هتتطبق من التفعيل الجاي');
+  const daily_start = document.getElementById('wq-daily-time').value || '19:00';
+  const daily_end = document.getElementById('wq-daily-end').value || '20:00';
+  const weekly_thresholds = [1,2,3,4].map(i => Number(document.getElementById('wq-target-'+i).value));
+  const weekly_seconds = [1,2,3,4].map(i => Number(document.getElementById('wq-seconds-'+i).value));
+  if (daily_start >= daily_end || weekly_thresholds.some(v => !Number.isInteger(v) || v < 0 || v > 300) ||
+      weekly_seconds.some(v => !Number.isInteger(v) || v < 1 || v > 60)) {
+    showToast('راجع وقت البداية والنهاية وحدود التأهل وزمن الأسئلة.', 'error'); return;
+  }
+  const { data: updateResult, error } = await sb.rpc('golden_league_update_settings', {
+    p_daily_start: daily_start, p_daily_end: daily_end,
+    p_questions_per_day: 5, p_points_per_question: 10,
+    p_weekly_thresholds, p_weekly_seconds
+  });
+  if (error || !updateResult?.ok) { showToast('خطأ: ' + (error?.message || updateResult?.reason || 'تعذر حفظ إعدادات الدوري'), 'error'); return; }
+  await logActivity('edit', 'تعديل إعدادات دوري الأندلس الذهبي: ' + daily_start + '–' + daily_end +
+    '؛ التأهل ' + weekly_thresholds.join('/') + '؛ زمن الأسئلة ' + weekly_seconds.join('/'));
+  showToast('🏆 تم حفظ إعدادات دوري الأندلس الذهبي بنجاح');
+  await loadWeeklyQuizAdmin();
 }
 
 async function manuallyActivateWeeklyQuiz() {
-  if (!confirm('تفعيل مسابقة النهاردة الآن؟ (لو مفعّلة بالفعل مش هيتغير حاجة)')) return;
+  if (!confirm('تجهيز أسئلة مسابقة اليوم؟ لن يسمح النظام بالدخول قبل الساعة 7 أو بعد الساعة 8 مساءً.')) return;
   await activateTodayQuizNow();
-  showToast('✅ تم — لو مفيش مسابقة مفعّلة للنهاردة قبل كده هتظهر دلوقتي للطلاب');
+  showToast('تم إرسال طلب تجهيز أسئلة اليوم. يظل الدخول مقيدًا بموعد المسابقة 7–8 مساءً.');
 }
 
 async function loadWeeklyQuizLeaderboardAdmin(weekStart) {
