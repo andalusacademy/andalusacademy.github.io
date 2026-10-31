@@ -242,7 +242,7 @@
         '<div style="text-align:center;padding:14px;"><div style="font-size:42px;">'+(selectedKey===null?'⏰':correct?'🏆':'❌')+'</div>' +
         '<h3 style="color:'+(selectedKey===null?'#b45309':correct?'#16a34a':'#dc2626')+';">'+(selectedKey===null?'انتهى الوقت':correct?'+10 نقاط — إجابة صحيحة':'إجابة غير صحيحة')+'</h3>' +
         '<div style="background:#f0fdf4;border:1px solid #16a34a55;border-radius:9px;padding:11px;margin-top:10px;color:#166534;">الإجابة الصحيحة: '+escapeHtml(options[data.correct_option]||'—')+'</div>' +
-        '<button class="btn btn-gold" style="width:100%;padding:13px;margin-top:16px;" onclick="loadWeeklyQuizSection()">متابعة ➜</button></div>';
+        '<button class="btn btn-gold" style="width:100%;padding:13px;margin-top:16px;" onclick="continueGoldenLeagueAfterAnswer()">متابعة ➜</button></div>';
     } catch(e) {
       console.error('Golden League answer:',e);
       weeklyQuizAnswered=false;
@@ -266,6 +266,13 @@
       b.setAttribute('aria-current',active?'page':'false');
     });
     if(tab==='history') renderGoldenLeagueHistory();
+  };
+
+  window.continueGoldenLeagueAfterAnswer=async function(){
+    await window.loadWeeklyQuizSection();
+    if(Array.isArray(window.weeklyQuizPendingList)&&window.weeklyQuizPendingList.length){
+      await window.startNextWeeklyQuizQuestion();
+    }
   };
 
   function renderGoldenLeagueHistory(){
@@ -299,6 +306,7 @@
     const progress=root.querySelector('.agl-progress');
     const labels=Array.from(root.querySelectorAll('.agl-section-label'));
     const podium=root.querySelector('.agl-podium');
+    const podiumEmpty=root.querySelector('div[style*="text-align:center;padding:25px"]');
     const rankings=Array.from(root.querySelectorAll('.agl-ranking-list'));
     const footer=root.querySelector('.agl-footer');
     const action=root.parentElement.querySelector(':scope > div:last-child');
@@ -314,6 +322,7 @@
     if(boardLabels.length){
       boardLabels.forEach(function(el){pages.board.appendChild(el);});
       if(podium)pages.board.appendChild(podium);
+      if(podiumEmpty)pages.board.appendChild(podiumEmpty);
       rankings.forEach(function(el){pages.board.appendChild(el);});
     }
     if(footer)pages.board.appendChild(footer);
