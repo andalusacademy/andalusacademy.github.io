@@ -299,12 +299,13 @@
         '<div style="overflow-x:auto;"><table><thead><tr><th>#</th><th>الطالب</th><th>الأسبوع 1</th><th>الأسبوع 2</th><th>الأسبوع 3</th><th>الأسبوع 4</th><th>الإجمالي</th><th>التأهل</th></tr></thead><tbody id="wq-monthly-leaderboard"><tr><td colspan="8">جاري التحميل...</td></tr></tbody></table></div>';
       weeklyCard.insertAdjacentElement('afterend',monthly);
     }
-    sb.from('golden_league_settings').select('*').eq('id',1).maybeSingle().then(function(r){
-      if(r.error||!r.data)return;
-      document.getElementById('agl-start').value=String(r.data.daily_start||'19:00').slice(0,5);
-      document.getElementById('agl-end').value=String(r.data.daily_end||'20:00').slice(0,5);
-      (r.data.weekly_thresholds||[200,230,260,280]).forEach(function(v,i){document.getElementById('agl-target-'+(i+1)).value=v;});
-      (r.data.weekly_seconds||[20,15,10,5]).forEach(function(v,i){document.getElementById('agl-seconds-'+(i+1)).value=v;});
+    sb.rpc('golden_league_get_settings_admin').then(function(r){
+      if(r.error||!r.data||!r.data.ok)return;
+      const settings=r.data.settings||{};
+      document.getElementById('agl-start').value=String(settings.daily_start||'19:00').slice(0,5);
+      document.getElementById('agl-end').value=String(settings.daily_end||'20:00').slice(0,5);
+      (settings.weekly_thresholds||[200,230,260,280]).forEach(function(v,i){document.getElementById('agl-target-'+(i+1)).value=v;});
+      (settings.weekly_seconds||[20,15,10,5]).forEach(function(v,i){document.getElementById('agl-seconds-'+(i+1)).value=v;});
     });
   }
 
