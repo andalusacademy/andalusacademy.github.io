@@ -229,7 +229,7 @@ DECLARE
 BEGIN
   SELECT * INTO v_settings FROM public.golden_league_settings WHERE id=1;
   IF NOT FOUND OR NOT v_settings.active THEN RETURN jsonb_build_object('ok',false,'reason','league_inactive'); END IF;
-  IF p_quiz_date<>v_local_date OR extract(dow FROM v_local_date)::integer<>ALL(ARRAY[5]) AND NOT (extract(dow FROM v_local_date)::integer=ANY(v_settings.allowed_days)) THEN
+  IF p_quiz_date<>v_local_date OR NOT (extract(dow FROM v_local_date)::integer=ANY(v_settings.allowed_days)) THEN
     RETURN jsonb_build_object('ok',false,'reason','closed_day');
   END IF;
   IF v_local_time<v_settings.daily_start OR v_local_time>=v_settings.daily_end THEN
