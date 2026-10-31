@@ -390,7 +390,7 @@ BEGIN
   v_seconds:=v_settings.weekly_seconds[v_week];
   INSERT INTO public.golden_league_question_starts(student_id,quiz_date,question_id,face_token,started_at)
   VALUES(v_student.id,p_quiz_date,p_question_id,p_face_token,v_now)
-  ON CONFLICT(student_id,quiz_date,question_id) DO NOTHING;
+  ON CONFLICT(student_id,quiz_date,question_id) DO UPDATE SET face_token=EXCLUDED.face_token;
   SELECT started_at INTO v_started FROM public.golden_league_question_starts
     WHERE student_id=v_student.id AND quiz_date=p_quiz_date AND question_id=p_question_id AND face_token=p_face_token;
   IF v_started IS NULL THEN RETURN jsonb_build_object('ok',false,'reason','question_session_conflict'); END IF;
