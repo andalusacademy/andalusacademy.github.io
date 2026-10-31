@@ -204,7 +204,7 @@ BEGIN
         AND EXISTS (SELECT 1 FROM public.quiz_answers qa0 WHERE qa0.student_id=s.id
           AND qa0.quiz_date>=v_cycle AND qa0.quiz_date<v_cycle+28)
     ) a
-  ) r WHERE r.rn<=50 OR r.student_id=v_student.id;
+  ) r WHERE (r.rn<=50 OR r.student_id=v_student.id) AND (v_completed_weeks<4 OR r.eligible);
 
   RETURN jsonb_build_object('ok',true,'cycle_start',v_cycle,'week_number',v_week,
     'week_start',v_week_start,'week_points',v_my_week,'month_points',v_month,
