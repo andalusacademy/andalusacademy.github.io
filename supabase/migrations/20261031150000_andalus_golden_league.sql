@@ -133,7 +133,7 @@ DECLARE
   v_now time := (now() AT TIME ZONE 'Africa/Cairo')::time;
   v_cycle date; v_week integer; v_week_start date; v_threshold integer; v_seconds integer;
   v_my_week integer:=0; v_month integer:=0; v_correct integer:=0; v_week_breakdown jsonb; v_completed_weeks integer:=0;
-  v_board jsonb; v_window text; v_eligible boolean:=true; v_i integer; v_points integer;
+  v_board jsonb; v_week_board jsonb; v_window text; v_eligible boolean:=true; v_i integer; v_points integer;
 BEGIN
   SELECT * INTO v_student FROM public.students WHERE id=btrim(coalesce(p_student_id,'')) AND deleted_at IS NULL AND student_status='active';
   IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'reason','student_not_found'); END IF;
@@ -221,13 +221,26 @@ BEGIN
     ) a
   ) r WHERE (r.rn<=50 OR r.student_id=v_student.id) AND (v_completed_weeks<4 OR r.eligible);
 
+  SELECT coalesce(jsonb_agg(jsonb_build_object('rank',r.rn,'student_name',r.student_name,
+    'total_points',r.total_points,'correct_count',r.correct_count,'is_me',r.student_id=v_student.id)
+    ORDER BY r.rn),'[]'::jsonb)
+  INTO v_week_board
+  FROM (
+    SELECT row_number() OVER(ORDER BY q.total_points DESC,q.correct_count DESC,q.student_name) rn,
+      q.student_id,q.student_name,q.total_points,q.correct_count
+    FROM public.quiz_weekly_scores q
+    WHERE q.week_start=v_cycle+(v_week-1)*7
+    ORDER BY q.total_points DESC,q.correct_count DESC,q.student_name
+    LIMIT 10
+  ) r WHERE r.rn<=10 OR r.student_id=v_student.id;
+
   RETURN jsonb_build_object('ok',true,'cycle_start',v_cycle,'week_number',v_week,
     'week_start',v_week_start,'week_points',v_my_week,'month_points',v_month,
     'correct_count',v_correct,'weekly_threshold',v_threshold,'question_seconds',v_seconds,
     'week_breakdown',v_week_breakdown,'eligible',v_eligible,'window_status',v_window,
     'daily_start',v_settings.daily_start,'daily_end',v_settings.daily_end,
     'questions_per_day',v_settings.questions_per_day,'points_per_question',v_settings.points_per_question,
-    'leaderboard',v_board);
+    'leaderboard',v_board,'weekly_leaderboard',v_week_board);
 END;
 $$;
 
@@ -242,7 +255,7 @@ BEGIN
     SELECT 1 FROM public.user_profiles up WHERE up.id=auth.uid() AND up.is_active IS TRUE AND up.role='admin'
   ) THEN RAISE EXCEPTION 'not authorized' USING ERRCODE='42501'; END IF;
   SELECT * INTO v_settings FROM public.golden_league_settings WHERE id=1;
-  SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY r.total_points DESC,r.student_name),'[]'::jsonb)
+  SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY r.qualified DESC,r.total_points DESC,r.student_name),'[]'::jsonb)
   INTO v_result
   FROM (
     SELECT s.id AS student_id,s.name AS student_name,
