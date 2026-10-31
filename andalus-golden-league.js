@@ -60,6 +60,7 @@
       }));
       const qMap = {};
       (questionResult.data || []).forEach(function (q) { qMap[q.id] = q; });
+      league.daily_session_ready = !!sessionResult.data;
       weeklyQuizPendingList = [];
       if (league.window_status === 'open' && sessionResult.data && Array.isArray(sessionResult.data.question_ids)) {
         sessionResult.data.question_ids.forEach(function (id) {
@@ -123,7 +124,7 @@
     const action = status === 'open' && weeklyQuizPendingList.length
       ? '<button class="btn btn-gold" style="width:100%;padding:14px;" onclick="startNextWeeklyQuizQuestion()">🎯 ابدأ المسابقة — ' + weeklyQuizPendingList.length + ' أسئلة متاحة</button>'
       : '<div style="text-align:center;color:#d7e0ee;font-size:12px;line-height:1.9;padding:12px 4px;">' +
-        (status === 'open' ? 'أكملت أسئلة اليوم الخمسة — أحسنت!' : statusText) + '</div>';
+        (status === 'open' ? (league && league.daily_session_ready ? 'أكملت أسئلة اليوم الخمسة — أحسنت!' : 'أسئلة اليوم لم تُجهز بعد. يرجى إبلاغ الإدارة بمراجعة بنك الأسئلة النشطة.') : statusText) + '</div>';
     box.innerHTML =
       '<style>' +
       '.agl-shell{direction:rtl;background:radial-gradient(circle at 50% 0%,#29436d 0,#14243d 48%,#0b1527 100%);color:#fff;border-radius:22px;padding:18px 14px 16px;overflow:hidden;position:relative;box-shadow:0 14px 34px rgba(8,20,40,.24)}' +
