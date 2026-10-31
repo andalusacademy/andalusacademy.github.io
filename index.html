@@ -8495,7 +8495,7 @@ async function exportExpenses() {
   if (!data || !data.length) { showToast('لا توجد بيانات', 'error'); return; }
   const rows = data.map(e => ({
     'التاريخ': e.expense_date || '', 'البند': e.item || '', 'القيمة': e.amount || 0,
-    'الفرع': e.branch || '', 'يخصم من الإجمالي': e.deduct === false ? 'لا' : 'نعم', 'ملاحظات': e.notes || ''
+    'الفرع': e.branch || '', 'أضيف بواسطة': getExpenseActorLabel(e.created_by), 'يخصم من الإجمالي': e.deduct === false ? 'لا' : 'نعم', 'ملاحظات': e.notes || ''
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -8511,7 +8511,7 @@ async function exportExpensesWord() {
   if (!data || !data.length) { showToast('لا توجد بيانات', 'error'); return; }
   const rows = data.map(e => ({
     'التاريخ': e.expense_date || '', 'البند': e.item || '', 'القيمة': e.amount || 0,
-    'الفرع': e.branch || '', 'يخصم من الإجمالي': e.deduct === false ? 'لا' : 'نعم', 'ملاحظات': e.notes || ''
+    'الفرع': e.branch || '', 'أضيف بواسطة': getExpenseActorLabel(e.created_by), 'يخصم من الإجمالي': e.deduct === false ? 'لا' : 'نعم', 'ملاحظات': e.notes || ''
   }));
   downloadWordDoc([{ title: 'مصروفات المركز', rows }], 'مصروفات_المركز_الاندلس_' + new Date().toLocaleDateString('ar-EG').replace(/\//g, '-') + '.doc');
   closeModal('modal-export');
