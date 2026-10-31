@@ -486,6 +486,8 @@ $$;
 
 REVOKE ALL ON FUNCTION public.golden_league_cycle_start(date) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.golden_league_week_number(date) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.golden_league_cycle_start(date) TO anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.golden_league_week_number(date) TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.golden_league_get_student_dashboard(text,uuid) TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.weekly_quiz_start_question(text,date,uuid,uuid) TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.weekly_quiz_submit_answer(date,text,uuid,text,uuid) TO anon,authenticated;
