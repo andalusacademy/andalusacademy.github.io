@@ -13754,33 +13754,45 @@ function backToPortalFromWeeklyQuiz() {
   renderStudentPortalMenu();
 }
 
-function startNextWeeklyQuizQuestion() {
-  if (!weeklyQuizPendingList.length) { loadWeeklyQuizSection(); return; }
+async function startNextWeeklyQuizQuestion() {
+  if (!weeklyQuizPendingList.length) { await loadWeeklyQuizSection(); return; }
   const item = weeklyQuizPendingList[0];
   weeklyQuizCurrentDate = item.quiz_date;
   weeklyQuizAnswered = false;
   const q = item.question;
-  const options = [
-    { key: 'a', text: q.option_a }, { key: 'b', text: q.option_b },
-    { key: 'c', text: q.option_c }, { key: 'd', text: q.option_d }
-  ];
-  document.getElementById('weekly-quiz-content').innerHTML = `
-    <p style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:4px;">${q.category ? escapeHtml(q.category) + ' — ' : ''}${q.points || 10} نقطة</p>
-    <div id="weekly-quiz-timer" style="text-align:center;font-size:32px;font-weight:900;color:var(--navy);margin-bottom:12px;">⏱ 15</div>
-    <h3 style="text-align:center;color:var(--navy);margin-bottom:16px;line-height:1.6;">${escapeHtml(q.question)}</h3>
-    <div id="weekly-quiz-options" style="display:flex;flex-direction:column;gap:8px;">
-      ${options.map(o => `<button class="btn btn-outline" style="width:100%;text-align:right;padding:12px;" onclick="answerWeeklyQuizQuestion('${o.key}')">${escapeHtml(o.text)}</button>`).join('')}
-    </div>`;
-  let remaining = 15;
+  const content = document.getElementById('weekly-quiz-content');
+  content.innerHTML = '<p style="text-align:center;padding:24px;">جاري بدء السؤال وتأمين الوقت...</p>';
+  let seconds = 0;
+  try {
+    const { data, error } = await sb.rpc('weekly_quiz_start_question', {
+      p_student_id: weeklyQuizStudent.id, p_quiz_date: weeklyQuizCurrentDate,
+      p_question_id: q.id, p_face_token: weeklyQuizFaceToken
+    });
+    if (error) throw error;
+    if (!data?.ok) {
+      const messages = { not_started:'المسابقة تفتح الساعة 7:00 مساءً.', ended:'انتهت المسابقة اليومية الساعة 8:00 مساءً.', closed_day:'المسابقة متاحة من السبت إلى الخميس فقط.', off_cycle:'لا توجد دورة شهرية نشطة الآن.', already_answered:'تم تسجيل إجابتك عن هذا السؤال بالفعل.', question_not_scheduled:'هذا السؤال غير موجود ضمن أسئلة اليوم.', session_expired:'انتهت جلسة التحقق. أعد الدخول للمسابقة.' };
+      throw new Error(messages[data?.reason] || 'تعذر بدء السؤال.');
+    }
+    seconds = Number(data.remaining_seconds ?? data.seconds ?? 0);
+    if (seconds <= 0) { await answerWeeklyQuizQuestion(null); return; }
+  } catch (e) {
+    content.innerHTML = '<div style="text-align:center;padding:20px;color:#991b1b;">' + escapeHtml(e?.message || 'تعذر بدء السؤال.') + '</div><button class="btn btn-outline" style="width:100%;" onclick="loadWeeklyQuizSection()">رجوع للوحة الدوري</button>';
+    return;
+  }
+  const options = [{key:'a',text:q.option_a},{key:'b',text:q.option_b},{key:'c',text:q.option_c},{key:'d',text:q.option_d}];
+  content.innerHTML = '<p style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:4px;">' + (q.category ? escapeHtml(q.category) + ' — ' : '') + '10 نقاط</p>' +
+    '<div id="weekly-quiz-timer" style="text-align:center;font-size:32px;font-weight:900;color:var(--navy);margin-bottom:12px;">⏱ ' + seconds + '</div>' +
+    '<h3 style="text-align:center;color:var(--navy);margin-bottom:16px;line-height:1.6;">' + escapeHtml(q.question) + '</h3>' +
+    '<div id="weekly-quiz-options" style="display:flex;flex-direction:column;gap:8px;">' + options.map(o => '<button class="btn btn-outline" style="width:100%;text-align:right;padding:12px;" onclick="answerWeeklyQuizQuestion(\'' + o.key + '\')">' + escapeHtml(o.text) + '</button>').join('') + '</div>';
+  let remaining = seconds;
   const timerEl = document.getElementById('weekly-quiz-timer');
   clearInterval(weeklyQuizTimerInterval);
   weeklyQuizTimerInterval = setInterval(() => {
     remaining--;
-    if (timerEl) { timerEl.textContent = '⏱ ' + remaining; timerEl.style.color = remaining <= 5 ? '#dc2626' : 'var(--navy)'; }
+    if (timerEl) { timerEl.textContent = '⏱ ' + Math.max(0, remaining); timerEl.style.color = remaining <= 5 ? '#dc2626' : 'var(--navy)'; }
     if (remaining <= 0) { clearInterval(weeklyQuizTimerInterval); if (!weeklyQuizAnswered) answerWeeklyQuizQuestion(null); }
   }, 1000);
 }
-
 async function answerWeeklyQuizQuestion(selectedKey) {
   if (weeklyQuizAnswered) return;
   weeklyQuizAnswered = true;
