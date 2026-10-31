@@ -13290,12 +13290,21 @@ let weeklyQuizAnswered = false;
 let weeklyQuizTimerInterval = null;
 
 // ✅ بداية الأسبوع الحالي (السبت) — نفس منطق تجميع النقاط والتصفير التلقائي
+function getCairoDateString(dateValue = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(dateValue);
+  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  return p.year + '-' + p.month + '-' + p.day;
+}
+
 function getWeekStartDate(d) {
-  const date = new Date(d);
-  const day = date.getDay(); // 0=Sunday ... 6=Saturday
-  const diff = (day + 1) % 7; // المسافة بالأيام من آخر يوم سبت
-  date.setDate(date.getDate() - diff);
-  return date.toISOString().split('T')[0];
+  const dateText = d instanceof Date ? getCairoDateString(d) : String(d).slice(0, 10);
+  const parts = dateText.split('-').map(Number);
+  const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+  const diff = (date.getUTCDay() + 1) % 7;
+  date.setUTCDate(date.getUTCDate() - diff);
+  return date.toISOString().slice(0, 10);
 }
 
 async function goToPortalWeeklyQuiz() {
@@ -13584,17 +13593,7 @@ async function loadWeeklyQuizAuditAdmin() {
 }
 
 async function ensureTodayQuizActivated() {
-  const todayStr = new Date().toISOString().split('T')[0];
-  const { data: existing } = await sb.from('quiz_daily_sessions').select('id').eq('quiz_date', todayStr).maybeSingle();
-  if (existing) return;
-
-  const { data: settings } = await sb.from('quiz_settings').select('id,daily_time,questions_per_day,updated_at').eq('id', 1).maybeSingle();
-  const dailyTime = settings?.daily_time || '19:00';
-  const [h, m] = dailyTime.split(':').map(Number);
-  const now = new Date();
-  const target = new Date(); target.setHours(h, m, 0, 0);
-  if (now < target) return; // لسه معاش ميعادها
-
+  // الخادم هو المرجع الوحيد للتاريخ والتوقيت ونافذة المسابقة.
   await activateTodayQuizNow();
 }
 
@@ -13612,52 +13611,67 @@ async function activateTodayQuizNow() {
 
 async function loadWeeklyQuizSection() {
   const contentEl = document.getElementById('weekly-quiz-content');
-  contentEl.innerHTML = '<p style="text-align:center;padding:20px;color:var(--muted);">جاري التحميل...</p>';
+  contentEl.innerHTML = '<p style="text-align:center;padding:20px;color:var(--muted);">جاري تحميل دوري الأندلس الذهبي...</p>';
 
-  await ensureTodayQuizActivated();
+  try {
+    await ensureTodayQuizActivated();
+    const today = getCairoDateString();
+    const weekStart = getWeekStartDate(today);
 
-  const weekStart = getWeekStartDate(new Date());
-  const { data: sessions } = await sb.from('quiz_daily_sessions').select('*').gte('quiz_date', weekStart).order('quiz_date', { ascending: true });
-  const { data: answeredResult, error: answeredError } = await sb.rpc('weekly_quiz_get_answered_questions', {
-    p_student_id: weeklyQuizStudent.id,
-    p_face_token: weeklyQuizFaceToken,
-    p_week_start: weekStart
-  });
-  if (answeredError || !answeredResult?.ok) {
-    console.warn('Weekly quiz answered-history lookup failed:', answeredError || answeredResult?.reason);
-    contentEl.innerHTML = '<div role="alert" style="text-align:center;padding:20px;"><p style="color:#b91c1c;">انتهت صلاحية التحقق أو تعذر تحميل حالة الإجابات.</p><button class="btn btn-gold" onclick="goToPortalWeeklyQuiz()">إعادة تسجيل الدخول من الجهاز المسجل</button></div>';
-    return;
-  }
-  const answered = answeredResult.answers || [];
-  const answeredKeys = new Set(answered.map(a => a.quiz_date + '|' + a.question_id));
-
-  const { data: allQs, error: questionsError } = await sb.rpc('weekly_quiz_get_public_questions');
-  if (questionsError) throw questionsError;
-  const qMap = {}; (allQs || []).forEach(q => qMap[q.id] = q);
-
-  weeklyQuizPendingList = [];
-  (sessions || []).forEach(s => {
-    (s.question_ids || []).forEach(qid => {
-      if (!answeredKeys.has(s.quiz_date + '|' + qid) && qMap[qid]) {
-        weeklyQuizPendingList.push({ quiz_date: s.quiz_date, question: qMap[qid] });
-      }
+    const { data: league, error: leagueError } = await sb.rpc('golden_league_get_student_dashboard', {
+      p_student_id: weeklyQuizStudent.id,
+      p_face_token: weeklyQuizFaceToken
     });
-  });
+    if (leagueError || !league?.ok) {
+      throw new Error(leagueError?.message || 'تعذر تحميل بيانات دوري الأندلس الذهبي. أعد التحقق من الهوية.');
+    }
 
-  const { data: scoreResult, error: scoreError } = await sb.rpc('weekly_quiz_get_public_scores', {
-    p_student_id: weeklyQuizStudent.id,
-    p_face_token: weeklyQuizFaceToken,
-    p_week_start: weekStart
-  });
-  if (scoreError || !scoreResult?.ok) {
-    console.warn('Weekly quiz score lookup failed:', scoreError || scoreResult?.reason);
-    contentEl.innerHTML = '<div role="alert" style="text-align:center;padding:20px;"><p style="color:#b91c1c;">تعذر تحميل النقاط ولوحة الصدارة. سجّل الدخول مجددًا من الجهاز المسجل.</p><button class="btn btn-gold" onclick="goToPortalWeeklyQuiz()">إعادة التحقق بالوجه</button></div>';
-    return;
+    const { data: sessions, error: sessionsError } = await sb.from('quiz_daily_sessions')
+      .select('quiz_date,question_ids').eq('quiz_date', today).maybeSingle();
+    if (sessionsError) throw sessionsError;
+
+    const { data: answeredResult, error: answeredError } = await sb.rpc('weekly_quiz_get_answered_questions', {
+      p_student_id: weeklyQuizStudent.id,
+      p_face_token: weeklyQuizFaceToken,
+      p_week_start: weekStart
+    });
+    if (answeredError || !answeredResult?.ok) {
+      throw new Error('انتهت صلاحية التحقق أو تعذر تحميل حالة الإجابات. أعد تسجيل الدخول للمسابقة.');
+    }
+    const answeredKeys = new Set((answeredResult.answers || []).map(a => a.quiz_date + '|' + a.question_id));
+
+    const { data: allQs, error: questionsError } = await sb.rpc('weekly_quiz_get_public_questions');
+    if (questionsError) throw questionsError;
+    const qMap = {};
+    (allQs || []).forEach(q => { qMap[q.id] = q; });
+
+    weeklyQuizPendingList = [];
+    if (league.window_status === 'open' && sessions?.question_ids) {
+      sessions.question_ids.forEach(qid => {
+        if (!answeredKeys.has(today + '|' + qid) && qMap[qid]) {
+          weeklyQuizPendingList.push({ quiz_date: today, question: qMap[qid] });
+        }
+      });
+    }
+
+    const myScore = {
+      total_points: Number(league.week_points || 0),
+      correct_count: Number(league.correct_count || 0),
+      month_points: Number(league.month_points || 0),
+      weekly_threshold: Number(league.weekly_threshold || 0),
+      week_number: Number(league.week_number || 0),
+      week_breakdown: league.week_breakdown || [],
+      eligible: league.eligible === true
+    };
+    renderWeeklyQuizHome(myScore, league.leaderboard || [], league);
+  } catch (e) {
+    console.error('Golden League load failed:', e);
+    contentEl.innerHTML = '<div role="alert" style="text-align:center;padding:20px;"><p style="color:#b91c1c;">' +
+      escapeHtml(e?.message || 'تعذر تحميل المسابقة.') +
+      '</p><button class="btn btn-gold" onclick="goToPortalWeeklyQuiz()">إعادة التحقق والدخول</button></div>';
   }
-  renderWeeklyQuizHome(scoreResult.my_score, scoreResult.leaderboard || []);
 }
-
-function renderWeeklyQuizHome(myScore, leaderboard) {
+function renderWeeklyQuizHome(myScore, leaderboard, leagueStatus = {}) {
   const contentEl = document.getElementById('weekly-quiz-content');
   const rows = Array.isArray(leaderboard) ? leaderboard : [];
   const podiumItems = [rows[1], rows[0], rows[2]].filter(Boolean);
@@ -13697,7 +13711,7 @@ function renderWeeklyQuizHome(myScore, leaderboard) {
       '.agl-shell:before,.agl-shell:after{content:"";position:absolute;border:1px solid rgba(232,200,122,.12);border-radius:50%;pointer-events:none;}' +
       '.agl-shell:before{width:230px;height:230px;top:-150px;right:-75px}.agl-shell:after{width:190px;height:190px;bottom:-135px;left:-65px}' +
       '.agl-head{position:relative;text-align:center;margin-bottom:14px}.agl-kicker{font-size:10px;letter-spacing:2px;color:#e8c87a;font-weight:900}.agl-title{font-size:21px;font-weight:900;color:#f4d27c;margin:3px 0}.agl-subtitle{font-size:11px;color:#d7e0ee}' +
-      '.agl-my-score{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 14px}.agl-stat{background:rgba(255,255,255,.075);border:1px solid rgba(232,200,122,.2);border-radius:13px;padding:10px;text-align:center}.agl-stat strong{display:block;color:#f4d27c;font-size:22px;font-weight:900}.agl-stat span{font-size:10px;color:#d5deeb}' +
+      '.agl-my-score{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0 14px}.agl-stat{background:rgba(255,255,255,.075);border:1px solid rgba(232,200,122,.2);border-radius:13px;padding:10px;text-align:center}.agl-stat strong{display:block;color:#f4d27c;font-size:22px;font-weight:900}.agl-stat span{font-size:10px;color:#d5deeb}.agl-progress{position:relative;background:rgba(255,255,255,.07);border:1px solid rgba(232,200,122,.18);border-radius:13px;padding:12px;margin:8px 0 14px}.agl-progress-line{height:8px;border-radius:20px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:7px}.agl-progress-line span{display:block;height:100%;background:linear-gradient(90deg,#b8892f,#f4d27c);border-radius:20px}.agl-weekchips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:10px}.agl-weekchip{background:rgba(255,255,255,.07);border-radius:8px;padding:7px 3px;text-align:center;font-size:9px;color:#d7e0ee}.agl-weekchip strong{display:block;color:#f4d27c;font-size:11px;margin-top:3px}' +
       '.agl-podium{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:7px;min-height:200px;padding:8px 2px 0}.agl-podium-card{height:var(--podium-height);flex:1;max-width:31%;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:10px 5px 0;border:1px solid color-mix(in srgb,var(--podium-color) 60%,transparent);border-bottom:0;border-radius:13px 13px 0 0;background:linear-gradient(180deg,color-mix(in srgb,var(--podium-color) 22%,#14243d),rgba(255,255,255,.035));text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}' +
       '.agl-podium-card.is-me{outline:2px solid #fff;outline-offset:2px}.agl-medal{font-size:26px;line-height:1.1}.agl-podium-name{font-size:11px;font-weight:900;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:5px}.agl-podium-score{font-size:16px;color:#f4d27c;font-weight:900;margin-top:5px}.agl-podium-score small{font-size:9px;margin-right:3px;color:#d7e0ee}.agl-podium-base{margin-top:auto;width:100%;padding:5px 2px;background:var(--podium-color);color:#17243a;font-size:10px;font-weight:900;border-radius:7px 7px 0 0}.agl-you-tag{position:absolute;top:5px;left:5px;background:#fff;color:#14243d;border-radius:20px;padding:1px 6px;font-size:8px;font-weight:900}' +
       '.agl-ranking-list{position:relative;margin-top:12px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);border-radius:13px;padding:4px 10px}.agl-rank-row{display:flex;align-items:center;gap:9px;padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.09)}.agl-rank-row:last-child{border-bottom:0}.agl-rank-row.is-me{background:rgba(244,210,124,.1);border-radius:9px;padding-right:8px;padding-left:8px}.agl-rank-number{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.1);color:#f4d27c;font-size:11px;font-weight:900;flex-shrink:0}.agl-rank-name{flex:1;min-width:0;font-size:12px;font-weight:700}.agl-rank-name small{margin-right:6px;color:#f4d27c;font-size:9px}.agl-rank-points{font-size:11px;color:#f4d27c;white-space:nowrap}.agl-section-label{position:relative;margin:14px 0 6px;color:#f4d27c;font-size:12px;font-weight:900}.agl-empty{position:relative;text-align:center;padding:28px 10px;color:#d5deeb;font-size:13px;line-height:2}.agl-quiz-action{position:relative;margin-top:14px}.agl-footer{text-align:center;color:#9eacc1;font-size:9px;margin-top:12px}' +
@@ -13708,17 +13722,30 @@ function renderWeeklyQuizHome(myScore, leaderboard) {
       '<header class="agl-head"><div class="agl-kicker">ANDALUS GOLDEN LEAGUE</div><div class="agl-title">🏆 دوري الأندلس الذهبي</div><div class="agl-subtitle">المعرفة منافسة، والتميز بطولة</div></header>' +
       '<div class="agl-my-score">' +
         '<div class="agl-stat"><strong>' + Number(myScore && myScore.total_points || 0) + '</strong><span>نقاطك هذا الأسبوع</span></div>' +
+        '<div class="agl-stat"><strong>' + Number(myScore && myScore.month_points || 0) + '</strong><span>نقاطك الشهرية</span></div>' +
         '<div class="agl-stat"><strong>' + Number(myScore && myScore.correct_count || 0) + '</strong><span>إجابات صحيحة</span></div>' +
+        '<div class="agl-stat"><strong>' + (Number(myScore && myScore.week_number || 0) || '—') + ' / 4</strong><span>الأسبوع الحالي</span></div>' +
       '</div>' +
-      '<div class="agl-section-label">👑 منصة الأبطال</div>' +
+      '<div class="agl-progress">' +
+        '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:900;"><span>🎯 هدف التأهل لهذا الأسبوع</span><span>' + Number(myScore && myScore.total_points || 0) + ' / ' + Number(myScore && myScore.weekly_threshold || 0) + '</span></div>' +
+        '<div class="agl-progress-line"><span style="width:' + Math.min(100, Number(myScore && myScore.weekly_threshold ? (myScore.total_points / myScore.weekly_threshold * 100) : 0)) + '%"></span></div>' +
+        '<div class="agl-weekchips">' + (myScore.week_breakdown || []).map(w => '<div class="agl-weekchip">الأسبوع ' + w.week + '<strong>' + Number(w.points || 0) + ' / ' + Number(w.threshold || 0) + '</strong></div>').join('') + '</div>' +
+      '</div>' +
+      '<div class="agl-section-label">👑 منصة الأبطال — الترتيب الشهري</div>' +
       podiumMarkup +
       (rankingMarkup ? '<div class="agl-section-label">ترتيب بقية المتنافسين</div>' + rankingMarkup : '') +
       '<div class="agl-footer">يتم تحديث لوحة الصدارة وفق النتائج المسجلة للمسابقة</div>' +
     '</section>' +
     '<div class="agl-quiz-action">' +
-      (weeklyQuizPendingList.length
-        ? '<button class="btn btn-gold" style="width:100%;padding:13px;" onclick="startNextWeeklyQuizQuestion()">🎯 جاوب على سؤال (' + weeklyQuizPendingList.length + ' متاح)</button>'
-        : '<p style="text-align:center;color:var(--muted);font-size:13px;margin-top:12px;">مفيش أسئلة متاحة دلوقتي — تعالى في موعد المسابقة</p>') +
+      (leagueStatus.window_status === 'open' && weeklyQuizPendingList.length
+        ? '<button class="btn btn-gold" style="width:100%;padding:13px;" onclick="startNextWeeklyQuizQuestion()">🎯 ابدأ المسابقة — (' + weeklyQuizPendingList.length + ' سؤال متاح)</button>'
+        : '<div style="text-align:center;color:var(--muted);font-size:13px;line-height:1.9;margin-top:12px;">' +
+          (leagueStatus.window_status === 'not_started' ? '🔒 المسابقة تفتح الساعة 7:00 مساءً' :
+           leagueStatus.window_status === 'ended' ? '⛔ انتهت المسابقة اليومية الساعة 8:00 مساءً' :
+           leagueStatus.window_status === 'closed_day' ? '📊 اليوم مخصص للنتائج والراحة — نلتقي السبت' :
+           leagueStatus.window_status === 'off_cycle' ? '📅 لا توجد دورة شهرية نشطة في هذا اليوم' :
+           weeklyQuizPendingList.length ? 'تمت الإجابة عن أسئلة اليوم كلها' : 'لم يتم تجهيز أسئلة اليوم بعد؛ تأكد من وجود 5 أسئلة نشطة في بنك المسابقة') +
+          '</div>') +
     '</div>';
 }
 function backToPortalFromWeeklyQuiz() {
