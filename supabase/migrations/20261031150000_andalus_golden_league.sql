@@ -227,7 +227,7 @@ BEGIN
     'eligible',r.eligible) ORDER BY r.rn),'[]'::jsonb)
   INTO v_board
   FROM (
-    SELECT row_number() OVER(ORDER BY a.month_points DESC,a.week_points DESC,a.student_name) rn,
+    SELECT row_number() OVER(ORDER BY CASE WHEN v_completed_weeks=4 THEN a.eligible ELSE true END DESC,a.month_points DESC,a.week_points DESC,a.student_name) rn,
       a.student_id,a.student_name,a.month_points,a.week_points,a.eligible
     FROM (
       SELECT s.id student_id,s.name student_name,
