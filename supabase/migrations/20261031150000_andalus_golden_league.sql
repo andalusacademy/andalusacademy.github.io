@@ -68,6 +68,35 @@ AS $$
   END;
 $$;
 
+-- All questions in this league have a fixed value of ten points.
+UPDATE public.quiz_bank_questions SET points=10 WHERE points IS DISTINCT FROM 10;
+
+CREATE OR REPLACE FUNCTION public.admin_add_weekly_quiz_question(
+  p_question text,p_option_a text,p_option_b text,p_option_c text,p_option_d text,
+  p_correct_option text,p_category text DEFAULT NULL,p_points integer DEFAULT 10
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public'
+AS $
+DECLARE new_id uuid; correct_key text:=lower(btrim(coalesce(p_correct_option,'')));
+BEGIN
+  IF auth.uid() IS NULL OR NOT EXISTS (
+    SELECT 1 FROM public.user_profiles up WHERE up.id=auth.uid() AND up.is_active IS TRUE AND up.role='admin'
+  ) THEN RAISE EXCEPTION 'not authorized' USING ERRCODE='42501'; END IF;
+  IF btrim(coalesce(p_question,''))='' OR btrim(coalesce(p_option_a,''))=''
+    OR btrim(coalesce(p_option_b,''))='' OR correct_key NOT IN ('a','b','c','d') THEN
+    RETURN jsonb_build_object('ok',false,'reason','invalid_question');
+  END IF;
+  INSERT INTO public.quiz_bank_questions(question,option_a,option_b,option_c,option_d,correct_option,category,points)
+  VALUES(btrim(p_question),btrim(p_option_a),btrim(p_option_b),
+    coalesce(nullif(btrim(p_option_c),''),'—'),coalesce(nullif(btrim(p_option_d),''),'—'),
+    correct_key,nullif(btrim(coalesce(p_category,'')),''),10)
+  RETURNING id INTO new_id;
+  RETURN jsonb_build_object('ok',true,'id',new_id);
+END;
+$;
+
 CREATE OR REPLACE FUNCTION public.golden_league_get_settings_admin()
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER STABLE
