@@ -78,7 +78,7 @@ CREATE OR REPLACE FUNCTION public.admin_add_weekly_quiz_question(
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO 'public'
-AS $
+AS $$
 DECLARE new_id uuid; correct_key text:=lower(btrim(coalesce(p_correct_option,'')));
 BEGIN
   IF auth.uid() IS NULL OR NOT EXISTS (
@@ -95,13 +95,13 @@ BEGIN
   RETURNING id INTO new_id;
   RETURN jsonb_build_object('ok',true,'id',new_id);
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.golden_league_get_settings_admin()
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER STABLE
 SET search_path TO 'public'
-AS $
+AS $$
 DECLARE s public.golden_league_settings%rowtype;
 BEGIN
   IF auth.uid() IS NULL OR NOT EXISTS (
@@ -114,7 +114,7 @@ BEGIN
     'points_per_question',s.points_per_question,'weekly_thresholds',s.weekly_thresholds,
     'weekly_seconds',s.weekly_seconds,'active',s.active,'timezone',s.timezone));
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.golden_league_update_settings(
   p_daily_start text DEFAULT '19:00',
@@ -276,7 +276,7 @@ CREATE OR REPLACE FUNCTION public.golden_league_admin_report(p_cycle_start date 
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER STABLE
 SET search_path TO 'public'
-AS $
+AS $$
 DECLARE v_settings public.golden_league_settings%rowtype; v_result jsonb;
 BEGIN
   IF auth.uid() IS NULL OR NOT EXISTS (
@@ -304,7 +304,7 @@ BEGIN
   ) r;
   RETURN jsonb_build_object('ok',true,'cycle_start',p_cycle_start,'leaderboard',v_result);
 END;
-$;
+$$;
 
 DROP POLICY IF EXISTS quiz_daily_sessions_public_read ON public.quiz_daily_sessions;
 CREATE POLICY quiz_daily_sessions_public_read ON public.quiz_daily_sessions
@@ -317,7 +317,7 @@ CREATE OR REPLACE FUNCTION public.weekly_quiz_get_answered_questions(
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER STABLE
 SET search_path TO 'public'
-AS $
+AS $$
 DECLARE answers_data jsonb; session_ok boolean:=false;
 BEGIN
   IF coalesce(btrim(p_student_id),'')='' OR p_face_token IS NULL OR p_week_start IS NULL
@@ -346,7 +346,7 @@ BEGIN
   WHERE qa.student_id=btrim(p_student_id) AND qa.quiz_date>=p_week_start AND qa.quiz_date<p_week_start+7;
   RETURN jsonb_build_object('ok',true,'answers',answers_data);
 END;
-$;
+$$;
 GRANT EXECUTE ON FUNCTION public.weekly_quiz_get_answered_questions(text,uuid,date) TO anon,authenticated;
 
 CREATE OR REPLACE FUNCTION public.weekly_quiz_start_question(
@@ -543,7 +543,7 @@ CREATE OR REPLACE FUNCTION public.get_portal_notifications(p_student_id text,p_p
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path TO 'public'
-AS $
+AS $$
 DECLARE st public.students%rowtype; items jsonb;
 BEGIN
   IF p_portal_type NOT IN ('student','parent') OR NOT public.student_face_phone_matches(p_student_id,p_phone) THEN
@@ -574,7 +574,7 @@ BEGIN
     );
   RETURN jsonb_build_object('verified',true,'notifications',items);
 END;
-$;
+$$;
 
 -- One-time mandatory login notice. Students must explicitly acknowledge it in the existing portal notice flow.
 INSERT INTO public.notifications(
