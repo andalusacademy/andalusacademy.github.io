@@ -231,7 +231,6 @@ BEGIN
     FROM public.quiz_weekly_scores q
     WHERE q.week_start=v_cycle+(v_week-1)*7
     ORDER BY q.total_points DESC,q.correct_count DESC,q.student_name
-    LIMIT 10
   ) r WHERE r.rn<=10 OR r.student_id=v_student.id;
 
   RETURN jsonb_build_object('ok',true,'cycle_start',v_cycle,'week_number',v_week,
