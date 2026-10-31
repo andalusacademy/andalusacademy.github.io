@@ -348,6 +348,26 @@
     };
   }
 
+  function relabelGoldenLeagueEntryPoints(){
+    const title=document.querySelector('#weekly-quiz-card p');
+    if(title)title.textContent='🏆 دوري الأندلس الذهبي';
+    document.querySelectorAll('.nav-card[onclick*="weekly-quiz-admin"]').forEach(function(card){
+      const label=card.querySelector('span:last-child');if(label)label.textContent='دوري الأندلس الذهبي';
+    });
+    document.querySelectorAll('[onclick*="goToPortalWeeklyQuiz"]').forEach(function(button){
+      if(button.tagName==='BUTTON')button.textContent='🏆 دوري الأندلس الذهبي';
+    });
+  }
+  relabelGoldenLeagueEntryPoints();
+  const legacyPortalMenu=window.renderStudentPortalMenu;
+  if(typeof legacyPortalMenu==='function'){
+    window.renderStudentPortalMenu=function(){
+      const result=legacyPortalMenu.apply(this,arguments);
+      relabelGoldenLeagueEntryPoints();
+      return result;
+    };
+  }
+
   const legacyNoticeRenderer=window.renderStudentLoginNotificationDialog;
   if(typeof legacyNoticeRenderer==='function'){
     window.renderStudentLoginNotificationDialog=function(){
