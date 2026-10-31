@@ -45,6 +45,10 @@ else if(action==='logout')headline='قام '+who+' بتسجيل الخروج';
 else if(action==='page_view')headline='قام '+who+' بفتح شاشة '+(e.title||module||'بالنظام');
 else if(action==='click')headline='قام '+who+' بتنفيذ الإجراء: '+(e.title||'');
 else if(action==='download'||action==='export')headline='قام '+who+(action==='download'?' بتحميل ':' بتصدير ')+(e.title||module||'ملف');
+else if(tableRaw==='payments')headline='قام '+who+' بـ'+(op==='إضافة'?'إضافة':'تسجيل')+' دفعة'+(student?' للمتدرب '+student:'');
+else if(tableRaw==='daily_revenue')headline='قام '+who+' بإضافة إيراد'+(student?' للمتدرب '+student:'');
+else if(tableRaw==='expenses')headline='قام '+who+' بتسجيل مصروف';
+else if(tableRaw==='cash_register_logs')headline='قام '+who+' بتسجيل حركة الخزينة';
 else headline='قام '+who+' بعملية '+op+' في '+(module||table||'النظام');
 const changed=[];
 if(action==='update'){
