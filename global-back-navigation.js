@@ -71,7 +71,7 @@
       }
     }
 
-    if (window.history.length > 1) window.history.back();
+    // Keep the web portal open at its root; Chrome back gestures are handled below.
   }
 
   function install() {
@@ -105,6 +105,24 @@
     observer.observe(document.body, {subtree:true, childList:true, attributes:true, attributeFilter:['style','class']});
     refresh();
     window.andalusGoBack = goBack;
+
+    // Android Chrome edge-swipe / system Back produces popstate.
+    // Keep one same-document history entry so the gesture returns within
+    // the portal rather than leaving the site or closing its tab.
+    const backSentinel = '__andalus_portal_back__';
+    function armBackSentinel() {
+      try {
+        if (history.state?.__andalusPortalBack === backSentinel) return;
+        history.pushState({ ...(history.state || {}), __andalusPortalBack: backSentinel }, '', location.href);
+      } catch (error) {
+        console.warn('تعذر تفعيل الرجوع الداخلي للبوابة:', error);
+      }
+    }
+    armBackSentinel();
+    window.addEventListener('popstate', function () {
+      goBack();
+      armBackSentinel();
+    });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
