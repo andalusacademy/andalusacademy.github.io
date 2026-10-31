@@ -11,6 +11,8 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 
 import java.util.ArrayList;
 
@@ -18,6 +20,7 @@ public class MainActivity extends Activity {
     private static final int MEDIA_PERMISSION_REQUEST = 4107;
     private WebView webView;
     private PermissionRequest pendingRequest;
+    private OnBackInvokedCallback backInvokedCallback;
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -47,6 +50,11 @@ public class MainActivity extends Activity {
             }
         });
         setContentView(webView);
+        if (Build.VERSION.SDK_INT >= 33) {
+            backInvokedCallback = this::handleAppBack;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT, backInvokedCallback);
+        }
         webView.loadUrl("https://andalusacademy.github.io/");
     }
 
@@ -91,12 +99,23 @@ public class MainActivity extends Activity {
         super.onPause();
     }
 
+    private void handleAppBack() {
+        if (webView == null) return;
+        // The web app owns navigation: return to the previous portal/page instead of closing the app.
+        webView.evaluateJavascript(
+            "(function(){if(typeof window.andalusGoBack==='function'){window.andalusGoBack();}else if(window.history.length>1){window.history.back();}})();",
+            null);
+    }
+
     @Override public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) webView.goBack();
-        else super.onBackPressed();
+        handleAppBack();
     }
 
     @Override protected void onDestroy() {
+        if (Build.VERSION.SDK_INT >= 33 && backInvokedCallback != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backInvokedCallback);
+            backInvokedCallback = null;
+        }
         if (webView != null) {
             webView.stopLoading();
             webView.setWebChromeClient(null);
