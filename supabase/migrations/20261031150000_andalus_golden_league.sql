@@ -50,12 +50,19 @@ CREATE OR REPLACE FUNCTION public.golden_league_cycle_start(p_date date DEFAULT 
 RETURNS date
 LANGUAGE sql IMMUTABLE
 SET search_path TO 'public'
-AS $$
-  SELECT (
-    date_trunc('month', p_date)::date
-    + ((6 - extract(dow FROM date_trunc('month', p_date)::date)::integer + 7) % 7)
-  )::date;
-$$;
+AS $
+  WITH anchors AS (
+    SELECT
+      (date_trunc('month',p_date)::date + ((6-extract(dow FROM date_trunc('month',p_date)::date)::integer+7)%7))::date AS current_anchor,
+      (date_trunc('month',p_date - interval '1 month')::date
+        + ((6-extract(dow FROM date_trunc('month',p_date - interval '1 month')::date)::integer+7)%7))::date AS previous_anchor
+  )
+  SELECT CASE
+    WHEN p_date>=previous_anchor AND p_date<previous_anchor+28 THEN previous_anchor
+    WHEN p_date>=current_anchor AND p_date<current_anchor+28 THEN current_anchor
+    ELSE current_anchor
+  END FROM anchors;
+$;
 
 CREATE OR REPLACE FUNCTION public.golden_league_week_number(p_date date)
 RETURNS integer
