@@ -55,6 +55,7 @@
         throw new Error('تعذر تحميل سجل إجاباتك. أعد التحقق من الهوية.');
       }
       if (questionResult.error) throw questionResult.error;
+      window.aglAnsweredRows = answeredResult.data.answers || [];
       const answered = new Set((answeredResult.data.answers || []).map(function (a) {
         return a.quiz_date + '|' + a.question_id;
       }));
@@ -249,6 +250,88 @@
       const box=document.getElementById('weekly-quiz-content');
       if(box) box.insertAdjacentHTML('afterbegin','<div role="alert" style="padding:10px;color:#991b1b;">'+escapeHtml(e.message||'تعذر حفظ الإجابة')+'</div>');
     }
+  };
+
+
+  // Full student-facing Golden League portal navigation (no database migration required).
+  window.showGoldenLeagueTab = function(tab) {
+    const root=document.querySelector('#weekly-quiz-content .agl-shell');
+    if(!root)return;
+    root.querySelectorAll('.agl-page').forEach(function(p){p.style.display=p.dataset.tab===tab?'block':'none';});
+    root.querySelectorAll('.agl-nav-btn').forEach(function(b){
+      const active=b.dataset.tab===tab;
+      b.style.background=active?'linear-gradient(135deg,#f4d27c,#c99a3b)':'rgba(255,255,255,.08)';
+      b.style.color=active?'#17243a':'#e8edf5';
+      b.style.borderColor=active?'#f4d27c':'rgba(255,255,255,.16)';
+      b.setAttribute('aria-current',active?'page':'false');
+    });
+    if(tab==='history') renderGoldenLeagueHistory();
+  };
+
+  function renderGoldenLeagueHistory(){
+    const box=document.getElementById('agl-history-content');
+    if(!box)return;
+    const rows=Array.isArray(window.aglAnsweredRows)?window.aglAnsweredRows:[];
+    if(!rows.length){box.innerHTML='<div class="agl-empty">لم تسجل إجابات سابقة في الأسبوع الحالي حتى الآن.</div>';return;}
+    const sorted=rows.slice().sort(function(a,b){return String(b.quiz_date||'').localeCompare(String(a.quiz_date||''));});
+    box.innerHTML=sorted.map(function(r){
+      const date=String(r.quiz_date||'');
+      const correct=r.is_correct===true;
+      return '<div class="agl-history-row"><span>'+escapeHtml(date)+'</span><strong>'+(correct?'✅ إجابة صحيحة':'❌ إجابة غير صحيحة')+'</strong><b>'+(correct?' +10':'0')+' نقاط</b></div>';
+    }).join('');
+  }
+
+  const aglLegacyRender=window.renderWeeklyQuizHome;
+  window.renderWeeklyQuizHome=function(myScore,leaderboard,league){
+    aglLegacyRender.apply(this,arguments);
+    const root=document.querySelector('#weekly-quiz-content .agl-shell');
+    if(!root||root.querySelector('.agl-portal-nav'))return;
+    const style=document.createElement('style');
+    style.textContent='.agl-portal-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:12px 0 14px}.agl-nav-btn{border:1px solid rgba(255,255,255,.16);border-radius:11px;padding:10px 5px;font:800 11px inherit;background:rgba(255,255,255,.08);color:#e8edf5;cursor:pointer}.agl-page{margin-top:8px}.agl-page .agl-section-label:first-child{margin-top:4px}.agl-empty{padding:18px;text-align:center;color:#d7e0ee;background:rgba(255,255,255,.06);border-radius:12px;font-size:12px;line-height:1.9}.agl-history-row{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.1);font-size:11px}.agl-history-row:last-child{border:0}.agl-history-row b{color:#f4d27c;white-space:nowrap}.agl-rule{padding:11px;border:1px solid rgba(232,200,122,.2);background:rgba(255,255,255,.055);border-radius:10px;margin:8px 0;font-size:12px;line-height:1.9;color:#e8edf5}.agl-achievement{display:flex;gap:10px;align-items:center;padding:12px;border:1px solid rgba(232,200,122,.25);background:rgba(255,255,255,.06);border-radius:11px;margin:8px 0}.agl-achievement strong{color:#f4d27c;display:block}.agl-action-wrap{margin-top:12px}';
+    root.appendChild(style);
+    const header=root.querySelector('.agl-head');
+    const nav=document.createElement('div');nav.className='agl-portal-nav';
+    const tabs=[['home','🏠 الرئيسية'],['quiz','🎯 المسابقة'],['board','👑 لوحة الصدارة'],['history','📊 مشاركاتي'],['achievements','🏅 إنجازاتي'],['rules','📜 النظام']];
+    nav.innerHTML=tabs.map(function(t){return '<button type="button" class="agl-nav-btn" data-tab="'+t[0]+'" onclick="showGoldenLeagueTab(\''+t[0]+'\')">'+t[1]+'</button>';}).join('');
+    if(header)header.insertAdjacentElement('afterend',nav);else root.insertBefore(nav,root.firstChild);
+
+    const stats=root.querySelector('.agl-my-score');
+    const progress=root.querySelector('.agl-progress');
+    const labels=Array.from(root.querySelectorAll('.agl-section-label'));
+    const podium=root.querySelector('.agl-podium');
+    const rankings=Array.from(root.querySelectorAll('.agl-ranking-list'));
+    const footer=root.querySelector('.agl-footer');
+    const action=root.parentElement.querySelector(':scope > div:last-child');
+    const pages={};
+    ['home','quiz','board','history','achievements','rules'].forEach(function(t){
+      const p=document.createElement('div');p.className='agl-page';p.dataset.tab=t;pages[t]=p;root.appendChild(p);
+    });
+    if(stats)pages.home.appendChild(stats);
+    if(progress)pages.home.appendChild(progress);
+    const actionButton=action;
+    if(actionButton){actionButton.classList.add('agl-action-wrap');pages.quiz.appendChild(actionButton);}
+    const boardLabels=labels.filter(function(el){return /منصة الأبطال|بقية المتنافسين|نتائج الأسبوع/.test(el.textContent);});
+    if(boardLabels.length){
+      boardLabels.forEach(function(el){pages.board.appendChild(el);});
+      if(podium)pages.board.appendChild(podium);
+      rankings.forEach(function(el){pages.board.appendChild(el);});
+    }
+    if(footer)pages.board.appendChild(footer);
+    pages.history.innerHTML='<div class="agl-section-label">📊 سجل مشاركاتي — الأسبوع الحالي</div><div id="agl-history-content"></div>';
+    pages.achievements.innerHTML='<div class="agl-section-label">🏅 إنجازاتي في الدوري</div>';
+    const points=Number(myScore.total_points||0);
+    const badges=[];
+    if(points>=50)badges.push(['🌟','بداية قوية','جمعت 50 نقطة أو أكثر']);
+    if(points>=100)badges.push(['🔥','متسابق نشيط','جمعت 100 نقطة أو أكثر']);
+    if(points>=200)badges.push(['👑','نجم التأهل','وصلت إلى 200 نقطة أو أكثر']);
+    pages.achievements.innerHTML+=badges.length?badges.map(function(b){return '<div class="agl-achievement"><span style="font-size:25px">'+b[0]+'</span><div><strong>'+b[1]+'</strong><span style="font-size:11px;color:#d7e0ee">'+b[2]+'</span></div></div>';}).join(''):'<div class="agl-empty">إنجازاتك في الدوري هتظهر هنا كلما جمعت نقاطًا وحققت أهدافًا جديدة.</div>';
+    pages.rules.innerHTML='<div class="agl-section-label">📜 نظام دوري الأندلس الذهبي</div>'+
+      '<div class="agl-rule">🗓️ المسابقة من السبت إلى الخميس، والجمعة مخصصة لإعلان النتائج.</div>'+
+      '<div class="agl-rule">⏰ تفتح المسابقة يوميًا من 7:00 إلى 8:00 مساءً بتوقيت القاهرة.</div>'+
+      '<div class="agl-rule">🎯 خمس أسئلة يوميًا، وقيمة الإجابة الصحيحة 10 نقاط.</div>'+
+      '<div class="agl-rule">🏆 يتم تجميع النقاط أسبوعيًا وشهريًا، وتظهر حدود التأهل الأسبوعية داخل لوحة الدوري.</div>'+
+      '<div class="agl-rule">🔐 وقت المسابقة وتسجيل الإجابات والتحقق من المشاركة يتم اعتمادها من الخادم.</div>';
+    window.showGoldenLeagueTab('home');
   };
 
   async function loadGoldenLeagueMonthlyAdmin() {
