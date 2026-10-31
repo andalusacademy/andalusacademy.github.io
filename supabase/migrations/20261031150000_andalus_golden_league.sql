@@ -50,15 +50,11 @@ CREATE OR REPLACE FUNCTION public.golden_league_cycle_start(p_date date DEFAULT 
 RETURNS date
 LANGUAGE sql IMMUTABLE
 SET search_path TO 'public'
-AS $
-  WITH anchors AS (
-    SELECT
-      (date_trunc('month',p_date)::date + ((6-extract(dow FROM date_trunc('month',p_date)::date)::integer+7)%7))::date AS current_anchor,
-      (date_trunc('month',p_date - interval '1 month')::date
-        + ((6-extract(dow FROM date_trunc('month',p_date - interval '1 month')::date)::integer+7)%7))::date AS previous_anchor
-  )
-  SELECT CASE WHEN p_date>=current_anchor THEN current_anchor ELSE previous_anchor END FROM anchors;
-$;
+AS $$
+  -- Four-week / 28-day monthly prize cycle, anchored to Saturday 2026-10-31.
+  SELECT date '2026-10-31'
+    + (floor((p_date - date '2026-10-31')::numeric / 28)::integer * 28);
+$$;
 
 CREATE OR REPLACE FUNCTION public.golden_league_week_number(p_date date)
 RETURNS integer
