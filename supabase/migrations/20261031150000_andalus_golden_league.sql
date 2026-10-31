@@ -33,6 +33,11 @@ DROP POLICY IF EXISTS golden_league_settings_admin_only ON public.golden_league_
 CREATE POLICY golden_league_settings_admin_only ON public.golden_league_settings
   FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
+CREATE INDEX IF NOT EXISTS quiz_answers_student_date_golden_idx
+  ON public.quiz_answers(student_id,quiz_date);
+CREATE INDEX IF NOT EXISTS quiz_weekly_scores_week_rank_golden_idx
+  ON public.quiz_weekly_scores(week_start,total_points DESC,correct_count DESC);
+
 CREATE TABLE IF NOT EXISTS public.golden_league_question_starts (
   student_id text NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
   quiz_date date NOT NULL,
