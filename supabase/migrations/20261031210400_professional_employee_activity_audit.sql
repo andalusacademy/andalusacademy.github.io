@@ -1,0 +1,39 @@
+-- Professional employee/admin activity audit trail
+create table if not exists public.employee_activity_log (
+  id bigint generated always as identity primary key,
+  actor_user_id uuid null,
+  action_type text not null,
+  module text null,
+  entity_table text null,
+  entity_id text null,
+  title text null,
+  details jsonb not null default '{}'::jsonb,
+  old_data jsonb null,
+  new_data jsonb null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists employee_activity_log_actor_created_idx on public.employee_activity_log(actor_user_id, created_at desc);
+create index if not exists employee_activity_log_created_idx on public.employee_activity_log(created_at desc);
+create index if not exists employee_activity_log_entity_idx on public.employee_activity_log(entity_table, entity_id);
+alter table public.employee_activity_log enable row level security;
+
+create or replace function public.audit_log_sanitize(p jsonb) returns jsonb language sql immutable as $$ select coalesce(p,'{}'::jsonb) - 'password' - 'password_hash' - 'access_token' - 'refresh_token' - 'token' - 'face_token' - 'secret' - 'api_key' - 'service_role_key'; $$;
+create or replace function public.audit_log_event(p_action_type text,p_module text default 'النظام',p_title text default null,p_details jsonb default '{}'::jsonb) returns bigint language plpgsql security definer set search_path=public as $$ declare v_id bigint; begin if auth.uid() is null then raise exception 'authentication_required'; end if; insert into public.employee_activity_log(actor_user_id,action_type,module,title,details) values(auth.uid(),left(coalesce(p_action_type,'activity'),80),left(coalesce(p_module,'النظام'),120),left(p_title,300),public.audit_log_sanitize(coalesce(p_details,'{}'::jsonb))) returning id into v_id; return v_id; end; $$;
+revoke all on function public.audit_log_event(text,text,text,jsonb) from public,anon; grant execute on function public.audit_log_event(text,text,text,jsonb) to authenticated;
+
+create or replace function public.audit_log_get_users(p_search text default null,p_role text default null) returns setof public.user_profiles language plpgsql security definer set search_path=public as $$ begin if not public.is_admin() then raise exception 'admin_required'; end if; return query select u.* from public.user_profiles u where (nullif(trim(p_role),'') is null or u.role=trim(p_role)) and (nullif(trim(p_search),'') is null or u.full_name ilike '%'||trim(p_search)||'%' or u.username ilike '%'||trim(p_search)||'%') order by coalesce(u.full_name,u.username),u.created_at; end; $$;
+revoke all on function public.audit_log_get_users(text,text) from public,anon; grant execute on function public.audit_log_get_users(text,text) to authenticated;
+
+create or replace function public.audit_log_get_user(p_user_id uuid,p_page integer default 1,p_page_size integer default 100) returns jsonb language plpgsql security definer set search_path=public as $$ declare v_offset integer:=greatest(coalesce(p_page,1)-1,0)*least(greatest(coalesce(p_page_size,100),1),200); v_size integer:=least(greatest(coalesce(p_page_size,100),1),200); v_total bigint; v_login bigint; v_change bigint; v_last timestamptz; v_events jsonb; begin if not public.is_admin() then raise exception 'admin_required'; end if; if not exists(select 1 from public.user_profiles where id=p_user_id) then raise exception 'user_not_found'; end if; select count(*) into v_total from public.employee_activity_log where actor_user_id=p_user_id; select count(*) into v_login from public.employee_activity_log where actor_user_id=p_user_id and action_type in ('login','login_session'); select count(*) into v_change from public.employee_activity_log where actor_user_id=p_user_id and action_type in ('insert','update','delete','create','edit','delete_record'); select max(created_at) into v_last from public.employee_activity_log where actor_user_id=p_user_id; select coalesce(jsonb_agg(to_jsonb(x) order by x.created_at desc),'[]'::jsonb) into v_events from (select e.id,e.created_at,e.action_type,case e.action_type when 'login' then 'تسجيل دخول' when 'logout' then 'تسجيل خروج' when 'login_session' then 'بدء جلسة' when 'page_view' then 'فتح شاشة' when 'click' then 'ضغط / تنفيذ إجراء' when 'insert' then 'إضافة سجل' when 'update' then 'تعديل سجل' when 'delete' then 'حذف سجل' when 'create' then 'إنشاء' when 'edit' then 'تعديل' when 'delete_record' then 'حذف' when 'download' then 'تحميل' when 'export' then 'تصدير' else e.action_type end action_label,e.module,e.entity_table,e.entity_id,e.title,e.details from public.employee_activity_log e where e.actor_user_id=p_user_id order by e.created_at desc offset v_offset limit v_size) x; v_events := (select coalesce(jsonb_agg(z order by (z->>'created_at')::timestamptz desc),'[]'::jsonb) from (select jsonb_build_object('id',-1,'created_at',u.created_at,'action_type','account_created','action_label','إنشاء حساب الموظف','module','المستخدمون والصلاحيات','entity_table','user_profiles','entity_id',u.id::text,'title','تم إنشاء حساب الموظف','details',jsonb_build_object('username',u.username,'role',u.role,'branch',u.branch)) z from public.user_profiles u where u.id=p_user_id union all select value from jsonb_array_elements(v_events)) z); return jsonb_build_object('total_count',v_total+1,'login_count',v_login,'change_count',v_change,'last_activity',coalesce(v_last,(select created_at from public.user_profiles where id=p_user_id)),'events',v_events); end; $$;
+revoke all on function public.audit_log_get_user(uuid,integer,integer) from public,anon; grant execute on function public.audit_log_get_user(uuid,integer,integer) to authenticated;
+
+create or replace function public.employee_activity_audit_trigger() returns trigger language plpgsql security definer set search_path=public as $$ declare v_actor uuid:=auth.uid(); v_old jsonb; v_new jsonb; v_entity text; begin if tg_table_name='employee_activity_log' then return coalesce(new,old); end if; v_old:=case when tg_op in ('UPDATE','DELETE') then public.audit_log_sanitize(to_jsonb(old)) end; v_new:=case when tg_op in ('INSERT','UPDATE') then public.audit_log_sanitize(to_jsonb(new)) end; v_entity:=coalesce((case when tg_op='DELETE' then v_old else v_new end)->>'id',(case when tg_op='DELETE' then v_old else v_new end)->>'uuid'); insert into public.employee_activity_log(actor_user_id,action_type,module,entity_table,entity_id,title,details,old_data,new_data) values(v_actor,lower(tg_op),replace(tg_table_name,'_',' '),tg_table_name,v_entity,case tg_op when 'INSERT' then 'إضافة سجل في '||tg_table_name when 'UPDATE' then 'تعديل سجل في '||tg_table_name when 'DELETE' then 'حذف سجل من '||tg_table_name end,jsonb_build_object('operation',tg_op,'source','database_trigger'),v_old,v_new); return coalesce(new,old); exception when others then return coalesce(new,old); end; $$;
+
+do $$ declare r record; begin for r in select table_schema,table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE' and table_name not in ('employee_activity_log','schema_migrations') and table_name not like 'pg_%' loop execute format('drop trigger if exists trg_employee_activity_audit on %I.%I',r.table_schema,r.table_name); execute format('create trigger trg_employee_activity_audit after insert or update or delete on %I.%I for each row execute function public.employee_activity_audit_trigger()',r.table_schema,r.table_name); end loop; end $$;
+
+drop policy if exists employee_activity_log_admin_read on public.employee_activity_log;
+create policy employee_activity_log_admin_read on public.employee_activity_log for select to authenticated using(public.is_admin());
+revoke all on public.employee_activity_log from anon,authenticated;
+grant select on public.employee_activity_log to authenticated;
+grant usage,select on sequence public.employee_activity_log_id_seq to authenticated;
