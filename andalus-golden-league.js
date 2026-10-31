@@ -118,7 +118,7 @@
     const status = league && league.window_status || 'not_started';
     let statusText = 'المسابقة تفتح الساعة 7:00 مساءً';
     if (status === 'open') statusText = 'المسابقة مفتوحة الآن — آخر موعد للدخول والإجابة 8:00 مساءً';
-    if (status === 'ended') statusText = 'انتهت المسابقة اليومية الساعة 8:00 مساءً';
+    if (status === 'ended') statusText = '🏆 انتهت مسابقة النهارده! 😂 تعال بكرة، مستنيينك! ومتتأخرش علينا ❤️ تعالا اشرب شاي ☕🤣';
     if (status === 'closed_day') statusText = 'الجمعة يوم إعلان النتائج — لا توجد مسابقة اليوم';
     if (status === 'off_cycle') statusText = 'موعد انطلاق الدورة الشهرية القادمة قريبًا';
     const weeklyRows = (league && league.weekly_leaderboard || []).map(function(r) {
