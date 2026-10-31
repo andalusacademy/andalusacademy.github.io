@@ -841,7 +841,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div class="nav-card c9 admin-only" onclick="showPage('court')" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);"><span class="nav-card-icon">👨‍⚖️</span><span>محكمة الأداء</span></div>
             <div class="nav-card c11 admin-only" onclick="showPage('dream')" style="background:linear-gradient(135deg,#581c87,#1e1b4b);"><span class="nav-card-icon">🌀</span><span>النظام يحلم</span></div>
             <div class="nav-card c9 admin-only" onclick="showPage('employees')"><span class="nav-card-icon">👥</span><span>الموظفين</span></div>
-            <div class="nav-card c10 admin-only" onclick="showPage('logs')"><span class="nav-card-icon">📋</span><span>سجل النشاط</span></div>
+            <div class="nav-card c10 admin-only" data-activity-log="1" onclick="window.employeeActivityLog &amp;&amp; window.employeeActivityLog.open()"><span class="nav-card-icon">🧾</span><span>سجل نشاط الموظفين والمديرين</span></div>
             <div class="nav-card c3" onclick="showPage('trainers')"><span class="nav-card-icon">👨‍🏫</span><span>أداء المدربين</span></div>
             <div class="nav-card c6" onclick="showPage('alumni')"><span class="nav-card-icon">💼</span><span>الخريجون وسوق العمل</span></div>
             <div class="nav-card c7" onclick="showPage('cashregister')"><span class="nav-card-icon">💵</span><span>الإيراد اليومي</span></div>
@@ -16416,6 +16416,6 @@ async function changeStudySummaryQuestion(delta){
 <script src="andalus-golden-league.js?v=1"></script>
 <script src="study-summary-ai.js?v=17"></script>
 <script src="login-runtime-guard.js?v=1"></script>
-<script src="employee-activity-log.js?v=2"></script>
+<script src="employee-activity-log.js?v=3"></script>
 </body>
 </html>
