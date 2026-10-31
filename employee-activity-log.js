@@ -26,13 +26,15 @@ const supplier=get(['supplier_name','vendor_name','supplier','vendor']);
 const course=get(['course_name','course_title','program_name','course','label','item']);
 const amount=get(['amount','paid_amount','payment_amount','total_amount','value','price','cost']);
 const money=amount?( /جنيه|EGP|LE/i.test(amount)?amount:amount+' جنيه'):'';
-const date=get(['payment_date','transaction_date','entry_date','date']);
+const date=get(['payment_date','transaction_date','entry_date','paid_date','revenue_date','expense_date','log_date','date']);
 const parts=[];
 if(student)parts.push('المتدرب: '+student);
 if(supplier)parts.push('المورد: '+supplier);
 if(course)parts.push((tableRaw==='payments'?'البند: ':'التفاصيل: ')+course);
 if(money)parts.push('المبلغ: '+money);
 if(date)parts.push('التاريخ: '+date);
+const paymentStatus=get(['payment_status']);if(paymentStatus)parts.push('حالة السداد: '+paymentStatus);
+if(tableRaw==='cash_register_logs'){const opening=get(['opening_balance']),expected=get(['expected_cash']),actual=get(['actual_cash']);if(opening)parts.push('رصيد الافتتاح: '+opening+' جنيه');if(expected)parts.push('النقدية المتوقعة: '+expected+' جنيه');if(actual)parts.push('النقدية الفعلية: '+actual+' جنيه');}
 const reason=get(['description','reason','notes','note','purpose']);
 if(reason)parts.push('البيان: '+reason);
 const op=action==='delete'||action==='delete_record'?'حذف':(['update','edit'].includes(action)?'تعديل':(['insert','create'].includes(action)?'إضافة':'تسجيل'));
