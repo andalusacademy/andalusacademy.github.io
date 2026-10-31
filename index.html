@@ -1670,7 +1670,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
                 <button class="btn btn-danger btn-sm" onclick="bulkDeleteRows({rowClass:'dr-row-cb',table:'daily_revenue',selectAllId:'select-all-dr',label:'إيراد',onSuccess:loadDailyRevenueLog})">🗑 حذف المحدد</button>
               </div>
             </div>
-            <table><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-dr" onchange="toggleAllCheckboxes(this,'dr-row-cb')"></th><th>مسلسل</th><th>رقم القيد</th><th>الاسم</th><th>المبلغ</th><th>التفاصيل</th><th>الفرع</th><th>تاريخ الإيراد / تاريخ الإدخال</th></tr></thead>
+            <table><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-dr" onchange="toggleAllCheckboxes(this,'dr-row-cb')"></th><th>مسلسل</th><th>رقم القيد</th><th>الاسم</th><th>المبلغ</th><th>التفاصيل</th><th>الفرع</th><th>تاريخ الإيراد / تاريخ الإدخال</th><th>أُدخل بواسطة</th></tr></thead>
             <tbody id="daily-revenue-table"></tbody></table>
           </div>
         </div>
@@ -9268,8 +9268,21 @@ async function saveFollowup() {
 
 let allExpenses = [];
 
+async function loadExpenseActorNames() {
+  try {
+    const { data, error } = await sb.from('user_profiles').select('id,full_name,username,role');
+    if (error) throw error;
+    window.__andalusActorNames = Object.fromEntries((data || []).map(u => [String(u.id), { name: u.full_name || u.username || 'مستخدم', role: u.role === 'admin' ? 'مدير' : 'موظف' }]));
+  } catch (error) { console.warn('تعذر تحميل أسماء مسجلي العمليات:', error); window.__andalusActorNames = window.__andalusActorNames || {}; }
+}
+function getExpenseActorLabel(id) {
+  if (!id) return 'غير مسجل';
+  const actor = window.__andalusActorNames?.[String(id)];
+  return actor ? `${actor.name} (${actor.role})` : 'حساب غير موجود حاليًا';
+}
 async function loadExpenses() {
   if (!currentUser) return;
+  await loadExpenseActorNames();
   const { data, error } = await sb.from('expenses').select('*').order('expense_date', { ascending: false }).limit(1000);
   if (error) { showToast('خطأ في تحميل المصروفات: ' + error.message, 'error'); return; }
   allExpenses = data || [];
@@ -9307,7 +9320,7 @@ function renderExpensesTable(rows) {
       <td><strong>${escapeHtml(e.item)}</strong></td>
       <td style="color:#ef4444;font-weight:700">${Number(e.amount).toLocaleString('ar-EG')} ج.م</td>
       <td style="font-size:12px;color:var(--muted)">${escapeHtml(e.notes || '—')}</td>
-      <td style="font-size:11px;color:var(--muted);font-family:monospace">${escapeHtml((e.created_by || '—').toString().slice(0,8))}</td>
+      <td style="font-size:11px;color:var(--muted);font-family:monospace">${escapeHtml(getExpenseActorLabel(e.created_by))}</td>
       <td><div class="actions">
         ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="deleteExpense('${e.id}','${escapeHtml(e.item)}')">🗑</button>` : ''}
       </div></td>
@@ -13809,6 +13822,7 @@ async function saveDailyRevenue() {
 }
 
 async function loadDailyRevenueLog() {
+  await loadExpenseActorNames();
   setDailyRevenueDateDefault();
   const dateFilter = document.getElementById('dr-filter-date')?.value;
   const branchFilter = document.getElementById('dr-filter-branch')?.value;
@@ -13818,7 +13832,7 @@ async function loadDailyRevenueLog() {
   const { data, error } = await q;
   const tbody = document.getElementById('daily-revenue-table');
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="emoji">⚠️</div><h4>جدول daily_revenue غير موجود — نفّذ SQL المرفق</h4></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="emoji">⚠️</div><h4>جدول daily_revenue غير موجود — نفّذ SQL المرفق</h4></div></td></tr>`;
     document.getElementById('dr-total-label').textContent = '';
     return;
   }
@@ -13838,8 +13852,9 @@ async function loadDailyRevenueLog() {
     <td>${escapeHtml(r.details || '—')}</td>
     <td><span class="badge ${r.branch === 'كفر الدوار' ? 'badge-info' : 'badge-gold'}">${escapeHtml(r.branch || '—')}</span></td>
     <td style="font-size:11px;color:var(--muted)"><strong>${revenueDateText}</strong><br><span title="تاريخ ووقت تسجيل الإيراد في النظام">تم الإدخال: ${escapeHtml(enteredAtText)}</span></td>
+    <td style="font-size:12px;font-weight:700">${escapeHtml(getExpenseActorLabel(r.created_by))}</td>
   </tr>`;
-  }).join('') : '<tr><td colspan="8"><div class="empty-state"><div class="emoji">💵</div><h4>لا توجد إيرادات مسجّلة</h4></div></td></tr>';
+  }).join('') : '<tr><td colspan="9"><div class="empty-state"><div class="emoji">💵</div><h4>لا توجد إيرادات مسجّلة</h4></div></td></tr>';
 }
 
 
@@ -16417,5 +16432,6 @@ async function changeStudySummaryQuestion(delta){
 <script src="study-summary-ai.js?v=17"></script>
 <script src="login-runtime-guard.js?v=1"></script>
 <script src="employee-activity-log.js?v=3"></script>
+<script src="./global-back-navigation.js?v=2"></script>
 </body>
 </html>
