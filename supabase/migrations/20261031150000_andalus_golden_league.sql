@@ -212,6 +212,40 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.golden_league_admin_report(p_cycle_start date DEFAULT public.golden_league_cycle_start((now() AT TIME ZONE 'Africa/Cairo')::date))
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER STABLE
+SET search_path TO 'public'
+AS $
+DECLARE v_settings public.golden_league_settings%rowtype; v_result jsonb;
+BEGIN
+  IF auth.uid() IS NULL OR NOT EXISTS (
+    SELECT 1 FROM public.user_profiles up WHERE up.id=auth.uid() AND up.is_active IS TRUE AND up.role='admin'
+  ) THEN RAISE EXCEPTION 'not authorized' USING ERRCODE='42501'; END IF;
+  SELECT * INTO v_settings FROM public.golden_league_settings WHERE id=1;
+  SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY r.total_points DESC,r.student_name),'[]'::jsonb)
+  INTO v_result
+  FROM (
+    SELECT s.id AS student_id,s.name AS student_name,
+      coalesce(max(q.total_points) FILTER(WHERE q.week_start=p_cycle_start),0) AS week1,
+      coalesce(max(q.total_points) FILTER(WHERE q.week_start=p_cycle_start+7),0) AS week2,
+      coalesce(max(q.total_points) FILTER(WHERE q.week_start=p_cycle_start+14),0) AS week3,
+      coalesce(max(q.total_points) FILTER(WHERE q.week_start=p_cycle_start+21),0) AS week4,
+      coalesce(sum(q.total_points),0) AS total_points,
+      (coalesce(max(q.total_points) FILTER(WHERE q.week_start=p_cycle_start),0)>=v_settings.weekly_thresholds[1]
+       AND coalesce(max(q.total_points) FILTER(WHERE q.week_start=p_cycle_start+7),0)>=v_settings.weekly_thresholds[2]
+       AND coalesce(max(q.total_points) FILTER(WHERE q.week_start=p_cycle_start+14),0)>=v_settings.weekly_thresholds[3]
+       AND coalesce(max(q.total_points) FILTER(WHERE q.week_start=p_cycle_start+21),0)>=v_settings.weekly_thresholds[4]) AS qualified
+    FROM public.students s
+    LEFT JOIN public.quiz_weekly_scores q ON q.student_id=s.id AND q.week_start>=p_cycle_start AND q.week_start<p_cycle_start+28
+    WHERE s.deleted_at IS NULL AND s.student_status='active'
+    GROUP BY s.id,s.name
+    HAVING coalesce(sum(q.total_points),0)>0
+  ) r;
+  RETURN jsonb_build_object('ok',true,'cycle_start',p_cycle_start,'leaderboard',v_result);
+END;
+$;
+
 CREATE OR REPLACE FUNCTION public.weekly_quiz_start_question(
   p_student_id text,p_quiz_date date,p_question_id uuid,p_face_token uuid
 )
@@ -396,6 +430,7 @@ GRANT EXECUTE ON FUNCTION public.weekly_quiz_submit_answer(date,text,uuid,text,u
 GRANT EXECUTE ON FUNCTION public.ensure_weekly_quiz_session() TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.weekly_quiz_get_public_questions() TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.golden_league_update_settings(text,text,integer,integer,integer[],integer[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.golden_league_admin_report(date) TO authenticated;
 
 -- One-time mandatory login notice. Students must explicitly acknowledge it in the existing portal notice flow.
 INSERT INTO public.notifications(
