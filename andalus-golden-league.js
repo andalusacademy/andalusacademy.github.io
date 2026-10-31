@@ -287,6 +287,18 @@
       '<button class="btn btn-outline" onclick="loadGoldenLeagueMonthlyAdmin()">🔄 تحديث ترتيب الشهر</button>'+
       '<p style="font-size:11px;color:var(--muted);line-height:1.8;margin-top:10px;">المسابقة من السبت إلى الخميس، 7–8 مساءً بتوقيت القاهرة. الجمعة للنتائج. لا يسمح الخادم بالدخول قبل الموعد أو بعده.</p></div>';
     page.insertBefore(panel,page.firstChild);
+    const weeklyBody=document.getElementById('wq-leaderboard-table');
+    const weeklyCard=weeklyBody&&weeklyBody.closest('.card');
+    if(weeklyCard&&!document.getElementById('golden-league-monthly-card')){
+      const monthly=document.createElement('div');
+      monthly.className='card';
+      monthly.id='golden-league-monthly-card';
+      monthly.style.marginBottom='16px';
+      monthly.innerHTML='<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><h3>👑 الترتيب الشهري والتأهل النهائي</h3><button class="btn btn-outline btn-sm" onclick="loadGoldenLeagueMonthlyAdmin()">تحديث</button></div>'+
+        '<div style="padding:8px 14px;color:var(--muted);font-size:12px;">يعرض نقاط الأسابيع الأربعة، ويحدد الطلاب الذين حققوا حدود التأهل 200 / 230 / 260 / 280.</div>'+
+        '<div style="overflow-x:auto;"><table><thead><tr><th>#</th><th>الطالب</th><th>الأسبوع 1</th><th>الأسبوع 2</th><th>الأسبوع 3</th><th>الأسبوع 4</th><th>الإجمالي</th><th>التأهل</th></tr></thead><tbody id="wq-monthly-leaderboard"><tr><td colspan="8">جاري التحميل...</td></tr></tbody></table></div>';
+      weeklyCard.insertAdjacentElement('afterend',monthly);
+    }
     sb.from('golden_league_settings').select('*').eq('id',1).maybeSingle().then(function(r){
       if(r.error||!r.data)return;
       document.getElementById('agl-start').value=String(r.data.daily_start||'19:00').slice(0,5);
