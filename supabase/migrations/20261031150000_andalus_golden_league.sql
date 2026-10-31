@@ -439,6 +439,43 @@ GRANT EXECUTE ON FUNCTION public.weekly_quiz_get_public_questions() TO anon,auth
 GRANT EXECUTE ON FUNCTION public.golden_league_update_settings(text,text,integer,integer,integer[],integer[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.golden_league_admin_report(date) TO authenticated;
 
+CREATE OR REPLACE FUNCTION public.get_portal_notifications(p_student_id text,p_phone text,p_portal_type text DEFAULT 'student')
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $
+DECLARE st public.students%rowtype; items jsonb;
+BEGIN
+  IF p_portal_type NOT IN ('student','parent') OR NOT public.student_face_phone_matches(p_student_id,p_phone) THEN
+    RETURN jsonb_build_object('verified',false,'notifications','[]'::jsonb);
+  END IF;
+  SELECT * INTO st FROM public.students
+  WHERE id=btrim(p_student_id) AND deleted_at IS NULL AND coalesce(student_status,'active')='active' LIMIT 1;
+  IF NOT FOUND THEN RETURN jsonb_build_object('verified',false,'notifications','[]'::jsonb); END IF;
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'id',n.id,'title',n.title,'body',n.body,'notification_type',n.notification_type,
+    'priority',n.priority,'created_at',n.created_at,'published_at',n.published_at,
+    'metadata',n.metadata,
+    'show_on_login',(n.show_on_login IS TRUE OR n.priority='urgent'),
+    'is_read',EXISTS(SELECT 1 FROM public.notification_receipts r
+      WHERE r.notification_id=n.id AND r.student_id=st.id AND r.portal_type=p_portal_type)
+  ) ORDER BY CASE n.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END,
+    coalesce(n.published_at,n.created_at) DESC),'[]'::jsonb) INTO items
+  FROM public.notifications n
+  WHERE n.is_published IS TRUE
+    AND (n.scheduled_for IS NULL OR n.scheduled_for<=now())
+    AND (n.expires_at IS NULL OR n.expires_at>now() OR n.priority='urgent')
+    AND (
+      n.audience='all'
+      OR (n.audience='student' AND p_portal_type='student' AND (n.student_id IS NULL OR n.student_id=st.id))
+      OR (n.audience='parent' AND p_portal_type='parent' AND (n.student_id IS NULL OR n.student_id=st.id))
+      OR (n.audience='branch' AND n.branch=st.branch)
+      OR (n.audience='program' AND n.program=st.program)
+    );
+  RETURN jsonb_build_object('verified',true,'notifications',items);
+END;
+$;
+
 -- One-time mandatory login notice. Students must explicitly acknowledge it in the existing portal notice flow.
 INSERT INTO public.notifications(
   title,body,notification_type,priority,audience,is_published,published_at,show_on_login,metadata,created_at,updated_at
