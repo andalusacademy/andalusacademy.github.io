@@ -121,6 +121,16 @@
     if (status === 'ended') statusText = 'انتهت المسابقة اليومية الساعة 8:00 مساءً';
     if (status === 'closed_day') statusText = 'الجمعة يوم إعلان النتائج — لا توجد مسابقة اليوم';
     if (status === 'off_cycle') statusText = 'موعد انطلاق الدورة الشهرية القادمة قريبًا';
+    const weeklyRows = (league && league.weekly_leaderboard || []).map(function(r) {
+      return '<div class="agl-rank-row ' + (r.is_me ? 'is-me' : '') + '">' +
+        '<span class="agl-rank-number">' + Number(r.rank || 0) + '</span>' +
+        '<span class="agl-rank-name">' + escapeHtml(r.student_name || 'متسابق') + (r.is_me ? '<small>أنت</small>' : '') + '</span>' +
+        '<strong class="agl-rank-points">' + Number(r.total_points || 0) + ' نقطة</strong></div>';
+    }).join('');
+    const weeklyResultsHtml = status === 'closed_day'
+      ? '<div class="agl-section-label">📊 نتائج الأسبوع — إعلان الجمعة</div>' +
+        (weeklyRows ? '<div class="agl-ranking-list">' + weeklyRows + '</div>' : '<div style="text-align:center;padding:12px;color:#d7e0ee;">لا توجد مشاركات مسجلة هذا الأسبوع بعد.</div>')
+      : '';
     const action = status === 'open' && weeklyQuizPendingList.length
       ? '<button class="btn btn-gold" style="width:100%;padding:14px;" onclick="startNextWeeklyQuizQuestion()">🎯 ابدأ المسابقة — ' + weeklyQuizPendingList.length + ' أسئلة متاحة</button>'
       : '<div style="text-align:center;color:#d7e0ee;font-size:12px;line-height:1.9;padding:12px 4px;">' +
@@ -148,6 +158,7 @@
       '<div class="agl-section-label">👑 منصة الأبطال — الترتيب الشهري</div>' +
       (podium.length ? '<div class="agl-podium">' + podiumHtml + '</div>' : '<div style="text-align:center;padding:25px;color:#d7e0ee;">🏆 ستظهر منصة الأبطال بعد أول مشاركة</div>') +
       (rest ? '<div class="agl-section-label">بقية المتنافسين</div><div class="agl-ranking-list">' + rest + '</div>' : '') +
+      weeklyResultsHtml +
       '<div class="agl-footer">حدود التأهل الأسبوعية: 200 • 230 • 260 • 280 نقطة</div></section>' +
       '<div style="margin-top:14px;">' + action + '</div>';
   };
