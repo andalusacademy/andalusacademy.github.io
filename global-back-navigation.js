@@ -1,5 +1,6 @@
 /* Andalus Global Back Navigation
- * Adds a consistent رجوع control to admin, student and parent flows.
+ * Consistent internal back behavior for admin, student and parent flows.
+ * Includes a resilient same-document history guard for Android Chrome.
  */
 (function () {
   'use strict';
@@ -62,7 +63,6 @@
 
     const activePage = document.querySelector('.page.active');
     if (activePage) {
-      // If the system already has a built-in home/back control, use it first.
       const homeBtn = document.querySelector('.back-home-btn');
       if (homeBtn && visible(homeBtn)) { homeBtn.click(); return; }
       const id = activePage.id || '';
@@ -70,8 +70,6 @@
         try { window.showPage('dashboard'); return; } catch (_) {}
       }
     }
-
-    // Keep the web portal open at its root; Chrome back gestures are handled below.
   }
 
   function install() {
@@ -83,6 +81,7 @@
       @media(max-width:600px){#andalus-global-back{right:10px;bottom:10px;padding:9px 13px;font-size:12px}}
     `;
     document.head.appendChild(style);
+
     const btn = document.createElement('button');
     btn.id = 'andalus-global-back';
     btn.type = 'button';
@@ -91,37 +90,72 @@
     btn.addEventListener('click', goBack);
     document.body.appendChild(btn);
 
+    let portalVisible = false;
+    let guardTimer = null;
+    let guardBusy = false;
+    const backSentinel = '__andalus_portal_back_v2__';
+
     const refresh = () => {
       const login = document.getElementById('login-screen');
       const app = document.getElementById('app-screen');
       const exam = document.getElementById('exam-portal-screen');
       const student = document.getElementById('student-portal-screen');
       const parent = document.getElementById('parent-portal-screen');
-      const shouldShow = visible(app) || visible(exam) || visible(student) || visible(parent);
-      btn.style.display = shouldShow && !(visible(login) && !shouldShow) ? 'flex' : 'none';
+      portalVisible = visible(app) || visible(exam) || visible(student) || visible(parent);
+      btn.style.display = portalVisible && !(visible(login) && !portalVisible) ? 'flex' : 'none';
+      if (portalVisible) ensureHistoryGuard();
     };
+
+    function ensureHistoryGuard() {
+      if (guardBusy || !portalVisible) return;
+      guardBusy = true;
+      try {
+        const state = history.state;
+        if (!state || state.__andalusPortalBack !== backSentinel) {
+          history.pushState({ ...(state || {}), __andalusPortalBack: backSentinel, __andalusGuard: true }, '', location.href);
+        }
+      } catch (error) {
+        console.warn('تعذر تفعيل الرجوع الداخلي للبوابة:', error);
+      } finally {
+        guardBusy = false;
+      }
+    }
 
     const observer = new MutationObserver(refresh);
     observer.observe(document.body, {subtree:true, childList:true, attributes:true, attributeFilter:['style','class']});
     refresh();
     window.andalusGoBack = goBack;
 
-    // Android Chrome edge-swipe / system Back produces popstate.
-    // Keep one same-document history entry so the gesture returns within
-    // the portal rather than leaving the site or closing its tab.
-    const backSentinel = '__andalus_portal_back__';
-    function armBackSentinel() {
-      try {
-        if (history.state?.__andalusPortalBack === backSentinel) return;
-        history.pushState({ ...(history.state || {}), __andalusPortalBack: backSentinel }, '', location.href);
-      } catch (error) {
-        console.warn('تعذر تفعيل الرجوع الداخلي للبوابة:', error);
-      }
-    }
-    armBackSentinel();
+    // Android Chrome's edge-swipe/system Back reaches the page as popstate
+    // when a same-document history entry exists. Re-arm immediately after
+    // every popstate and periodically while the portal is visible, so SPA
+    // navigation or a component that calls pushState cannot remove the guard.
     window.addEventListener('popstate', function () {
+      if (!portalVisible) return;
       goBack();
-      armBackSentinel();
+      setTimeout(ensureHistoryGuard, 0);
+    });
+
+    window.addEventListener('pageshow', function () {
+      setTimeout(refresh, 0);
+      setTimeout(ensureHistoryGuard, 50);
+    });
+
+    window.addEventListener('hashchange', function () {
+      setTimeout(ensureHistoryGuard, 0);
+    });
+
+    guardTimer = window.setInterval(function () {
+      if (portalVisible) ensureHistoryGuard();
+    }, 700);
+
+    // If a portal is entered after the script has already loaded, install the
+    // guard again without requiring a page reload.
+    window.addEventListener('visibilitychange', function () {
+      if (!document.hidden) {
+        refresh();
+        setTimeout(ensureHistoryGuard, 50);
+      }
     });
   }
 
