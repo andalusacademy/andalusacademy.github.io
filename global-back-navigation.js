@@ -37,7 +37,16 @@
       }
     }
 
-    if (visible(document.getElementById('weekly-quiz-screen')) || visible(document.getElementById('public-competition-screen')) || visible(document.getElementById('competition-screen'))) {
+    if (visible(document.getElementById('weekly-quiz-screen'))) {
+      if (typeof window.backToPortalFromWeeklyQuiz === 'function') { window.backToPortalFromWeeklyQuiz(); return; }
+      const quiz = document.getElementById('weekly-quiz-screen');
+      const student = document.getElementById('student-portal-screen');
+      if (quiz) quiz.style.display = 'none';
+      if (student) student.style.display = 'block';
+      if (typeof window.renderStudentPortalMenu === 'function') { window.renderStudentPortalMenu(); return; }
+    }
+
+    if (visible(document.getElementById('public-competition-screen')) || visible(document.getElementById('competition-screen'))) {
       if (typeof window.renderStudentPortalMenu === 'function') { window.renderStudentPortalMenu(); return; }
       if (typeof window.showStudentPortalLoginStep === 'function') { window.showStudentPortalLoginStep(); return; }
     }
