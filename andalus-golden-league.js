@@ -283,8 +283,18 @@
     const sorted=rows.slice().sort(function(a,b){return String(b.quiz_date||'').localeCompare(String(a.quiz_date||''));});
     box.innerHTML=sorted.map(function(r){
       const date=String(r.quiz_date||'');
-      const correct=r.is_correct===true;
-      return '<div class="agl-history-row"><span>'+escapeHtml(date)+'</span><strong>'+(correct?'✅ إجابة صحيحة':'❌ إجابة غير صحيحة')+'</strong><b>'+(correct?' +10':'0')+' نقاط</b></div>';
+      const raw=r.is_correct;
+      const correct=raw===true||raw===1||raw==='1'||raw==='true'||raw==='t'||raw==='TRUE';
+      const answerLabels={a:r.option_a,b:r.option_b,c:r.option_c,d:r.option_d};
+      const selected=answerLabels[r.selected_option]||r.selected_option||'لم يتم اختيار إجابة';
+      const correctAnswer=answerLabels[r.correct_option]||r.correct_option||'—';
+      const question=r.question_text||r.question||'';
+      return '<article class="agl-history-row agl-history-detail" style="display:block;border:1px solid rgba(255,255,255,.12);border-right:4px solid '+(correct?'#22c55e':'#ef4444')+';border-radius:12px;margin:9px 0;padding:12px;">'+
+        '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span>'+escapeHtml(date)+'</span><strong style="color:'+(correct?'#86efac':'#fca5a5')+';">'+(correct?'✅ إجابة صحيحة':'❌ إجابة غير صحيحة')+'</strong><b>'+(correct?' +10':'0')+' نقاط</b></div>'+
+        (question?'<div style="margin-top:9px;line-height:1.8;font-weight:800;">'+escapeHtml(question)+'</div>':'')+
+        '<div style="margin-top:7px;font-size:12px;color:#e8edf5;">إجابتك: <strong>'+escapeHtml(selected)+'</strong></div>'+
+        (!correct?'<div style="margin-top:5px;font-size:12px;color:#86efac;">الإجابة الصحيحة: <strong>'+escapeHtml(correctAnswer)+'</strong></div>':'')+
+      '</article>';
     }).join('');
   }
 
@@ -473,6 +483,37 @@
         const overlay=document.getElementById('student-login-notification-overlay');
         const p=overlay&&overlay.querySelector('p');
         if(p)p.textContent='يجب تأكيد قراءة هذا الإعلان للمتابعة.';
+      }
+    };
+  }
+
+  // Student portal polish and direct entry to the leaderboard tab.
+  (function installGoldenLeaguePortalPolish(){
+    const css=document.createElement('style');
+    css.id='andalus-golden-league-portal-polish';
+    css.textContent=`
+      #student-portal-card{max-width:760px!important;width:min(100%,760px)!important}
+      #student-portal-content .student-portal-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:16px!important}
+      #student-portal-content .student-portal-tile{min-height:154px!important;padding:20px 16px!important;border-radius:20px!important;border:1px solid #dbe5f2!important;background:linear-gradient(145deg,#ffffff 0%,#edf3fb 58%,#dfe8f5 100%)!important;box-shadow:0 7px 0 #b5c4d8,0 13px 22px rgba(10,35,70,.14)!important;transition:transform .18s,box-shadow .18s!important}
+      #student-portal-content .student-portal-tile:active{transform:translateY(4px)!important;box-shadow:0 3px 0 #b5c4d8,0 7px 13px rgba(10,35,70,.12)!important}
+      #student-portal-content .student-portal-tile .tile-icon{width:66px!important;height:66px!important;border-radius:19px!important;font-size:34px!important;background:linear-gradient(145deg,#f9fcff,#c9d8ed)!important;border:1px solid #fff!important;box-shadow:inset 0 2px 3px rgba(255,255,255,.95),0 6px 0 #9fb2cc,0 10px 16px rgba(24,49,82,.18)!important;filter:drop-shadow(0 2px 1px rgba(20,35,60,.12))}
+      #student-portal-content .student-portal-tile .tile-label{font-size:14px!important;font-weight:900!important}
+      #student-portal-content .student-portal-tile .tile-hint{font-size:11px!important}
+      #weekly-quiz-card{max-width:860px!important;width:min(100%,860px)!important}
+      #weekly-quiz-card .agl-shell{padding:22px 20px!important}
+      #weekly-quiz-content>button[onclick*=backToPortalFromWeeklyQuiz]{border:1px solid rgba(244,210,124,.55)!important;background:linear-gradient(135deg,#243b5b,#101d32)!important;color:#f4d27c!important;border-radius:12px!important;padding:10px 18px!important;font-weight:900!important}
+      .agl-history-detail{color:#f8fafc!important}
+      @media(max-width:420px){#student-portal-content .student-portal-grid{gap:12px!important}#student-portal-content .student-portal-tile{min-height:132px!important;padding:14px 8px!important}#student-portal-content .student-portal-tile .tile-icon{width:56px!important;height:56px!important;font-size:29px!important}}
+    `;
+    (document.head||document.documentElement).appendChild(css);
+  })();
+
+  const legacyGoldenLeagueEntry=window.goToPortalWeeklyQuiz;
+  if(typeof legacyGoldenLeagueEntry==='function'){
+    window.goToPortalWeeklyQuiz=async function(){
+      await legacyGoldenLeagueEntry.apply(this,arguments);
+      if(document.getElementById('weekly-quiz-screen')?.style.display!=='none'){
+        window.showGoldenLeagueTab('board');
       }
     };
   }
