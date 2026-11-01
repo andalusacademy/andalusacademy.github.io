@@ -9,8 +9,31 @@
   function loadAIFixes(){loadScript('./student-ai-ui-fixes.js?v=1','data-andalus-student-ai-fixes');}
   function loadGoldenLeaguePage(){loadScript('./golden-league-page.js?v=3','data-andalus-golden-page');}
   function loadAnnouncements(){loadScript('./portal-announcements.js?v=2','data-andalus-portal-announcements');}
-  function loadUIFix(){loadScript('./student-portal-ui-guard.js?v=1','data-andalus-student-portal-ui-guard');}
+  function loadUIFix(){loadScript('./student-portal-ui-guard.js?v=2','data-andalus-student-portal-ui-guard');}
+  function repairLoginInteractivity(){
+    if(!isDirect()&&!portalVisible())return;
+    const root=document.getElementById('student-portal-screen')||document.getElementById('student-portal-card')||document.getElementById('student-portal-content');
+    if(!root)return;
+    root.style.pointerEvents='auto';root.style.position=root.style.position==='static'?'relative':root.style.position;
+    const fields=[...root.querySelectorAll('input:not([type="hidden"]),textarea,select,button')];
+    fields.forEach(el=>{try{el.disabled=false;el.readOnly=false;el.removeAttribute('aria-disabled');el.style.pointerEvents='auto';el.style.userSelect='text';el.style.position='relative';el.style.zIndex='100002';}catch(_) {}});
+    fields.filter(el=>el.matches('input:not([type="hidden"]),textarea,select')).forEach(el=>{
+      try{
+        const r=el.getBoundingClientRect(); if(r.width<5||r.height<5)return;
+        const x=Math.max(1,Math.min(innerWidth-1,r.left+r.width/2)), y=Math.max(1,Math.min(innerHeight-1,r.top+r.height/2));
+        let hit=document.elementFromPoint(x,y);
+        if(hit&&hit!==el&&!el.contains(hit)){
+          let p=hit;
+          while(p&&p!==document.body&&p!==el){
+            const cs=getComputedStyle(p), pos=cs.position, zi=parseInt(cs.zIndex,10);
+            if((pos==='fixed'||pos==='absolute'||pos==='sticky')&&(Number.isFinite(zi)?zi:0)>=1000){p.style.pointerEvents='none';break;}
+            p=p.parentElement;
+          }
+        }
+      }catch(_){ }
+    });
+  }
   function renderFallback(){const box=document.getElementById('student-portal-content');if(!box)return false;const loading=box.textContent&&box.textContent.indexOf('جاري التحميل')!==-1;if(!loading&&box.querySelector('input,button'))return true;box.innerHTML='<p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:16px;">أول دخول يربط الحساب بهذا الجهاز. بعد ذلك يمكنك فتح البوابة من الجهاز نفسه.</p><div class="form-group"><label>كود الطالب / رقم القيد</label><input type="text" id="student-portal-id-input" autocomplete="username" placeholder="كود الطالب أو رقم القيد" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div><div class="form-group"><label>الرقم القومي للطالب</label><input type="password" inputmode="numeric" autocomplete="off" id="student-portal-phone-input" placeholder="أدخل الرقم القومي" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;"></div><div id="student-portal-login-err" role="alert" style="color:#dc2626;font-size:12px;margin-top:6px;display:none"></div><button id="student-portal-fallback-login" class="btn btn-gold" style="width:100%;padding:13px;margin-top:12px">تسجيل الدخول وربط الجهاز</button>';const go=()=>{if(typeof window.enterStudentPortal==='function')return window.enterStudentPortal();const e=document.getElementById('student-portal-login-err');if(e){e.textContent='جاري تجهيز نظام الدخول، حاول مرة أخرى بعد لحظات.';e.style.display='block';}};document.getElementById('student-portal-fallback-login')?.addEventListener('click',go);document.getElementById('student-portal-id-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')go()});document.getElementById('student-portal-phone-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')go()});return true;}
-  function boot(){if(isDirect())setDirectView();loadAI();loadAIFixes();loadGoldenLeaguePage();loadAnnouncements();loadUIFix();let tries=0;const timer=setInterval(()=>{if(isDirect())setDirectView();loadAI();loadAIFixes();loadGoldenLeaguePage();loadAnnouncements();loadUIFix();if(typeof window.showStudentPortalLoginStep==='function'&&(isDirect()||portalVisible())){try{window.showStudentPortalLoginStep();clearInterval(timer);return;}catch(e){console.warn('Student portal boot:',e)}}if(isDirect()&&renderFallback())clearInterval(timer);if(++tries>=20)clearInterval(timer);},250);setTimeout(()=>{if(isDirect()){setDirectView();renderFallback();}},50);}
+  function boot(){if(isDirect())setDirectView();loadAI();loadAIFixes();loadGoldenLeaguePage();loadAnnouncements();loadUIFix();repairLoginInteractivity();let tries=0;const timer=setInterval(()=>{if(isDirect())setDirectView();loadAI();loadAIFixes();loadGoldenLeaguePage();loadAnnouncements();loadUIFix();if(typeof window.showStudentPortalLoginStep==='function'&&(isDirect()||portalVisible())){try{window.showStudentPortalLoginStep();}catch(e){console.warn('Student portal boot:',e)}}if(isDirect())repairLoginInteractivity();if(isDirect()&&renderFallback())repairLoginInteractivity();if(++tries>=40)clearInterval(timer);},250);setInterval(repairLoginInteractivity,700);setTimeout(()=>{if(isDirect()){setDirectView();renderFallback();repairLoginInteractivity();}},50);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
