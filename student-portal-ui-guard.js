@@ -40,6 +40,6 @@
   }
   function rename(root){if(!root)return;const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);nodes.forEach(n=>{if(n.nodeValue&&n.nodeValue.includes(AI_OLD))n.nodeValue=n.nodeValue.replaceAll(AI_OLD,AI_NEW);});root.querySelectorAll?.('[title*="المساعد الذكي"],[aria-label*="المساعد الذكي"]').forEach(e=>{if(e.title)e.title=e.title.replaceAll(AI_OLD,AI_NEW);if(e.getAttribute('aria-label'))e.setAttribute('aria-label',e.getAttribute('aria-label').replaceAll(AI_OLD,AI_NEW));});}
   function tick(){css();repair();const portal=document.getElementById('student-portal-screen');if(!portal)return;const ai=document.getElementById('sai-card');if(ai){if(loggedIn()){ai.classList.remove('portal-ai-hidden');ai.style.display='';}else{ai.classList.add('portal-ai-hidden');}}if(loggedIn())rename(portal);else rename(document.getElementById('apa-student')||portal);}
-  function init(){tick();new MutationObserver(tick).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class','disabled','readonly']});setInterval(tick,700);}
+  function init(){tick();new MutationObserver(tick).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','readonly']});setInterval(tick,700);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
