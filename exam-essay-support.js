@@ -12,6 +12,48 @@ async function publish(){sync();const e=window._andalusGeneratedExam,title=docum
 document.addEventListener('click',e=>{const b=e.target?.closest?.('#modal-exam button[onclick="saveExam()"]');if(b&&staged){e.preventDefault();e.stopImmediatePropagation();publish();}},true);
 window.showGeneratedExamReview=review;
 function studentEssay(){if(typeof window.renderExamQuestionsForStudent!=='function'||originalRender)return;originalRender=window.renderExamQuestionsForStudent;window.renderExamQuestionsForStudent=function(saved){const qs=window.examQuestionsForStudent||[];if(!qs.some(q=>q.question_type==='essay'))return originalRender(saved);const w=document.getElementById('exam-questions-wrap');w.innerHTML=qs.map((q,i)=>{if(q.question_type==='essay')return '<div class="exam-q-card"><div class="q-title">سؤال '+(i+1)+' · مقالي</div><div style="white-space:pre-wrap;margin:10px 0">'+esc(q.question_text)+'</div><textarea style="width:100%;min-height:150px;padding:12px;border:1px solid var(--border);border-radius:10px;font-family:inherit" placeholder="اكتب إجابتك هنا..." oninput="saveExamAnswer(\''+q.id+'\',this.value)">'+esc(saved?.[q.id]||'')+'</textarea></div>';return originalRender?'<div></div>':'';}).join('');};}
-function grader(){if(!window.currentUser||window.currentUser.role!=='admin'||document.getElementById('essay-grader-btn'))return;const b=document.createElement('button');b.id='essay-grader-btn';b.className='btn btn-gold';b.textContent='📝 تصحيح المقالي';b.style='position:fixed;left:18px;bottom:18px;z-index:900';b.onclick=async()=>{const {data:q}=await sb.from('exam_questions').select('id,exam_id,question_text,points,correct_answer').eq('question_type','essay');if(!q?.length)return toast('لا توجد أسئلة مقالية منشورة');const ids=[...new Set(q.map(x=>x.exam_id))];const {data:a,error}=await sb.from('exam_attempts').select('id,exam_id,student_id,answers,score,submitted_at,status').in('exam_id',ids).eq('status','submitted').order('submitted_at',{ascending:false}).limit(100);if(error)return toast(error.message,'error');let m=document.getElementById('modal-essay-grader');if(!m){m=document.createElement('div');m.id='modal-essay-grader';m.className='modal-overlay';m.innerHTML='<div class="modal" style="max-width:900px;max-height:90vh;overflow:auto"><div class="modal-header"><h3>📝 تصحيح المقالي</h3><button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'open\')">×</button></div><div class="modal-body" id="essay-grader-body"></div></div>';document.body.appendChild(m);}const names={};const sids=[...new Set((a||[]).map(x=>x.student_id))];if(sids.length){const {data:s}=await sb.from('students').select('id,name').in('id',sids);(s||[]).forEach(x=>names[x.id]=x.name);}m.querySelector('#essay-grader-body').innerHTML=(a||[]).map(x=>'<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px"><b>'+esc(names[x.student_id]||x.student_id)+'</b> — '+new Date(x.submitted_at).toLocaleString('ar-EG')+'<div style="margin-top:7px">'+q.filter(z=>z.exam_id===x.exam_id).map(z=>'<div style="background:#f8fafc;padding:8px;margin-top:6px;border-radius:8px"><b>'+esc(z.question_text)+'</b><div style="white-space:pre-wrap;margin:5px 0">'+esc(x.answers?.[z.id]||'لم يجب')+'</div><input data-score="'+z.id+'" data-attempt="'+x.id+'" type="number" min="0" max="'+Number(z.points||1)+'" step="0.25" value="'+Number(x.answers?.__essay_grades?.[z.id]?.score||0)+'" style="width:90px"></div>').join('')+'</div>').join('')+'<button class="btn btn-gold" data-save-attempt="'+x.id+'" style="margin-top:8px">حفظ درجات المقالي</button></div>').join('')||'<div>لا توجد محاولات مسلّمة تحتاج تصحيحًا.</div>';m.querySelectorAll('[data-save-attempt]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.saveAttempt,at=(a||[]).find(x=>x.id===id);const grades={...(at.answers?.__essay_grades||{})};let sum=0;q.filter(z=>z.exam_id===at.exam_id).forEach(z=>{const sc=Math.max(0,Math.min(Number(z.points||1),Number(m.querySelector('[data-score="'+z.id+'"][data-attempt="'+id+'"]').value)||0));grades[z.id]={score:sc,graded_at:new Date().toISOString(),grader_id:window.currentAuth?.id||null};sum+=sc;});const old=Object.values(at.answers?.__essay_grades||{}).reduce((s,g)=>s+Number(g?.score||0),0);const merged={...(at.answers||{}),__essay_grades:grades};const {error}=await sb.from('exam_attempts').update({answers:merged,score:Number(at.score||0)-old+sum}).eq('id',id);if(error)toast('❌ '+error.message,'error');else{toast('✅ تم حفظ التصحيح');at.answers=merged;at.score=Number(at.score||0)-old+sum;}});m.classList.add('open');};document.body.appendChild(b);}
+function grader(){
+ if(!window.currentUser||window.currentUser.role!=='admin'||document.getElementById('essay-grader-btn'))return;
+ const b=document.createElement('button');
+ b.id='essay-grader-btn';b.className='btn btn-gold';b.textContent='📝 تصحيح المقالي';
+ b.style='position:fixed;left:18px;bottom:18px;z-index:900';
+ b.onclick=async()=>{
+  const {data:q,error:qe}=await sb.from('exam_questions').select('id,exam_id,question_text,points,correct_answer').eq('question_type','essay');
+  if(qe)return toast(qe.message,'error');
+  if(!q?.length)return toast('لا توجد أسئلة مقالية منشورة');
+  const ids=[...new Set(q.map(x=>x.exam_id))];
+  const {data:a,error}=await sb.from('exam_attempts').select('id,exam_id,student_id,answers,score,submitted_at,status').in('exam_id',ids).eq('status','submitted').order('submitted_at',{ascending:false}).limit(100);
+  if(error)return toast(error.message,'error');
+  let m=document.getElementById('modal-essay-grader');
+  if(!m){
+   m=document.createElement('div');m.id='modal-essay-grader';m.className='modal-overlay';
+   m.innerHTML='<div class="modal" style="max-width:900px;max-height:90vh;overflow:auto"><div class="modal-header"><h3>📝 تصحيح المقالي</h3><button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'open\')">×</button></div><div class="modal-body" id="essay-grader-body"></div></div>';
+   document.body.appendChild(m);
+  }
+  const names={};const sids=[...new Set((a||[]).map(x=>x.student_id))];
+  if(sids.length){const {data:s}=await sb.from('students').select('id,name').in('id',sids);(s||[]).forEach(x=>names[x.id]=x.name);}
+  const attemptsHtml=(a||[]).map(x=>{
+   const questionsHtml=q.filter(z=>z.exam_id===x.exam_id).map(z=>'<div style="background:#f8fafc;padding:8px;margin-top:6px;border-radius:8px"><b>'+esc(z.question_text)+'</b><div style="white-space:pre-wrap;margin:5px 0">'+esc(x.answers?.[z.id]||'لم يجب')+'</div><input data-score="'+z.id+'" data-attempt="'+x.id+'" type="number" min="0" max="'+Number(z.points||1)+'" step="0.25" value="'+Number(x.answers?.__essay_grades?.[z.id]?.score||0)+'" style="width:90px"></div>').join('');
+   return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px"><b>'+esc(names[x.student_id]||x.student_id)+'</b> — '+new Date(x.submitted_at).toLocaleString('ar-EG')+'<div style="margin-top:7px">'+questionsHtml+'</div><button class="btn btn-gold" data-save-attempt="'+x.id+'" style="margin-top:8px">حفظ درجات المقالي</button></div>';
+  }).join('');
+  m.querySelector('#essay-grader-body').innerHTML=attemptsHtml||'<div>لا توجد محاولات مسلّمة تحتاج تصحيحًا.</div>';
+  m.querySelectorAll('[data-save-attempt]').forEach(btn=>btn.onclick=async()=>{
+   const id=btn.dataset.saveAttempt,at=(a||[]).find(x=>x.id===id);if(!at)return;
+   const grades={...(at.answers?.__essay_grades||{})};let sum=0;
+   q.filter(z=>z.exam_id===at.exam_id).forEach(z=>{
+    const input=m.querySelector('[data-score="'+z.id+'"][data-attempt="'+id+'"]');
+    const sc=Math.max(0,Math.min(Number(z.points||1),Number(input?.value)||0));
+    grades[z.id]={score:sc,graded_at:new Date().toISOString(),grader_id:window.currentAuth?.id||null};sum+=sc;
+   });
+   const old=Object.values(at.answers?.__essay_grades||{}).reduce((s,g)=>s+Number(g?.score||0),0);
+   const merged={...(at.answers||{}),__essay_grades:grades};
+   const {error:saveError}=await sb.from('exam_attempts').update({answers:merged,score:Number(at.score||0)-old+sum}).eq('id',id);
+   if(saveError)toast('❌ '+saveError.message,'error');
+   else{toast('✅ تم حفظ التصحيح');at.answers=merged;at.score=Number(at.score||0)-old+sum;}
+  });
+  m.classList.add('open');
+ };
+ document.body.appendChild(b);
+}
 function install(){studentEssay();setInterval(()=>{studentEssay();grader();},1500);}install();
 })();
