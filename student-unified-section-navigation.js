@@ -4,6 +4,30 @@
   if (window.__andalusUnifiedStudentSectionsV1) return;
   window.__andalusUnifiedStudentSectionsV1 = true;
 
+  // Compatibility repair: the live project was using a stale Supabase API key.
+  // Keep the existing app/client untouched, but normalize the publishable key on
+  // every request sent to this project's Supabase endpoint. Authorization headers
+  // (including the logged-in user's JWT) are preserved unchanged.
+  (function repairSupabaseApiKey(){
+    const VALID_PUBLISHABLE_KEY='sb_publishable_MBvIDp_gVme16l3nqwyTBw_qog5lUBW';
+    const PROJECT_HOST='uvwarprsghwvrfmdaaqv.supabase.co';
+    const originalFetch=window.fetch;
+    if(typeof originalFetch!=='function' || window.__andalusSupabaseApiKeyRepairV1) return;
+    window.__andalusSupabaseApiKeyRepairV1=true;
+    window.fetch=function(input, init){
+      let url='';
+      try { url=typeof input==='string' ? input : (input && input.url) || ''; } catch(_) {}
+      if(url.includes(PROJECT_HOST)){
+        try{
+          const request = new Request(input, init);
+          request.headers.set('apikey', VALID_PUBLISHABLE_KEY);
+          return originalFetch.call(window, request);
+        }catch(_){}
+      }
+      return originalFetch.call(window, input, init);
+    };
+  })();
+
   const portal = () => document.getElementById('student-portal-screen');
   const content = () => document.getElementById('student-portal-content');
   const exam = () => document.getElementById('exam-portal-screen');
