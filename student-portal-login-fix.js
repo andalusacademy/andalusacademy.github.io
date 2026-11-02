@@ -2,8 +2,8 @@
 (function(){
   try {
     function loadStudentAI(){
-      if(document.querySelector('script[data-andalus-student-ai]'))return;
-      const s=document.createElement('script');s.src='./student-ai.js?v=2';s.dataset.andalusStudentAi='1';s.defer=true;document.head.appendChild(s);
+      if(document.querySelector('script[data-andalus-student-ai-assistant]'))return;
+      const s=document.createElement('script');s.src='./student-ai-assistant.js?v=20261103';s.dataset.andalusStudentAiAssistant='1';s.defer=true;document.head.appendChild(s);
     }
     if(typeof window.completeStudentDeviceLogin!=='function'||typeof window.getStudentDeviceToken!=='function') { setTimeout(loadStudentAI,800); return; }
     window.completeStudentDeviceLogin=async function(studentCode='',nationalId=''){
