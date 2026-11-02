@@ -1,5 +1,5 @@
-/* Andalus Academy Service Worker — clean HTML delivery + AI assistant session refresh v41 */
-const CACHE='andalus-v41-ai-assistant-session-refresh';
+/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v40 */
+const CACHE='andalus-v40-student-auth-refresh';
 const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3','./student-passkey.js?v=2','./study-summary-receipt-admin.js?v=2'];
 
 self.addEventListener('install',e=>{
