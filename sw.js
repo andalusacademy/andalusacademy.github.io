@@ -1,6 +1,6 @@
-/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v40 */
-const CACHE='andalus-v40-student-auth-refresh';
-const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3','./student-passkey.js?v=2','./study-summary-receipt-admin.js?v=2'];
+/* Andalus Academy Service Worker — clean HTML delivery + resilient student portal bootstrap v41 */
+const CACHE='andalus-v41-student-auth-refresh';
+const ASSETS=['./manifest.json','./student-portal-bootstrap.js?v=3','./student-passkey.js?v=2','./study-summary-receipt-admin.js?v=2','./student-portal-admin-gateway-v3.js?v=4'];
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));
@@ -30,6 +30,9 @@ self.addEventListener('fetch',e=>{
           }
           if(!injected.includes('study-summary-receipt-admin.js')){
             injected=injected.replace('</head>','<script src="./study-summary-receipt-admin.js?v=2"></script>\n</head>');
+          }
+          if(!injected.includes('student-portal-admin-gateway-v3.js')){
+            injected=injected.replace('</head>','<script src="./student-portal-admin-gateway-v3.js?v=4"></script>\n</head>');
           }
           if(injected!==text){
             const headers=new Headers(r.headers); headers.delete('content-length'); headers.delete('content-encoding'); headers.set('cache-control','no-store');
