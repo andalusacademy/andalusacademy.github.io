@@ -1,146 +1,176 @@
-/* Andalus student navigation: open the Golden League leaderboard directly
-   and return from the exam list to the student portal without signing out. */
+/* Andalus student portal: real screen-to-screen navigation.
+   Keep feature screens separate from the student menu and never sign out on back. */
 (function () {
   'use strict';
 
+  const PORTAL = '#student-portal-screen';
+  const LEAGUE = '#weekly-quiz-screen';
+  const EXAM = '#exam-portal-screen';
+  let view = '';
+
   function visible(el) {
     if (!el) return false;
-    const s = getComputedStyle(el);
+    const s = window.getComputedStyle(el);
     return s.display !== 'none' && s.visibility !== 'hidden' && s.opacity !== '0';
   }
 
-  function returnToStudentPortal() {
+  function setDisplay(el, value) {
+    if (el && el.style.display !== value) el.style.display = value;
+  }
+
+  function returnToPortal() {
+    // Close feature screens first; the authenticated student session is untouched.
+    [LEAGUE, EXAM, '#exam-question-screen', '#public-competition-screen', '#competition-screen']
+      .forEach(function (selector) { setDisplay(document.querySelector(selector), 'none'); });
+    const portal = document.querySelector(PORTAL);
+    if (portal) setDisplay(portal, 'block');
     try {
-      if (typeof window.renderStudentPortalMenu === 'function') {
-        window.renderStudentPortalMenu();
-        return true;
-      }
-    } catch (e) { console.warn('Student portal menu failed:', e); }
-    try {
-      if (typeof window.showStudentPortalLoginStep === 'function') {
-        window.showStudentPortalLoginStep();
-        return true;
-      }
-    } catch (e) { console.warn('Student portal fallback failed:', e); }
+      if (typeof window.renderStudentPortalMenu === 'function') window.renderStudentPortalMenu();
+      else if (typeof window.showStudentPortalLoginStep === 'function') window.showStudentPortalLoginStep();
+    } catch (e) { console.warn('Student portal return:', e); }
+    if (portal) setDisplay(portal, 'block');
+    view = 'portal';
     return false;
   }
 
-  // The tab function is defined before the league UI is rendered. Wait for
-  // the actual .agl-shell; checking only for the function caused the old fix
-  // to stop too early and leave the student on the landing/home tab.
-  function forceBoard() {
-    let tries = 0;
-    const timer = setInterval(function () {
-      const exam = document.getElementById('exam-portal-screen');
-      const root = document.querySelector('#weekly-quiz-content .agl-shell');
-      if (root && typeof window.showGoldenLeagueTab === 'function') {
-        try {
-          window.showGoldenLeagueTab('board');
-          clearInterval(timer);
-          return;
-        } catch (e) { console.warn('Golden League board navigation failed:', e); }
-      }
-      if (exam && visible(exam)) clearInterval(timer);
-      if (++tries >= 150) clearInterval(timer);
-    }, 100);
-
-    // Also catch the asynchronous render that creates the league shell.
-    if (document.body && !window.__andalusLeagueBoardObserver) {
-      window.__andalusLeagueBoardObserver = new MutationObserver(function () {
-        const root = document.querySelector('#weekly-quiz-content .agl-shell');
-        if (!root || typeof window.showGoldenLeagueTab !== 'function') return;
-        try {
-          window.showGoldenLeagueTab('board');
-          window.__andalusLeagueBoardObserver.disconnect();
-          window.__andalusLeagueBoardObserver = null;
-        } catch (e) { console.warn('Golden League board observer:', e); }
-      });
-      window.__andalusLeagueBoardObserver.observe(document.body, { childList: true, subtree: true });
+  function enterFeature(name) {
+    const portal = document.querySelector(PORTAL);
+    if (portal) setDisplay(portal, 'none');
+    view = name;
+    if (name === 'league') {
+      const screen = document.querySelector(LEAGUE);
+      if (screen) setDisplay(screen, 'block');
+      openBoardWhenReady();
+    }
+    if (name === 'exam') {
+      const screen = document.querySelector(EXAM);
+      if (screen) setDisplay(screen, 'block');
+      setExamBackLabel();
     }
   }
 
-  function installBoardRenderHook() {
-    if (window.__andalusBoardRenderHookInstalled || typeof window.renderWeeklyQuizHome !== 'function') return false;
-    const original = window.renderWeeklyQuizHome;
-    window.renderWeeklyQuizHome = function () {
-      const result = original.apply(this, arguments);
-      if (window.__andalusForceBoardOnNextRender) {
-        window.__andalusForceBoardOnNextRender = false;
-        if (typeof window.showGoldenLeagueTab === 'function') window.showGoldenLeagueTab('board');
+  function openBoardWhenReady() {
+    let attempts = 0;
+    const timer = window.setInterval(function () {
+      const screen = document.querySelector(LEAGUE);
+      const board = document.querySelector('#weekly-quiz-content .agl-page[data-tab="board"]');
+      if (screen && visible(screen) && board && typeof window.showGoldenLeagueTab === 'function') {
+        window.showGoldenLeagueTab('board');
+        window.clearInterval(timer);
+      } else if (++attempts >= 180) {
+        window.clearInterval(timer);
       }
-      return result;
-    };
-    window.__andalusBoardRenderHookInstalled = true;
-    return true;
+    }, 100);
+  }
+
+  function setExamBackLabel() {
+    const back = document.getElementById('andalus-global-back');
+    if (back) {
+      back.innerHTML = '↩ <span>عودة إلى البوابة</span>';
+      back.setAttribute('aria-label', 'عودة إلى بوابة الطالب');
+    }
   }
 
   function installLeagueEntry() {
-    if (window.__andalusDirectGoldenLeagueEntryInstalled) return true;
-    if (typeof window.goToPortalWeeklyQuiz !== 'function') return false;
+    if (window.__andalusDirectLeagueScreenInstalled || typeof window.goToPortalWeeklyQuiz !== 'function') return;
     const original = window.goToPortalWeeklyQuiz;
-    window.goToPortalWeeklyQuiz = function () {
-      window.__andalusForceBoardOnNextRender = true;
-      const result = original.apply(this, arguments);
-      forceBoard();
+    window.goToPortalWeeklyQuiz = async function () {
+      const result = await original.apply(this, arguments);
+      enterFeature('league');
       return result;
     };
-    window.__andalusDirectGoldenLeagueEntryInstalled = true;
-    return true;
+    window.__andalusDirectLeagueScreenInstalled = true;
   }
 
-  function installExamLogoutOverride() {
-    if (window.__andalusExamLogoutOverrideInstalled) return true;
-    if (typeof window.examStudentLogout !== 'function') return false;
-    const original = window.examStudentLogout;
-    window.examStudentLogout = function () {
-      if (visible(document.getElementById('exam-portal-screen'))) {
-        returnToStudentPortal();
-        return;
-      }
-      return original.apply(this, arguments);
-    };
-    window.__andalusExamLogoutOverrideInstalled = true;
-    return true;
+  function installExamLogoutGuard() {
+    if (window.__andalusExamLogoutGuardInstalled) return;
+    if (typeof window.examStudentLogout === 'function') {
+      const original = window.examStudentLogout;
+      window.examStudentLogout = function () {
+        if (visible(document.querySelector(EXAM))) returnToPortal();
+        else return original.apply(this, arguments);
+      };
+    }
+    window.__andalusExamLogoutGuardInstalled = true;
   }
 
-  function replaceExamLogout() {
-    const exam = document.getElementById('exam-portal-screen');
-    if (!visible(exam)) return;
-    exam.querySelectorAll('button,a,[role="button"]').forEach(function (el) {
-      const label = (el.innerText || el.textContent || '').trim();
-      if (!label.includes('تسجيل الخروج') || el.dataset.andalusPortalBack === '1') return;
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = el.className || 'btn';
-      b.style.cssText = el.style.cssText || '';
-      b.textContent = '← الرجوع إلى البوابة';
-      b.setAttribute('aria-label', 'الرجوع إلى بوابة الطالب');
-      b.dataset.andalusPortalBack = '1';
-      b.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        returnToStudentPortal();
-      });
-      el.replaceWith(b);
+  function replaceExamLogoutButtons() {
+    if (!visible(document.querySelector(EXAM))) return;
+    document.querySelectorAll('button,a,[role="button"]').forEach(function (el) {
+      const label = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+      if (!/تسجيل\\s+الخروج/.test(label) || el.dataset.andalusReturnButton === '1') return;
+      el.textContent = '↩ عودة إلى البوابة';
+      el.dataset.andalusReturnButton = '1';
+      el.setAttribute('aria-label', 'عودة إلى بوابة الطالب');
+      el.onclick = null;
+      el.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        returnToPortal();
+      }, true);
     });
+  }
+
+  // Capture the old logout control even when it is rendered outside the exam card.
+  document.addEventListener('click', function (event) {
+    const control = event.target && event.target.closest
+      ? event.target.closest('button,a,[role="button"]') : null;
+    if (!control || !visible(document.querySelector(EXAM))) return;
+    const label = (control.innerText || control.textContent || '').replace(/\\s+/g, ' ').trim();
+    if (/تسجيل\\s+الخروج/.test(label)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      returnToPortal();
+    }
+  }, true);
+
+  // Watch the actual active feature screen, not merely the existence of its DOM node.
+  function syncScreens() {
+    const exam = document.querySelector(EXAM);
+    const league = document.querySelector(LEAGUE);
+    if (visible(exam)) {
+      enterFeature('exam');
+      replaceExamLogoutButtons();
+    } else if (visible(league)) {
+      if (view !== 'league') enterFeature('league');
+    } else {
+      const portal = document.querySelector(PORTAL);
+      if (visible(portal)) {
+        view = 'portal';
+        const back = document.getElementById('andalus-global-back');
+        if (back) back.innerHTML = '← <span>رجوع</span>';
+      }
+    }
   }
 
   function install() {
     installLeagueEntry();
-    installExamLogoutOverride();
-    replaceExamLogout();
+    installExamLogoutGuard();
+    syncScreens();
   }
 
   install();
   let tries = 0;
-  const timer = setInterval(function () {
+  const retry = window.setInterval(function () {
     install();
-    if (++tries >= 150) clearInterval(timer);
+    if (++tries >= 180) window.clearInterval(retry);
   }, 200);
 
   if (document.body) {
-    new MutationObserver(install).observe(document.body, {
+    new MutationObserver(function () { install(); }).observe(document.body, {
       childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class']
     });
+  }
+
+  // The global back control must return to the portal from the exam list.
+  const oldBack = window.andalusGoBack;
+  if (typeof oldBack === 'function' && !window.__andalusExamBackScreenInstalled) {
+    window.andalusGoBack = function () {
+      if (visible(document.querySelector(EXAM))) return returnToPortal();
+      return oldBack.apply(this, arguments);
+    };
+    window.__andalusExamBackScreenInstalled = true;
   }
 })();
