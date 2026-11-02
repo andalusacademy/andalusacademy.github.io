@@ -91,8 +91,8 @@
     const exam = document.getElementById('exam-portal-screen');
     if (!visible(exam)) return;
     exam.querySelectorAll('button,a,[role="button"]').forEach(function (el) {
-      const label = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
-      if (!/تسجيل\\s+الخروج/.test(label) || el.dataset.andalusPortalBack === '1') return;
+      const label = (el.innerText || el.textContent || '').trim();
+      if (!label.includes('تسجيل الخروج') || el.dataset.andalusPortalBack === '1') return;
       const b = document.createElement('button');
       b.type = 'button';
       b.className = el.className || 'btn';
