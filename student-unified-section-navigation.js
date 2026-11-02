@@ -5,9 +5,6 @@
   window.__andalusUnifiedStudentSectionsV1 = true;
 
   // Compatibility repair: the live project was using a stale Supabase API key.
-  // Keep the existing app/client untouched, but normalize the publishable key on
-  // every request sent to this project's Supabase endpoint. Authorization headers
-  // (including the logged-in user's JWT) are preserved unchanged.
   (function repairSupabaseApiKey(){
     const VALID_PUBLISHABLE_KEY='sb_publishable_MBvIDp_gVme16l3nqwyTBw_qog5lUBW';
     const PROJECT_HOST='uvwarprsghwvrfmdaaqv.supabase.co';
@@ -73,6 +70,26 @@
     if(typeof window.renderStudentPortalMenu==='function') window.renderStudentPortalMenu();
   }
 
+  // The tutor tile is strictly a logged-in student feature.
+  function syncTutorTile(){
+    const tile=document.getElementById('sai-tile');
+    if(!tile) return;
+    const loggedIn=typeof unifiedPortalStudent!=='undefined' && !!unifiedPortalStudent?.id;
+    tile.style.display=loggedIn ? '' : 'none';
+    const label=tile.querySelector('.tile-label');
+    const hint=tile.querySelector('.tile-hint');
+    if(label) label.textContent='مدرسك الخصوصي';
+    if(hint) hint.textContent='ذاكر مع مدرسك الخصوصي';
+    tile.setAttribute('aria-label','مدرسك الخصوصي');
+  }
+  function watchTutorTile(){
+    syncTutorTile();
+    const root=document.getElementById('student-portal-screen');
+    if(!root || root.__andalusTutorTileWatcher) return;
+    root.__andalusTutorTileWatcher=true;
+    new MutationObserver(function(){syncTutorTile()}).observe(root,{childList:true,subtree:true});
+  }
+
   window.goToPortalExams = async function () {
     const root=exam(); if(!root || !prepareSection(root)) return; addBack(root,'exam');
     if(typeof showExamScreen==='function') showExamScreen('exam-login-screen');
@@ -128,13 +145,14 @@
     if(belongs) backToStudentMenu();
   };
 
-  // Load the tutor only from a real script file; never inject it into index.html strings.
   function loadTutor(){
     if(document.getElementById('student-ai-assistant-script')) return;
     const s=document.createElement('script');
-    s.id='student-ai-assistant-script'; s.src='./student-ai-assistant.js?v=20261102-3'; s.async=false;
+    s.id='student-ai-assistant-script'; s.src='./student-ai-assistant.js?v=20261102-4'; s.async=false;
     (document.head||document.documentElement).appendChild(s);
+    s.addEventListener('load',watchTutorTile,{once:true});
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',loadTutor,{once:true});
   else loadTutor();
+  setTimeout(watchTutorTile,1000);
 })();
