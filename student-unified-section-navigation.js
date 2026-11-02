@@ -118,4 +118,31 @@
 
   window.backToPortalFromWeeklyQuiz = backToStudentMenu;
   window.backToPortalFromExam = backToStudentMenu;
+
+  const originalOpenStudentRequestForm = window.openStudentRequestForm;
+  const originalCloseStudentRequestForm = window.closeStudentRequestForm;
+
+  window.openStudentRequestForm = function () {
+    if (typeof originalOpenStudentRequestForm !== 'function') return;
+    originalOpenStudentRequestForm();
+    const modal = document.getElementById('student-request-submit-modal');
+    const box = content();
+    if (!modal || !box || !unifiedPortalStudent || !unifiedPortalPhone) return;
+    box.innerHTML = '<button type="button" class="btn btn-outline" data-andalus-request-back="1" style="width:100%;margin-bottom:12px;">← الرجوع إلى بوابة الطالب</button>';
+    box.querySelector('[data-andalus-request-back]').addEventListener('click', backToStudentMenu);
+    modal.style.cssText = 'position:relative;inset:auto;z-index:auto;background:transparent;display:block;align-items:initial;justify-content:initial;padding:0;direction:rtl;';
+    box.appendChild(modal);
+    const history = document.createElement('div');
+    history.id = 'student-portal-requests';
+    history.style.marginTop = '14px';
+    box.appendChild(history);
+    if (typeof window.loadStudentPortalRequests === 'function') void window.loadStudentPortalRequests();
+  };
+
+  window.closeStudentRequestForm = function () {
+    const modal = document.getElementById('student-request-submit-modal');
+    const belongsToStudentPortal = !!(modal && modal.parentNode === content());
+    if (typeof originalCloseStudentRequestForm === 'function') originalCloseStudentRequestForm();
+    if (belongsToStudentPortal) backToStudentMenu();
+  };
 })();
