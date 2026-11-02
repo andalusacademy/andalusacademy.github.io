@@ -154,7 +154,20 @@
     (document.head||document.documentElement).appendChild(s);
     s.addEventListener('load',watchTutorTile,{once:true});
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',loadTutor,{once:true});
-  else loadTutor();
-  setTimeout(watchTutorTile,1000);
+  // Keep the core student login independent from the optional AI assistant.
+  // Load the assistant only after the student portal has authenticated a student.
+  let tutorLoaded=false;
+  function loadTutorAfterLogin(){
+    if(tutorLoaded) return;
+    const loggedIn=typeof unifiedPortalStudent!=='undefined' && !!unifiedPortalStudent?.id;
+    if(!loggedIn) return;
+    tutorLoaded=true;
+    loadTutor();
+  }
+  const tutorLoginWatcher=setInterval(function(){
+    loadTutorAfterLogin();
+    if(tutorLoaded) clearInterval(tutorLoginWatcher);
+  },500);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',loadTutorAfterLogin);
+  else loadTutorAfterLogin();
 })();
