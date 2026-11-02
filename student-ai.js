@@ -6,7 +6,7 @@
   function load(){
     if (window.__andalusStudentAiAssistantLoaded || document.querySelector('script[data-andalus-student-ai-assistant]')) return;
     const s=document.createElement('script');
-    s.src='./student-ai-assistant.js?v=20261105';
+    s.src='./student-ai-assistant.js?v=20261106';
     s.dataset.andalusStudentAiAssistant='1';
     s.defer=true;
     document.head.appendChild(s);
