@@ -5,7 +5,11 @@
       if(document.querySelector('script[data-andalus-student-ai-assistant]'))return;
       const s=document.createElement('script');s.src='./student-ai-assistant.js?v=20261103';s.dataset.andalusStudentAiAssistant='1';s.defer=true;document.head.appendChild(s);
     }
-    if(typeof window.completeStudentDeviceLogin!=='function'||typeof window.getStudentDeviceToken!=='function') { setTimeout(loadStudentAI,800); return; }
+    function loadStudentAIMenuFix(){
+      if(document.querySelector('script[data-andalus-student-ai-menu-fix]'))return;
+      const s=document.createElement('script');s.src='./student-ai-menu-fix.js?v=20261103';s.dataset.andalusStudentAiMenuFix='1';s.defer=true;document.head.appendChild(s);
+    }
+    if(typeof window.completeStudentDeviceLogin!=='function'||typeof window.getStudentDeviceToken!=='function') { setTimeout(loadStudentAI,800); setTimeout(loadStudentAIMenuFix,1000); return; }
     window.completeStudentDeviceLogin=async function(studentCode='',nationalId=''){
       const code=String(studentCode||'').trim(),nid=String(nationalId||'').trim(),token=await window.getStudentDeviceToken(nid);
       if(!token){if(!code&&!nid)return false;throw new Error('تعذر إنشاء رمز الجهاز. امسح بيانات الموقع غير الضرورية أو استخدم Chrome ثم حاول مرة أخرى.');}
@@ -16,10 +20,11 @@
       if(!data?.ok){if(data?.reason==='device_mismatch')throw new Error('هذا الحساب مربوط بجهاز آخر. تواصل مع إدارة المركز لإعادة ربط الجهاز.');if(data?.reason==='session_not_found')return false;if(data?.reason==='invalid_device')throw new Error('رمز الجهاز غير صالح. أعد فتح البوابة وحاول مرة أخرى.');if(data?.reason==='invalid_credentials')throw new Error('بيانات الدخول غير صحيحة، راجع رقم القيد والرقم القومي.');throw new Error('تعذر تسجيل الدخول. راجع بياناتك وحاول مرة أخرى.');}
       window.unifiedPortalStudent=data.student;window.unifiedPortalPhone=String(data.student?.phone||'');window.studentPortalFaceToken=null;window.__andalusStudentPortalSessionToken=data.token||null;
       if(typeof window.renderStudentPortalMenu==='function')await Promise.resolve(window.renderStudentPortalMenu());else throw new Error('تعذر تجهيز واجهة بوابة الطالب. أعد تحميل الصفحة.');
-      setTimeout(loadStudentAI,150);return true;
+      setTimeout(loadStudentAI,150);setTimeout(loadStudentAIMenuFix,250);return true;
     };
     const originalEnter=window.enterStudentPortal;
     window.enterStudentPortal=async function(){const idInput=document.getElementById('student-portal-id-input'),identityInput=document.getElementById('student-portal-phone-input'),errEl=document.getElementById('student-portal-login-err'),studentCode=idInput?.value.trim()||'',identity=identityInput?.value.trim()||'',weeklyEntry=new URLSearchParams(window.location.search).get('weekly-quiz')==='1';if(weeklyEntry&&typeof originalEnter==='function')return originalEnter();if(!studentCode||!identity){if(errEl){errEl.textContent='اكتب رقم القيد والرقم القومي';errEl.style.display='block';}return;}if(errEl)errEl.style.display='none';const button=document.querySelector('#student-portal-content button.btn');if(button)button.disabled=true;try{await window.completeStudentDeviceLogin(studentCode,identity);}catch(e){if(errEl){errEl.textContent=e?.message||'تعذر تسجيل الدخول. حاول مرة أخرى.';errEl.style.display='block';}}finally{if(button)button.disabled=false;}};
     setTimeout(loadStudentAI,1200);
+    setTimeout(loadStudentAIMenuFix,1400);
   } catch(e){console.warn('Student portal login hotfix unavailable:',e);}
 })();
