@@ -23,8 +23,45 @@ function css(){if($('sai-style'))return;const s=document.createElement('style');
 function robot(){return '<div class="sai-robot-wrap"><div class="sai-robot"><i class="sai-antenna"></i><i class="sai-ear left"></i><i class="sai-ear right"></i><div class="sai-face"><div class="sai-eyes"><i></i><i></i></div><div class="sai-smile"></div><div class="sai-cheek left"></div><div class="sai-cheek right"></div></div><div class="sai-body"><i></i><i></i></div></div></div>'}
 function setRobot(m){const r=document.querySelector('.sai-robot');if(r){r.classList.remove('listening','thinking','speaking');if(m)r.classList.add(m)}}
 function stopSpeech(){try{if('speechSynthesis'in window)speechSynthesis.cancel()}catch(_){}setRobot('')}
-function speechText(t){return String(t||'').replace(/\r/g,'').replace(/^\s{0,3}#{1,6}\s*/gm,'').replace(/(^|\s)#{1,6}(?=\s|$)/g,' ').replace(/!?\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/https?:\/\/\S+/gi,'').replace(/\*\*|__|~~|\*|_|\x60/g,'').replace(/^\s*[-*+•]\s+/gm,'').replace(/^\s*\|/gm,'').replace(/\|\s*/g,'، ').replace(/&nbsp;/g,' ').replace(/&amp;/g,' و ').replace(/[ \t]{2,}/g,' ').replace(/\n{2,}/g,'. ').replace(/\n/g,'، ').replace(/[#*_~|]/g,' ').replace(/\s+([،؛:!?])/g,'$1').trim()}
-function speak(t){if(!S.speechEnabled||!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance)return;const clean=speechText(t);if(!clean)return;stopSpeech();const english=/[A-Za-z]/.test(clean)&&!/[\u0600-\u06FF]/.test(clean);const u=new SpeechSynthesisUtterance(clean);u.lang=english?'en-US':'ar-EG';u.rate=.94;u.pitch=1.02;const vs=speechSynthesis.getVoices()||[];u.voice=english?(vs.find(v=>/^en[-_]US/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||null):(vs.find(v=>/^ar[-_]EG/i.test(v.lang))||vs.find(v=>/^ar/i.test(v.lang))||null);setRobot('speaking');u.onend=()=>setRobot('');u.onerror=()=>setRobot('');speechSynthesis.speak(u)}
+function speechText(t){return String(t||'').replace(/\r/g,'').replace(/^\s{0,3}#{1,6}\s*/gm,'').replace(/(^|\s)#[\w\u0600-\u06FF-]+/g,' ').replace(/!?\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/https?:\/\/\S+/gi,'').replace(/\*\*|__|~~|\*|_|\x60/g,'').replace(/^\s*[-*+•]\s+/gm,'').replace(/^\s*>\s?/gm,'').replace(/^\s*\|/gm,'').replace(/\|\s*/g,'، ').replace(/&nbsp;/g,' ').replace(/&amp;/g,' و ').replace(/[ \t]{2,}/g,' ').replace(/\n{2,}/g,'. ').replace(/\n/g,'، ').replace(/[#*_~|]/g,' ').replace(/\s+([،؛:!?])/g,'$1').trim()}
+function speechSegments(text){
+ const tokens=String(text||'').match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+|[A-Za-z]+(?:['’][A-Za-z]+)?|\d+(?:[.,]\d+)?|[^\s]/g)||[];
+ const out=[];let lang='ar-EG',buffer='';
+ const flush=()=>{if(buffer.trim())out.push({text:buffer.trim(),lang});buffer=''};
+ for(const token of tokens){
+  const isArabic=/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(token);
+  const isEnglish=/[A-Za-z]/.test(token);
+  const nextLang=isArabic?'ar-EG':isEnglish?'en-US':lang;
+  if((isArabic||isEnglish)&&buffer&&nextLang!==lang)flush();
+  if(isArabic||isEnglish)lang=nextLang;
+  const punctuation=/^[،؛:,.!?؟()[\]{}"“”'’\-–—]$/.test(token);
+  if(punctuation)buffer=buffer.replace(/\s+$/,'')+token+' ';
+  else buffer+=(buffer&&!/[\s([{“"'’\-–—]$/.test(buffer)?' ':'')+token+' ';
+ }
+ flush();
+ return out;
+}
+function speak(t){
+ if(!S.speechEnabled||!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance)return;
+ const clean=speechText(t),parts=speechSegments(clean);if(!parts.length)return;
+ stopSpeech();
+ const synth=window.speechSynthesis,voices=synth.getVoices()||[];
+ let index=0;
+ const next=()=>{
+  if(!S.speechEnabled||index>=parts.length){setRobot('');return}
+  const part=parts[index++],u=new SpeechSynthesisUtterance(part.text);
+  u.lang=part.lang;u.rate=.94;u.pitch=1.02;
+  const voice=part.lang==='en-US'
+   ?(voices.find(v=>/^en[-_]US/i.test(v.lang))||voices.find(v=>/^en/i.test(v.lang)))
+   :(voices.find(v=>/^ar[-_]EG/i.test(v.lang))||voices.find(v=>/^ar/i.test(v.lang)));
+  if(voice)u.voice=voice;
+  u.onstart=()=>setRobot('speaking');
+  u.onend=next;
+  u.onerror=()=>{if(index<parts.length)next();else setRobot('')};
+  synth.speak(u);
+ };
+ setRobot('speaking');next();
+}
 window.toggleStudentAiSpeech=function(){S.speechEnabled=!S.speechEnabled;if(!S.speechEnabled)stopSpeech();else if(S.lastAnswer)speak(S.lastAnswer);const b=$('sai-speech-toggle');if(b){b.textContent=S.speechEnabled?'🔊 إيقاف الصوت':'🔈 تشغيل الصوت';b.setAttribute('aria-pressed',String(S.speechEnabled))}};
 function shell(){css();const b=$('student-portal-content');if(!b)return;b.innerHTML='<div class="sai-shell"><div class="sai-top"><button class="sai-btn sai-soft" onclick="closeStudentAiAssistant()">← رجوع لبوابة الطالب</button><strong>🤖 مدرسك الخصوصي</strong></div><div id="sai-root"></div></div>'}
 function chatMarkup(){return '<section class="sai-chat"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px"><strong>📖 '+esc(S.selected.name)+'</strong><button class="sai-btn sai-soft" onclick="changeStudentAiSubject()">تغيير المادة</button></div><div style="display:flex;justify-content:flex-start;margin:4px 0 8px"><button class="sai-btn sai-soft" id="sai-speech-toggle" aria-pressed="'+(S.speechEnabled?'true':'false')+'" onclick="toggleStudentAiSpeech()">'+(S.speechEnabled?'🔊 إيقاف الصوت':'🔈 تشغيل الصوت')+'</button></div><div id="sai-log" class="sai-log"></div><div id="sai-status" class="sai-status"></div><div class="sai-compose"><textarea id="sai-message" placeholder="اسألني عن الدرس أو قولّي مش فاهم..." onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendStudentAiMessage()}"></textarea><button class="sai-btn sai-mic" id="sai-mic" onclick="toggleStudentAiMic()">🎙️</button><button class="sai-btn sai-primary" onclick="sendStudentAiMessage()">إرسال</button></div><div class="sai-foot"><span class="sai-muted">اتكلم بالمصري أو اكتب سؤالك، وأنا هرد عليك كتابة وصوت.</span><button class="sai-btn sai-danger" onclick="endStudentAiLesson()">■ إنهاء الحصة</button></div></section>'}
