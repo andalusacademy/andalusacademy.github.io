@@ -79,6 +79,7 @@
     if (typeof window.goToPortalWeeklyQuiz !== 'function') return false;
     const original = window.goToPortalWeeklyQuiz;
     window.goToPortalWeeklyQuiz = function () {
+      window.__andalusForceBoardOnNextRender = true;
       const result = original.apply(this, arguments);
       forceBoard();
       return result;
