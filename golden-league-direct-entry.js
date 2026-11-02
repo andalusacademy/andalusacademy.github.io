@@ -75,6 +75,7 @@
     if (window.__andalusDirectLeagueScreenInstalled || typeof window.goToPortalWeeklyQuiz !== 'function') return;
     const original = window.goToPortalWeeklyQuiz;
     window.goToPortalWeeklyQuiz = async function () {
+      enterFeature('league');
       const result = await original.apply(this, arguments);
       enterFeature('league');
       return result;
@@ -117,6 +118,9 @@
     const control = event.target && event.target.closest
       ? event.target.closest('button,a,[role="button"]') : null;
     if (!control || !visible(document.querySelector(EXAM))) return;
+    if (control.id === 'andalus-global-back' || control.closest('#andalus-global-back')) {
+      event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); returnToPortal(); return;
+    }
     const label = (control.innerText || control.textContent || '').replace(/\\s+/g, ' ').trim();
     if (/تسجيل\\s+الخروج/.test(label)) {
       event.preventDefault();
@@ -148,6 +152,7 @@
   function install() {
     installLeagueEntry();
     installExamLogoutGuard();
+    installBackOverride();
     syncScreens();
   }
 
@@ -164,13 +169,17 @@
     });
   }
 
-  // The global back control must return to the portal from the exam list.
-  const oldBack = window.andalusGoBack;
-  if (typeof oldBack === 'function' && !window.__andalusExamBackScreenInstalled) {
+  // The document-level capture handler above also intercepts the fixed global back button.
+  // Recheck late-defined globals because legacy portal scripts may load after this file.
+  function installBackOverride() {
+    const oldBack = window.andalusGoBack;
+    if (typeof oldBack !== 'function' || window.__andalusExamBackScreenInstalled) return;
     window.andalusGoBack = function () {
       if (visible(document.querySelector(EXAM))) return returnToPortal();
       return oldBack.apply(this, arguments);
     };
     window.__andalusExamBackScreenInstalled = true;
   }
+  installBackOverride();
+  window.setInterval(installBackOverride, 250);
 })();
