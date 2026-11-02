@@ -79,40 +79,40 @@
     const root = exam();
     if (!root || !prepareSection(root)) return;
     addExamBackButton();
-    if (typeof window.showExamScreen === 'function') window.showExamScreen('exam-login-screen');
-    if (!window.unifiedPortalStudent || !window.unifiedPortalStudent.id) return;
+    if (typeof showExamScreen === 'function') showExamScreen('exam-login-screen');
+    if (!unifiedPortalStudent || !unifiedPortalStudent.id) return;
     try {
-      window.examStudent = window.unifiedPortalStudent;
-      window.examStudentPhone = String(window.unifiedPortalPhone || window.unifiedPortalStudent.phone || '');
-      window.examFaceVerifiedStudentId = String(window.unifiedPortalStudent.id);
-      window.examFaceVerificationToken = await window.issueStudentDeviceContextToken('exam_portal', null);
+      examStudent = unifiedPortalStudent;
+      examStudentPhone = String(unifiedPortalPhone || unifiedPortalStudent.phone || '');
+      examFaceVerifiedStudentId = String(unifiedPortalStudent.id);
+      examFaceVerificationToken = await issueStudentDeviceContextToken('exam_portal', null);
       const welcome = document.getElementById('exam-student-welcome');
-      if (welcome) welcome.textContent = 'أهلاً، ' + window.examStudent.name;
-      if (typeof window.loadAvailableExamsForStudent === 'function') await window.loadAvailableExamsForStudent();
-      if (typeof window.showExamScreen === 'function') window.showExamScreen('exam-select-screen');
+      if (welcome) welcome.textContent = 'أهلاً، ' + examStudent.name;
+      if (typeof loadAvailableExamsForStudent === 'function') await loadAvailableExamsForStudent();
+      if (typeof showExamScreen === 'function') showExamScreen('exam-select-screen');
     } catch (e) {
-      if (typeof window.showExamScreen === 'function') window.showExamScreen('exam-login-screen');
-      if (typeof window.showToast === 'function') window.showToast(e && e.message || 'تعذر تأمين جلسة الامتحان على هذا الجهاز.', 'error');
+      if (typeof showExamScreen === 'function') showExamScreen('exam-login-screen');
+      if (typeof showToast === 'function') showToast(e && e.message || 'تعذر تأمين جلسة الامتحان على هذا الجهاز.', 'error');
     }
   };
 
   window.goToPortalWeeklyQuiz = async function () {
-    if (typeof window.stopWeeklyQuizAuditCamera === 'function') window.stopWeeklyQuizAuditCamera();
-    if (!window.unifiedPortalStudent || !window.unifiedPortalStudent.id) {
+    if (typeof stopWeeklyQuizAuditCamera === 'function') stopWeeklyQuizAuditCamera();
+    if (!unifiedPortalStudent || !unifiedPortalStudent.id) {
       const host = portal();
       if (host) host.style.display = 'block';
-      if (typeof window.showStudentPortalLoginStep === 'function') window.showStudentPortalLoginStep();
+      if (typeof showStudentPortalLoginStep === 'function') showStudentPortalLoginStep();
       return;
     }
     try {
-      window.weeklyQuizStudent = window.unifiedPortalStudent;
-      window.weeklyQuizFaceToken = await window.issueStudentDeviceContextToken('weekly_quiz', null);
+      weeklyQuizStudent = unifiedPortalStudent;
+      weeklyQuizFaceToken = await issueStudentDeviceContextToken('weekly_quiz', null);
       const root = weekly();
       if (!root || !prepareSection(root)) return;
       addWeeklyBackButton();
-      if (typeof window.loadWeeklyQuizSection === 'function') await window.loadWeeklyQuizSection();
+      if (typeof loadWeeklyQuizSection === 'function') await loadWeeklyQuizSection();
     } catch (e) {
-      if (typeof window.showToast === 'function') window.showToast(e && e.message || 'تعذر تأمين جلسة المسابقة على هذا الجهاز.', 'error');
+      if (typeof showToast === 'function') showToast(e && e.message || 'تعذر تأمين جلسة المسابقة على هذا الجهاز.', 'error');
     }
   };
 
