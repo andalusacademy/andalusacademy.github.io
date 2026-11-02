@@ -66,7 +66,7 @@
   function setExamBackLabel() {
     const back = document.getElementById('andalus-global-back');
     if (back) {
-      back.innerHTML = '↩ <span>عودة إلى البوابة</span>';
+      if (back.innerHTML !== '↩ <span>عودة إلى البوابة</span>') back.innerHTML = '↩ <span>عودة إلى البوابة</span>';
       back.setAttribute('aria-label', 'عودة إلى بوابة الطالب');
     }
   }
@@ -98,8 +98,8 @@
   function replaceExamLogoutButtons() {
     if (!visible(document.querySelector(EXAM))) return;
     document.querySelectorAll('button,a,[role="button"]').forEach(function (el) {
-      const label = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
-      if (!/تسجيل\\s+الخروج/.test(label) || el.dataset.andalusReturnButton === '1') return;
+      const label = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!/تسجيل\s+الخروج/.test(label) || el.dataset.andalusReturnButton === '1') return;
       el.textContent = '↩ عودة إلى البوابة';
       el.dataset.andalusReturnButton = '1';
       el.setAttribute('aria-label', 'عودة إلى بوابة الطالب');
@@ -121,8 +121,8 @@
     if (control.id === 'andalus-global-back' || control.closest('#andalus-global-back')) {
       event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); returnToPortal(); return;
     }
-    const label = (control.innerText || control.textContent || '').replace(/\\s+/g, ' ').trim();
-    if (/تسجيل\\s+الخروج/.test(label)) {
+    const label = (control.innerText || control.textContent || '').replace(/\s+/g, ' ').trim();
+    if (/تسجيل\s+الخروج/.test(label)) {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
@@ -135,7 +135,7 @@
     const exam = document.querySelector(EXAM);
     const league = document.querySelector(LEAGUE);
     if (visible(exam)) {
-      enterFeature('exam');
+      if (view !== 'exam') enterFeature('exam');
       replaceExamLogoutButtons();
     } else if (visible(league)) {
       if (view !== 'league') enterFeature('league');
@@ -144,7 +144,7 @@
       if (visible(portal)) {
         view = 'portal';
         const back = document.getElementById('andalus-global-back');
-        if (back) back.innerHTML = '← <span>رجوع</span>';
+        if (back) if (back.innerHTML !== '← <span>رجوع</span>') back.innerHTML = '← <span>رجوع</span>';
       }
     }
   }
