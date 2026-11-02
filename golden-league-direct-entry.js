@@ -1,7 +1,5 @@
-/* Andalus student section navigation fix.
-   دوري الأندلس -> Leaderboard directly.
-   الامتحانات -> رجوع إلى بوابة الطالب (never logout from this screen).
-*/
+/* Andalus student navigation: open the Golden League leaderboard directly
+   and return from the exam list to the student portal without signing out. */
 (function () {
   'use strict';
 
@@ -13,24 +11,52 @@
 
   function returnToStudentPortal() {
     try {
-      if (typeof window.renderStudentPortalMenu === 'function') return window.renderStudentPortalMenu();
-      if (typeof window.showStudentPortalLoginStep === 'function') return window.showStudentPortalLoginStep();
-    } catch (e) { console.warn('Portal return failed:', e); }
+      if (typeof window.renderStudentPortalMenu === 'function') {
+        window.renderStudentPortalMenu();
+        return true;
+      }
+    } catch (e) { console.warn('Student portal menu failed:', e); }
+    try {
+      if (typeof window.showStudentPortalLoginStep === 'function') {
+        window.showStudentPortalLoginStep();
+        return true;
+      }
+    } catch (e) { console.warn('Student portal fallback failed:', e); }
+    return false;
   }
 
+  // The tab function is defined before the league UI is rendered. Wait for
+  // the actual .agl-shell; checking only for the function caused the old fix
+  // to stop too early and leave the student on the landing/home tab.
   function forceBoard() {
     let tries = 0;
     const timer = setInterval(function () {
-      try {
-        if (typeof window.showGoldenLeagueTab === 'function') {
+      const exam = document.getElementById('exam-portal-screen');
+      const root = document.querySelector('#weekly-quiz-content .agl-shell');
+      if (root && typeof window.showGoldenLeagueTab === 'function') {
+        try {
           window.showGoldenLeagueTab('board');
           clearInterval(timer);
           return;
-        }
-      } catch (e) { console.warn('Golden League board navigation failed:', e); }
-      if (++tries >= 40) clearInterval(timer);
+        } catch (e) { console.warn('Golden League board navigation failed:', e); }
+      }
+      if (exam && visible(exam)) clearInterval(timer);
+      if (++tries >= 150) clearInterval(timer);
     }, 100);
-    try { if (typeof window.showGoldenLeagueTab === 'function') window.showGoldenLeagueTab('board'); } catch (_) {}
+
+    // Also catch the asynchronous render that creates the league shell.
+    if (document.body && !window.__andalusLeagueBoardObserver) {
+      window.__andalusLeagueBoardObserver = new MutationObserver(function () {
+        const root = document.querySelector('#weekly-quiz-content .agl-shell');
+        if (!root || typeof window.showGoldenLeagueTab !== 'function') return;
+        try {
+          window.showGoldenLeagueTab('board');
+          window.__andalusLeagueBoardObserver.disconnect();
+          window.__andalusLeagueBoardObserver = null;
+        } catch (e) { console.warn('Golden League board observer:', e); }
+      });
+      window.__andalusLeagueBoardObserver.observe(document.body, { childList: true, subtree: true });
+    }
   }
 
   function installLeagueEntry() {
@@ -38,10 +64,26 @@
     if (typeof window.goToPortalWeeklyQuiz !== 'function') return false;
     const original = window.goToPortalWeeklyQuiz;
     window.goToPortalWeeklyQuiz = function () {
-      try { original.apply(this, arguments); }
-      finally { forceBoard(); }
+      const result = original.apply(this, arguments);
+      forceBoard();
+      return result;
     };
     window.__andalusDirectGoldenLeagueEntryInstalled = true;
+    return true;
+  }
+
+  function installExamLogoutOverride() {
+    if (window.__andalusExamLogoutOverrideInstalled) return true;
+    if (typeof window.examStudentLogout !== 'function') return false;
+    const original = window.examStudentLogout;
+    window.examStudentLogout = function () {
+      if (visible(document.getElementById('exam-portal-screen'))) {
+        returnToStudentPortal();
+        return;
+      }
+      return original.apply(this, arguments);
+    };
+    window.__andalusExamLogoutOverrideInstalled = true;
     return true;
   }
 
@@ -49,13 +91,13 @@
     const exam = document.getElementById('exam-portal-screen');
     if (!visible(exam)) return;
     exam.querySelectorAll('button,a,[role="button"]').forEach(function (el) {
-      const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
-      if (!/تسجيل\s+الخروج/.test(text) || el.dataset.andalusPortalBack === '1') return;
+      const label = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+      if (!/تسجيل\\s+الخروج/.test(label) || el.dataset.andalusPortalBack === '1') return;
       const b = document.createElement('button');
       b.type = 'button';
       b.className = el.className || 'btn';
       b.style.cssText = el.style.cssText || '';
-      b.innerHTML = '← الرجوع إلى البوابة';
+      b.textContent = '← الرجوع إلى البوابة';
       b.setAttribute('aria-label', 'الرجوع إلى بوابة الطالب');
       b.dataset.andalusPortalBack = '1';
       b.addEventListener('click', function (e) {
@@ -67,33 +109,21 @@
     });
   }
 
-  function installExamBack() {
-    if (window.__andalusExamBackOverrideInstalled) return true;
-    if (typeof window.andalusGoBack !== 'function') return false;
-    const original = window.andalusGoBack;
-    window.andalusGoBack = function () {
-      if (visible(document.getElementById('exam-portal-screen'))) return returnToStudentPortal();
-      return original.apply(this, arguments);
-    };
-    window.__andalusExamBackOverrideInstalled = true;
-    return true;
-  }
-
-  function boot() {
+  function install() {
     installLeagueEntry();
-    installExamBack();
+    installExamLogoutOverride();
     replaceExamLogout();
   }
 
-  boot();
+  install();
   let tries = 0;
   const timer = setInterval(function () {
-    boot();
-    if (++tries >= 100) clearInterval(timer);
+    install();
+    if (++tries >= 150) clearInterval(timer);
   }, 200);
 
   if (document.body) {
-    new MutationObserver(boot).observe(document.body, {
+    new MutationObserver(install).observe(document.body, {
       childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class']
     });
   }
