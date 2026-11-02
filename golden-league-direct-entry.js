@@ -59,6 +59,21 @@
     }
   }
 
+  function installBoardRenderHook() {
+    if (window.__andalusBoardRenderHookInstalled || typeof window.renderWeeklyQuizHome !== 'function') return false;
+    const original = window.renderWeeklyQuizHome;
+    window.renderWeeklyQuizHome = function () {
+      const result = original.apply(this, arguments);
+      if (window.__andalusForceBoardOnNextRender) {
+        window.__andalusForceBoardOnNextRender = false;
+        if (typeof window.showGoldenLeagueTab === 'function') window.showGoldenLeagueTab('board');
+      }
+      return result;
+    };
+    window.__andalusBoardRenderHookInstalled = true;
+    return true;
+  }
+
   function installLeagueEntry() {
     if (window.__andalusDirectGoldenLeagueEntryInstalled) return true;
     if (typeof window.goToPortalWeeklyQuiz !== 'function') return false;
