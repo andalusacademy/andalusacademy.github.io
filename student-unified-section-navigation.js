@@ -78,9 +78,11 @@
     tile.style.display=loggedIn ? '' : 'none';
     const label=tile.querySelector('.tile-label');
     const hint=tile.querySelector('.tile-hint');
-    if(label) label.textContent='مدرسك الخصوصي';
-    if(hint) hint.textContent='ذاكر مع مدرسك الخصوصي';
-    tile.setAttribute('aria-label','مدرسك الخصوصي');
+    if(label) label.textContent='المساعد الذكي';
+    if(hint) hint.textContent='ذاكر معايا بصوتك وبالعامية المصرية';
+    const trial=tile.querySelector('.sai-tile-trial');
+    if(trial) trial.textContent='تجربة 24 ساعة';
+    tile.setAttribute('aria-label','المساعد الذكي');
   }
   function watchTutorTile(){
     syncTutorTile();
@@ -148,7 +150,7 @@
   function loadTutor(){
     if(document.getElementById('student-ai-assistant-script')) return;
     const s=document.createElement('script');
-    s.id='student-ai-assistant-script'; s.src='./student-ai-assistant.js?v=20261102-4'; s.async=false;
+    s.id='student-ai-assistant-script'; s.src='./student-ai-assistant.js?v=20261102-5'; s.async=false;
     (document.head||document.documentElement).appendChild(s);
     s.addEventListener('load',watchTutorTile,{once:true});
   }
