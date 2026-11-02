@@ -3,7 +3,7 @@
   try {
     function loadStudentAI(){
       if(document.querySelector('script[data-andalus-student-ai-assistant]'))return;
-      const s=document.createElement('script');s.src='./student-ai-assistant.js?v=20261106';s.dataset.andalusStudentAiAssistant='1';s.defer=true;document.head.appendChild(s);
+      const s=document.createElement('script');s.src='./student-ai-assistant.js?v=20261107';s.dataset.andalusStudentAiAssistant='1';s.defer=true;document.head.appendChild(s);
     }
     function loadStudentAIMenuFix(){
       if(document.querySelector('script[data-andalus-student-ai-menu-fix]'))return;
