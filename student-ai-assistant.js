@@ -45,22 +45,51 @@ function speak(t){
  if(!S.speechEnabled||!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance)return;
  const clean=speechText(t),parts=speechSegments(clean);if(!parts.length)return;
  stopSpeech();
- const synth=window.speechSynthesis,voices=synth.getVoices()||[];
- let index=0;
+ const synth=window.speechSynthesis;
+ let index=0,activeUtterance=null;
+ const getVoice=(lang)=>{
+  const voices=synth.getVoices()||[];
+  if(lang==='en-US')return voices.find(v=>/^en[-_]US/i.test(v.lang))||voices.find(v=>/^en/i.test(v.lang))||null;
+  return voices.find(v=>/^ar[-_]EG/i.test(v.lang))||voices.find(v=>/^ar/i.test(v.lang))||null;
+ };
  const next=()=>{
   if(!S.speechEnabled||index>=parts.length){setRobot('');return}
-  const part=parts[index++],u=new SpeechSynthesisUtterance(part.text);
-  u.lang=part.lang;u.rate=.94;u.pitch=1.02;
-  const voice=part.lang==='en-US'
-   ?(voices.find(v=>/^en[-_]US/i.test(v.lang))||voices.find(v=>/^en/i.test(v.lang)))
-   :(voices.find(v=>/^ar[-_]EG/i.test(v.lang))||voices.find(v=>/^ar/i.test(v.lang)));
+  const part=parts[index++],isArabic=part.lang==='ar-EG'||part.lang==='ar';
+  const voice=getVoice(isArabic?'ar':'en-US');
+  const u=new SpeechSynthesisUtterance(part.text);
+  u.lang=isArabic?(voice?.lang||'ar'):(voice?.lang||'en-US');
+  u.rate=.92;u.pitch=1.0;
   if(voice)u.voice=voice;
+  let retried=false;
   u.onstart=()=>setRobot('speaking');
   u.onend=next;
-  u.onerror=()=>{if(index<parts.length)next();else setRobot('')};
-  synth.speak(u);
+  u.onerror=(event)=>{
+   // Some browsers reject the regional Arabic locale or a stale voice object.
+   // Retry once with the generic language tag and let the device choose its Arabic engine.
+   if(isArabic&&!retried&&S.speechEnabled){
+    retried=true;
+    const retry=new SpeechSynthesisUtterance(part.text);
+    retry.lang='ar';retry.rate=.92;retry.pitch=1.0;
+    retry.onstart=()=>setRobot('speaking');
+    retry.onend=next;
+    retry.onerror=()=>{setRobot('');status('المتصفح لا يوفر صوتًا عربيًا حاليًا. فعّل/نزّل صوت اللغة العربية في إعدادات تحويل النص إلى كلام بالجهاز، ثم جرّب مرة أخرى.');next()};
+    activeUtterance=retry;synth.speak(retry);
+    return;
+   }
+   next();
+  };
+  activeUtterance=u;synth.speak(u);
  };
- setRobot('speaking');next();
+ // Voice lists are populated asynchronously in some Chromium browsers.
+ // Refresh the list at each segment rather than relying on the first empty result.
+ const begin=()=>{if(S.speechEnabled)next()};
+ const voices=synth.getVoices();
+ if(!voices.length){
+  let started=false;
+  const startOnce=()=>{if(started)return;started=true;synth.removeEventListener?.('voiceschanged',startOnce);begin()};
+  synth.addEventListener?.('voiceschanged',startOnce);
+  setTimeout(startOnce,900);
+ }else begin();
 }
 window.toggleStudentAiSpeech=function(){S.speechEnabled=!S.speechEnabled;if(!S.speechEnabled)stopSpeech();else if(S.lastAnswer)speak(S.lastAnswer);const b=$('sai-speech-toggle');if(b){b.textContent=S.speechEnabled?'🔊 إيقاف الصوت':'🔈 تشغيل الصوت';b.setAttribute('aria-pressed',String(S.speechEnabled))}};
 function shell(){css();const b=$('student-portal-content');if(!b)return;b.innerHTML='<div class="sai-shell"><div class="sai-top"><button class="sai-btn sai-soft" onclick="closeStudentAiAssistant()">← رجوع لبوابة الطالب</button><strong>🤖 مدرسك الخصوصي</strong></div><div id="sai-root"></div></div>'}
