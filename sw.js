@@ -1,5 +1,5 @@
 /* Andalus Academy Service Worker — Student Portal AI tutor materials fix v50 */
-const CACHE='andalus-v51-owner-avatar-tutor';
+const CACHE='andalus-v52-actual-student-counts';
 const ASSETS=['./student-ai-assistant.js?v=20261103-4','./assets/andalus-owner-avatar.svg?v=1','./manifest.json','./student-portal-bootstrap.js?v=3','./student-passkey.js?v=2','./study-summary-receipt-admin.js?v=2','./student-portal-admin-gateway-v5.js?v=4','./student-ai-subscriptions-admin-v1.js?v=2'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));await self.clients.claim()})())});
