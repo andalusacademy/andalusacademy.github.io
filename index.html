@@ -4477,7 +4477,7 @@ let pulseStudents = [], pulseGrades = [], pulseAttendance = [], pulseSubjects = 
 
 async function loadPulseData() {
   const [sRes, gRes, aRes, subRes] = await Promise.all([
-    sb.from('students').select('id,name,branch,program_id,date'),
+    sb.from('students').select('id,name,branch,program_id,date,student_status,deleted_at,dismissed_at'),
     sb.from('grades').select('*'),
     sb.from('attendance').select('status,date'),
     sb.from('subjects').select('id,max_grade_1,max_grade_2')
@@ -5641,7 +5641,8 @@ function updateDashboard() {
 function renderDashboardCharts() {
   if (typeof Chart === 'undefined') return;
   const bf = dashboardBranch;
-  const studentsInScope = bf ? allStudents.filter(s => s.branch === bf) : allStudents;
+  const countedStudents = getCountedStudents();
+  const studentsInScope = bf ? countedStudents.filter(s => normalizeStudentsBranch(s.branch) === normalizeStudentsBranch(bf)) : countedStudents;
   // Branches chart
   const kafr = bf ? (normalizeStudentsBranch(bf) === 'كفر الدوار' ? studentsInScope.length : 0) : getCountedStudents().filter(s => normalizeStudentsBranch(s.branch) === 'كفر الدوار').length;
   const vic = bf ? (normalizeStudentsBranch(bf) === 'فرع اسكندرية' ? studentsInScope.length : 0) : getCountedStudents().filter(s => normalizeStudentsBranch(s.branch) === 'فرع اسكندرية').length;
