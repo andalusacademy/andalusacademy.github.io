@@ -53,19 +53,35 @@
       </div>`;
   }
 
-  function closeGateway() { document.getElementById(MODAL_ID)?.remove(); }
-  function openGateway() {
-    let box = document.getElementById(MODAL_ID);
-    if (!box) {
-      box = document.createElement('div'); box.id = MODAL_ID;
-      box.style.cssText = 'position:fixed;inset:5%;z-index:12000;background:#fff;overflow:auto;padding:0;box-shadow:0 30px 100px #0005;border-radius:20px;border:1px solid var(--border)';
-      document.body.appendChild(box);
-    }
-    box.innerHTML = gatewayMarkup();
-    document.getElementById('andulus-student-gateway-close').onclick = closeGateway;
-    document.getElementById('gateway-summaries').onclick = openExistingSummary;
-    document.getElementById('gateway-ai').onclick = openAiDashboard;
+  const INTERNAL_ID = 'andalus-student-gateway-page';
+  function internalHost() {
+    let host = document.getElementById(INTERNAL_ID);
+    if (host) return host;
+    const grid = document.getElementById('nav-cards-grid');
+    if (!grid || !grid.parentElement) return null;
+    host = document.createElement('section');
+    host.id = INTERNAL_ID;
+    host.style.cssText = 'display:none;width:100%;max-width:100%;margin:0;padding:0;direction:rtl;box-sizing:border-box;';
+    grid.insertAdjacentElement('afterend', host);
+    return host;
   }
+  function closeGateway() {
+    const host = internalHost(), grid = document.getElementById('nav-cards-grid');
+    if (host) { host.style.display='none'; host.innerHTML=''; }
+    if (grid) grid.style.display='';
+  }
+  function showGatewayHome() {
+    const host=internalHost(), grid=document.getElementById('nav-cards-grid');
+    if(!host) { alert('تعذر فتح بوابة الطلاب داخل مساحة النظام.'); return; }
+    if(grid) grid.style.display='none';
+    host.style.display='block';
+    host.innerHTML='<div id="'+MODAL_ID+'" class="card" style="width:100%;max-width:100%;margin:0;position:relative;inset:auto;overflow:visible;border-radius:16px;box-shadow:none">'+gatewayMarkup()+'</div>';
+    host.querySelector('#andulus-student-gateway-close').onclick=closeGateway;
+    host.querySelector('#gateway-summaries').onclick=openExistingSummary;
+    host.querySelector('#gateway-ai').onclick=openAiDashboard;
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function openGateway() { showGatewayHome(); }
 
   function installNav() {
     const card = document.getElementById('andalus-student-gateway-card') ||
@@ -143,7 +159,7 @@
   }
 
   async function bindAiActions(data) {
-    document.getElementById('ai-admin-close').onclick=()=>document.getElementById(AI_MODAL_ID)?.remove();
+    document.getElementById('ai-admin-close').onclick=showGatewayHome;
     document.getElementById('ai-admin-refresh').onclick=()=>loadAndRenderAi();
     document.querySelectorAll('[data-ai-approve]').forEach(b=>b.onclick=async()=>{
       b.disabled=true; const r=await sbc().rpc('student_ai_approve_order',{p_order_id:b.dataset.aiApprove});
@@ -168,12 +184,15 @@
   async function loadAndRenderAi(){
     const box=document.getElementById(AI_MODAL_ID); if(!box)return;
     box.innerHTML='<div style="padding:50px;text-align:center">جاري تحميل بيانات المدرس الخصوصي...</div>';
-    try{renderAiDashboard(await loadAiData());}catch(e){box.innerHTML=`<div class="card-header"><h2>👨‍🏫 إدارة المدرس الخصوصي AI</h2><button class="btn btn-outline" id="ai-admin-close">إغلاق</button></div><div style="padding:30px;color:#991b1b">تعذر تحميل البيانات: ${esc(e?.message||e)}</div>`;document.getElementById('ai-admin-close').onclick=()=>box.remove();}
+    try{renderAiDashboard(await loadAiData());}catch(e){box.innerHTML=`<div class="card-header"><h2>👨‍🏫 إدارة المدرس الخصوصي AI</h2><button class="btn btn-outline" id="ai-admin-close">← الرجوع للبوابة</button></div><div style="padding:30px;color:#991b1b">تعذر تحميل البيانات: ${esc(e?.message||e)}</div>`;document.getElementById('ai-admin-close').onclick=showGatewayHome;}
   }
   function openAiDashboard(){
-    closeGateway();
-    let box=document.getElementById(AI_MODAL_ID);
-    if(!box){box=document.createElement('div');box.id=AI_MODAL_ID;box.style.cssText='position:fixed;inset:3%;z-index:12500;background:#fff;overflow:auto;padding:0;box-shadow:0 30px 100px #0006;border-radius:20px;border:1px solid var(--border)';document.body.appendChild(box);}
+    const host=internalHost(), grid=document.getElementById('nav-cards-grid');
+    if(!host) { alert('تعذر فتح المدرس الخصوصي داخل مساحة النظام.'); return; }
+    if(grid) grid.style.display='none';
+    host.style.display='block';
+    host.innerHTML='<div id="'+AI_MODAL_ID+'" class="card" style="width:100%;max-width:100%;margin:0;position:relative;inset:auto;overflow:visible;border-radius:16px;box-shadow:none"><div style="padding:18px;text-align:center">جاري فتح المدرس الخصوصي...</div></div>';
+    window.scrollTo({top:0,behavior:'smooth'});
     loadAndRenderAi();
   }
   function start(){
