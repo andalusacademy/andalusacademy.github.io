@@ -5629,9 +5629,11 @@ function renderDailySummary() {
   allStudents.filter(s => s.program_id).forEach(s => {
     const schedule = getPaymentSchedule(s);
     const payments = allPayments[s.id] || {};
+    const summary = getStudentPaymentSummary(s, schedule, payments);
     schedule.forEach(item => {
+      const info = summary.installments[item.type];
+      if (!info || info.remaining <= 0) return;
       const rec = payments[item.type] || {};
-      if (rec.paid) return;
       const dueDate = new Date(rec.due_date || item.due);
       if (!isNaN(dueDate.getTime()) && dueDate >= today && dueDate <= horizon) upcomingCount++;
     });
@@ -9763,25 +9765,29 @@ function getUpcomingReminders() {
   allStudents.filter(s => s.program_id).forEach(s => {
     const payments = allPayments[s.id] || {};
     const schedule = getPaymentSchedule(s);
+    const summary = getStudentPaymentSummary(s, schedule, payments);
     const scheduledTypes = new Set(schedule.map(i => i.type));
     const fixedTypes = new Set(FIXED_EXTRA_ITEMS.map(i => i.type));
-    const customExpenses = Object.values(payments)
-      .filter(p => p.payment_type && !scheduledTypes.has(p.payment_type) && !fixedTypes.has(p.payment_type)
-        && p.payment_type !== '_notes' && p.payment_type !== 'رسوم_كاملة' && !p.is_discount);
+    const customExpenses = Object.values(payments).filter(p =>
+      p.payment_type && !scheduledTypes.has(p.payment_type) && !fixedTypes.has(p.payment_type)
+      && p.payment_type !== '_notes' && p.payment_type !== 'رسوم_كاملة' && !p.is_discount
+    );
     const allDueItems = [
       ...schedule.map(item => ({ ...item, isCustom: false })),
       ...customExpenses.map(rec => ({ type: rec.payment_type, label: rec.label || rec.payment_type, amount: rec.amount || 0, due: rec.due_date, isCustom: true }))
     ];
     allDueItems.forEach(item => {
       const rec = payments[item.type] || {};
-      if (rec.paid) return;
+      const installment = item.isCustom ? null : summary.installments[item.type];
+      if (item.isCustom ? rec.paid : (!installment || installment.remaining <= 0)) return;
       const due = rec.due_date || item.due;
       if (!due) return;
       const dueDate = new Date(due); dueDate.setHours(0, 0, 0, 0);
       const daysLeft = Math.round((dueDate - today) / 86400000);
       if (daysLeft < 0 || daysLeft > REMINDER_WINDOW_DAYS) return;
       if (rec.last_reminder_sent === todayStr) return;
-      results.push({ student: s, item, rec, due, daysLeft });
+      const amount = item.isCustom ? Number(rec.amount || item.amount) : installment.remaining;
+      results.push({ student: s, item, rec, due, daysLeft, amount });
     });
   });
   return results.sort((a, b) => a.daysLeft - b.daysLeft);
@@ -9800,7 +9806,7 @@ function renderPaymentReminders() {
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;flex-wrap:wrap;">
       <div>
         <strong>${escapeHtml(r.student.name)}</strong>
-        <span style="font-size:12px;color:var(--muted);">— ${escapeHtml(r.item.label)} (${Number(r.rec.amount ?? r.item.amount).toLocaleString('ar-EG')} ج.م) — ${dayLabel}</span>
+        <span style="font-size:12px;color:var(--muted);">— ${escapeHtml(r.item.label)} (${Number(r.amount ?? r.item.amount).toLocaleString('ar-EG')} ج.م) — ${dayLabel}</span>
       </div>
       ${waPhone
         ? `<button class="btn btn-sm" style="background:#25d366;color:#fff;" onclick="sendPaymentReminder('${escapeHtml(r.student.id)}','${escapeHtml(r.item.type)}')">📱 إرسال تذكير</button>`
@@ -9813,18 +9819,20 @@ async function sendPaymentReminder(studentId, paymentType) {
   const s = allStudents.find(x => x.id === studentId);
   if (!s) return;
   const schedule = getPaymentSchedule(s);
-  const rec = (allPayments[studentId] || {})[paymentType] || {};
+  const payments = allPayments[studentId] || {};
+  const rec = payments[paymentType] || {};
   const item = schedule.find(i => i.type === paymentType) || (rec.payment_type && rec.payment_type !== '_notes'
     ? { type: paymentType, label: rec.label || paymentType, amount: rec.amount || 0, due: rec.due_date }
     : null);
   const waPhone = s.guardian_phone || s.phone;
   if (!waPhone || !item) return;
+  const summary = getStudentPaymentSummary(s, schedule, payments);
+  const installment = summary.installments[paymentType];
   const due = rec.due_date || item.due;
   const dueLabel = due ? new Date(due).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) : '';
-  const amount = Number(rec.amount ?? item.amount).toLocaleString('ar-EG');
+  const amount = Number(installment ? installment.remaining : (rec.amount ?? item.amount)).toLocaleString('ar-EG');
   const msg = `السيد ولي أمر المتدرب/ة ${s.name}\nنحيطكم علمًا بأن قسط "${item.label}" بقيمة ${amount} جنيه مستحق بتاريخ ${dueLabel}.\nياريت تتابعوا السداد فى الموعد لتفادي أي غرامة تأخير.\nشكرًا لتعاونكم.\n${SYSTEM_NAME}`;
   window.open(waLink(waPhone, msg), '_blank', 'noopener');
-  // ✅ سجّل إن التذكير اتبعت النهاردة عشان منكررش نفس التذكير تانى
   const todayStr = toLocalDateStr(new Date());
   await upsertOnlineOrQueue('payments', { ...rec, student_id: studentId, payment_type: paymentType, last_reminder_sent: todayStr }, 'student_id,payment_type');
   if (!allPayments[studentId]) allPayments[studentId] = {};
@@ -9868,7 +9876,7 @@ function renderPayments() {
     return `<tr style="cursor:pointer" onclick="openProfileAndFinance('${escapeHtml(s.id)}')">
       <td><div style="display:flex;align-items:center;gap:8px;">${photo}<strong>${escapeHtml(s.name)}</strong></div></td>
       <td>${escapeHtml(s.program)}</td>
-      <td>${escapeHtml(s.system_name || '—')}</td>
+      <td>${escapeHtml(getStudentPaymentSystem(s) || '—')}</td>
       <td>${escapeHtml(s.branch)}</td>
       <td>${totalDue} ج</td>
       <td style="color:#22c55e;font-weight:700">${totalPaid} ج</td>
@@ -9964,7 +9972,7 @@ function renderStudentFinance(s, container) {
     const payDateFormatted = new Date(payDateForMsg).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const waMsg = waPhone ? waLink(waPhone, `السلام عليكم ورحمة الله\nنُحيطكم علمًا بأنه تم استلام دفعة "${label}" من المتدرب/ة ${s.name} بتاريخ اليوم ${payDateFormatted}\n${SYSTEM_NAME}`) : '';
 
-    const actionCell = applicable === false ? '—' : rec.paid
+    const actionCell = applicable === false ? '—' : rec._legacyPayment ? (rec.paid ? '✓ سداد من إيصال سابق' : 'سداد جزئي من إيصال سابق') : rec.paid
       ? `<div style="display:flex;flex-direction:column;gap:4px">
           <span class="badge badge-success" style="font-size:11px">✓ تم الدفع ${rec.paid_date ? '(' + escapeHtml(rec.paid_date) + ')' : ''}</span>
           <div style="display:flex;gap:4px;flex-wrap:wrap">
