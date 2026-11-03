@@ -150,7 +150,7 @@
   function loadTutor(){
     if(document.getElementById('student-ai-assistant-script')) return;
     const s=document.createElement('script');
-    s.id='student-ai-assistant-script'; s.src='./student-ai-assistant.js?v=20261102-5'; s.async=false;
+    s.id='student-ai-assistant-script'; s.src='./student-ai-assistant.js?v=20261103-1'; s.async=false;
     (document.head||document.documentElement).appendChild(s);
     s.addEventListener('load',watchTutorTile,{once:true});
   }
