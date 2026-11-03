@@ -4482,7 +4482,7 @@ async function loadPulseData() {
     sb.from('attendance').select('status,date'),
     sb.from('subjects').select('id,max_grade_1,max_grade_2')
   ]);
-  pulseStudents = sRes.data || [];
+  pulseStudents = (sRes.data || []).filter(isCountedStudent);
   pulseGrades = gRes.data || [];
   pulseAttendance = aRes.data || [];
   pulseSubjects = subRes.data || [];
@@ -5468,7 +5468,8 @@ function renderCenterMood() {
   const bar = document.getElementById('center-mood-bar');
   if (!bar) return;
   const bf = dashboardBranch;
-  const studentsInScope = bf ? allStudents.filter(s => s.branch === bf) : allStudents;
+  const countedStudents = getCountedStudents();
+  const studentsInScope = bf ? countedStudents.filter(s => normalizeStudentsBranch(s.branch) === normalizeStudentsBranch(bf)) : countedStudents;
   const activeStudents = studentsInScope.filter(s => s.program_id);
 
   if (!activeStudents.length) {
@@ -5642,8 +5643,8 @@ function renderDashboardCharts() {
   const bf = dashboardBranch;
   const studentsInScope = bf ? allStudents.filter(s => s.branch === bf) : allStudents;
   // Branches chart
-  const kafr = bf ? (bf === 'كفر الدوار' ? studentsInScope.length : 0) : allStudents.filter(s => s.branch === 'كفر الدوار').length;
-  const vic = bf ? (bf === 'فرع اسكندرية' ? studentsInScope.length : 0) : allStudents.filter(s => s.branch === 'فرع اسكندرية').length;
+  const kafr = bf ? (normalizeStudentsBranch(bf) === 'كفر الدوار' ? studentsInScope.length : 0) : getCountedStudents().filter(s => normalizeStudentsBranch(s.branch) === 'كفر الدوار').length;
+  const vic = bf ? (normalizeStudentsBranch(bf) === 'فرع اسكندرية' ? studentsInScope.length : 0) : getCountedStudents().filter(s => normalizeStudentsBranch(s.branch) === 'فرع اسكندرية').length;
   const ctx1 = document.getElementById('chart-branches');
   if (ctx1) {
     if (dashboardCharts.branches) dashboardCharts.branches.destroy();
@@ -6077,6 +6078,17 @@ function normalizeStudentsBranch(value) {
   if (v.includes('اسكند') || v.includes('اسكندر') || v.includes('alex')) return 'فرع اسكندرية';
   return v;
 }
+function isCountedStudent(s) {
+  const status = String(s?.student_status || 'active').trim().toLowerCase();
+  const excludedStatuses = new Set(['dismissed','final_dismissed','expelled','withdrawn','deleted','inactive','suspended']);
+  if (excludedStatuses.has(status) || s?.deleted_at || s?.dismissed_at) return false;
+  const id = String(s?.id ?? s?.enrollment_number ?? s?.registration_number ?? '').trim();
+  const name = String(s?.name || '').trim();
+  if (!id || !name || ['0','1','2'].includes(id) || ['0','امنيه','يمنى'].includes(name)) return false;
+  return true;
+}
+function getCountedStudents() { return allStudents.filter(isCountedStudent); }
+
 window.studentsBranch = '';
 window.studentsCategory = 'all';
 
@@ -6086,7 +6098,7 @@ function getFilteredStudents() {
   const prog = document.getElementById('filter-program')?.value || '';
   const category = window.studentsCategory || 'all';
   return allStudents.filter(s => {
-    if (['dismissed','final_dismissed'].includes(String(s.student_status || 'active'))) return false;
+    if (!isCountedStudent(s)) return false;
     const mq = !q || String(s.name || '').toLowerCase().includes(q) || String(s.id || '').toLowerCase().includes(q);
     const mb = !branch || normalizeStudentsBranch(s.branch) === normalizeStudentsBranch(branch);
     const mp = !prog || (s.program_id + '|' + (s.system_name || '')) === prog || (s.program_id + '|') === prog;
@@ -6209,7 +6221,7 @@ function showAllStudents() {
 }
 
 function updateStudentsBranchCounts() {
-  const count = branch => allStudents.filter(s => normalizeStudentsBranch(s.branch) === branch).length;
+  const count = branch => getCountedStudents().filter(s => normalizeStudentsBranch(s.branch) === branch).length;
   const a = document.getElementById('stu-home-count-kafr');
   const b = document.getElementById('stu-home-count-vic');
   if (a) a.textContent = 'عدد الطلاب: ' + count('كفر الدوار');
