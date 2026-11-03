@@ -903,10 +903,11 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
               <div class="stat-card"><div class="stat-label">مسدد بالكامل</div><div class="stat-value" id="dash-finance-full">0</div></div>
               <div class="stat-card"><div class="stat-label">مسدد جزئيًا</div><div class="stat-value" id="dash-finance-partial">0</div></div>
               <div class="stat-card"><div class="stat-label">لم يسدد</div><div class="stat-value" id="dash-finance-unpaid">0</div></div>
+              <div class="stat-card"><div class="stat-label">أقساط مستحقة الآن</div><div class="stat-value" id="dash-finance-due-now">0</div></div>
               <div class="stat-card"><div class="stat-label">متأخر بعد فترة السماح</div><div class="stat-value" id="dash-finance-late" style="color:#dc2626">0</div></div>
               <div class="stat-card"><div class="stat-label">لم يحن موعده</div><div class="stat-value" id="dash-finance-notdue">0</div></div>
             </div>
-            <div id="dash-finance-details" style="padding:0 14px 14px;"></div>
+            <div style="overflow:auto;max-height:480px;padding:0 14px 14px;"><table style="width:100%;min-width:900px;border-collapse:collapse;"><thead><tr><th>الطالب</th><th>رقم القيد</th><th>المجموعة / البرنامج</th><th>الفرع</th><th>المطلوب</th><th>المدفوع</th><th>المتبقي</th><th>الاستحقاق القادم</th><th>آخر سداد</th><th>الحالة</th></tr></thead><tbody id="dash-finance-table"></tbody></table></div>
           </div>
           <div class="card no-print" id="dashboard-distribution" style="margin-bottom:18px;">
             <div class="card-header"><h3>👥 توزيع الطلاب حسب الفرع والبرنامج والدفعة</h3></div>
@@ -5410,11 +5411,18 @@ function renderRiskSection() {
 }
 
 function dashboardScopedStudents(){const students=getCountedStudents().filter(s=>s.program_id);return dashboardBranch?students.filter(s=>normalizeStudentsBranch(s.branch)===normalizeStudentsBranch(dashboardBranch)):students;}
-function dashboardStudentLine(student,detail,color){return '<div onclick="openProfile(' + JSON.stringify(String(student.id)) + ')" style="padding:9px 13px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center;"><div style="min-width:0;"><strong style="font-size:12px;">'+escapeHtml(student.name)+'</strong><div style="font-size:10px;color:var(--muted);">'+escapeHtml(student.id)+' · '+escapeHtml(student.branch||'—')+'</div></div><span style="font-size:11px;font-weight:800;color:'+(color||'#475569')+';text-align:left;white-space:nowrap;">'+escapeHtml(detail||'')+'</span></div>';}
+function dashboardStudentLine(student,detail,color){const safeId=String(student.id).replace(/[^a-zA-Z0-9_-]/g,'');return '<div onclick="openProfile(\''+safeId+'\')" style="padding:9px 13px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center;"><div style="min-width:0;"><strong style="font-size:12px;">'+escapeHtml(student.name)+'</strong><div style="font-size:10px;color:var(--muted);">'+escapeHtml(student.id)+' · '+escapeHtml(student.branch||'—')+'</div></div><span style="font-size:11px;font-weight:800;color:'+(color||'#475569')+';text-align:left;white-space:nowrap;">'+escapeHtml(detail||'')+'</span></div>';}
 function getStudentAcademicRisk(student){
- const rows=(allGradesGlobal||[]).filter(g=>g.student_id===student.id);let secondRound=0,failed=0;
- rows.forEach(g=>{const subject=(allSubjects||[]).find(x=>x.id===g.subject_id);if(!subject)return;const pass1=Number(subject.pass_grade_1??subject.min_pass??25),pass2=Number(subject.pass_grade_2??subject.min_pass??pass1),g1=g.grade_1==null?null:Number(g.grade_1),g2=g.grade_2==null?null:Number(g.grade_2),failedFirst=g1!=null&&g1<pass1;if(failedFirst||g2!=null)secondRound++;if(g2!=null?g2<pass2:failedFirst)failed++;});
- const gradePct=getStudentGradePct(student.id),low=(gradePct!==null&&gradePct<50)||failed>0;return {secondRound,failed,gradePct,low,atRisk:low||secondRound>0};
+ const rows=(allGradesGlobal||[]).filter(g=>g.student_id===student.id);let secondRound=0,failed=0,passed=0;
+ rows.forEach(g=>{
+  const subject=(allSubjects||[]).find(x=>x.id===g.subject_id);if(!subject)return;
+  const pass1=Number(subject.pass_grade_1??subject.min_pass??25),pass2=Number(subject.pass_grade_2??subject.min_pass??pass1);
+  const g1=g.grade_1==null?null:Number(g.grade_1),g2=g.grade_2==null?null:Number(g.grade_2),failedFirst=g1!=null&&g1<pass1;
+  if(failedFirst||g2!=null)secondRound++;
+  if(g2!=null?g2<pass2:failedFirst)failed++;else if(g2!=null||(g1!=null&&!failedFirst))passed++;
+ });
+ const gradePct=getStudentGradePct(student.id),low=(gradePct!==null&&gradePct<50)||failed>0,hasGrades=rows.some(g=>g.grade_1!=null||g.grade_2!=null);
+ return {secondRound,failed,passed,gradePct,low,hasGrades,atRisk:low||secondRound>0};
 }
 function renderDashboardRiskPanels(){
  const students=dashboardScopedStudents(),absence=students.map(s=>({student:s,rate:getStudentAbsenceRate(s.id)})).filter(x=>x.rate>=25).sort((a,b)=>b.rate-a.rate);
@@ -5423,23 +5431,34 @@ function renderDashboardRiskPanels(){
  const money=n=>Number(n||0).toLocaleString('ar-EG')+' ج.م';
  document.getElementById('risk-absence-count').textContent=absence.length;
  document.getElementById('risk-absence-total').textContent=absence.length?'طلاب تجاوزوا حد الغياب المسموح (25%).':'لا يوجد طلاب بلغوا حد 25% غياب.';
- document.getElementById('risk-absence-list').innerHTML=absence.slice(0,8).map(x=>dashboardStudentLine(x.student,x.rate+'% غياب','#b91c1c')).join('')||'<div style="padding:12px;color:var(--muted);font-size:12px;">لا توجد حالات تحتاج متابعة.</div>';
+ document.getElementById('risk-absence-list').innerHTML=absence.map(x=>dashboardStudentLine(x.student,x.rate+'% غياب','#b91c1c')).join('')||'<div style="padding:12px;color:var(--muted);font-size:12px;">لا توجد حالات تحتاج متابعة.</div>';
  const overdue=finance.filter(x=>x.pay.status==='red'),overdueTotal=overdue.reduce((sum,x)=>sum+x.pay.overdueAmount+x.pay.lateFeesDue,0);
- document.getElementById('risk-finance-count').textContent=overdue.length;
+ document.getElementById('risk-finance-count').textContent=finance.length;
  document.getElementById('risk-finance-total').textContent='متأخرون فعليًا: '+overdue.length+' · المتأخر المستحق: '+money(overdueTotal)+' · إجمالي المتبقي: '+money(finance.reduce((sum,x)=>sum+x.pay.remaining,0));
- document.getElementById('risk-finance-list').innerHTML=finance.slice(0,8).map(x=>dashboardStudentLine(x.student,(x.pay.status==='red'?'متأخر':x.pay.status==='yellow'?'مستحق':'غير مستحق')+' · '+money(x.pay.remaining),x.pay.status==='red'?'#dc2626':x.pay.status==='yellow'?'#d97706':'#64748b')).join('')||'<div style="padding:12px;color:var(--muted);font-size:12px;">لا توجد أرصدة متبقية.</div>';
+ document.getElementById('risk-finance-list').innerHTML=finance.map(x=>dashboardStudentLine(x.student,(x.pay.status==='red'?'متأخر':x.pay.status==='yellow'?'مستحق':'غير مستحق')+' · '+money(x.pay.remaining),x.pay.status==='red'?'#dc2626':x.pay.status==='yellow'?'#d97706':'#64748b')).join('')||'<div style="padding:12px;color:var(--muted);font-size:12px;">لا توجد أرصدة متبقية.</div>';
  document.getElementById('risk-academic-count').textContent=academic.length;
- document.getElementById('risk-academic-total').textContent='دخلوا الدور الثاني: '+academic.filter(x=>x.risk.secondRound>0).length+' · أكثر من مادة: '+academic.filter(x=>x.risk.secondRound>1).length+' · حالات رسوب: '+academic.filter(x=>x.risk.failed>0).length;
- document.getElementById('risk-academic-list').innerHTML=academic.slice(0,8).map(x=>dashboardStudentLine(x.student,x.risk.failed+' رسوب · '+x.risk.secondRound+' دور ثانٍ'+(x.risk.gradePct===null?'':' · '+x.risk.gradePct+'%'),'#a16207')).join('')||'<div style="padding:12px;color:var(--muted);font-size:12px;">لا توجد حالات ضعف أو دور ثانٍ مسجلة.</div>';
+ const passedStudents=students.map(s=>getStudentAcademicRisk(s)).filter(r=>r.hasGrades&&r.failed===0).length;
+ document.getElementById('risk-academic-total').textContent='دخلوا الدور الثاني: '+academic.filter(x=>x.risk.secondRound>0).length+' · أكثر من مادة: '+academic.filter(x=>x.risk.secondRound>1).length+' · راسبون: '+academic.filter(x=>x.risk.failed>0).length+' · اجتازوا المواد المرصودة: '+passedStudents;
+ document.getElementById('risk-academic-list').innerHTML=academic.map(x=>dashboardStudentLine(x.student,x.risk.failed+' رسوب · '+x.risk.secondRound+' دور ثانٍ'+(x.risk.gradePct===null?'':' · '+x.risk.gradePct+'%'),'#a16207')).join('')||'<div style="padding:12px;color:var(--muted);font-size:12px;">لا توجد حالات ضعف أو دور ثانٍ مسجلة.</div>';
 }
 function renderDashboardFinance(){
  const students=dashboardScopedStudents(),summaries=students.map(student=>({student,pay:getStudentPayStatus(student)}));
  const totalDue=summaries.reduce((sum,x)=>sum+x.pay.totalDue,0),totalPaid=summaries.reduce((sum,x)=>sum+x.pay.totalPaid,0),remaining=summaries.reduce((sum,x)=>sum+x.pay.remaining,0);
- const full=summaries.filter(x=>x.pay.totalDue>0&&x.pay.remaining<=0.009).length,partial=summaries.filter(x=>x.pay.totalPaid>0&&x.pay.remaining>0.009).length,unpaid=summaries.filter(x=>x.pay.totalDue>0&&x.pay.totalPaid<=0.009).length,late=summaries.filter(x=>x.pay.status==='red').length,notDue=summaries.filter(x=>x.pay.remaining>0&&x.pay.status==='gray').length;
- const fmt=n=>Number(n||0).toLocaleString('ar-EG')+' ج.م',values={'dash-finance-due':fmt(totalDue),'dash-finance-paid':fmt(totalPaid),'dash-finance-remaining':fmt(remaining),'dash-finance-full':full,'dash-finance-partial':partial,'dash-finance-unpaid':unpaid,'dash-finance-late':late,'dash-finance-notdue':notDue};
+ const full=summaries.filter(x=>x.pay.totalDue>0&&x.pay.remaining<=0.009).length,partial=summaries.filter(x=>x.pay.totalPaid>0&&x.pay.remaining>0.009).length,unpaid=summaries.filter(x=>x.pay.totalDue>0&&x.pay.totalPaid<=0.009).length;
+ const late=summaries.filter(x=>x.pay.status==='red').length,dueNow=summaries.filter(x=>x.pay.status==='yellow'||x.pay.status==='red').length,notDue=summaries.filter(x=>x.pay.remaining>0&&x.pay.status==='gray').length;
+ const fmt=n=>Number(n||0).toLocaleString('ar-EG')+' ج.م';
+ const values={'dash-finance-due':fmt(totalDue),'dash-finance-paid':fmt(totalPaid),'dash-finance-remaining':fmt(remaining),'dash-finance-full':full,'dash-finance-partial':partial,'dash-finance-unpaid':unpaid,'dash-finance-due-now':dueNow,'dash-finance-late':late,'dash-finance-notdue':notDue};
  Object.keys(values).forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=values[id];});
- const details=summaries.filter(x=>x.pay.remaining>0).sort((a,b)=>b.pay.remaining-a.pay.remaining).slice(0,10),box=document.getElementById('dash-finance-details');
- if(box)box.innerHTML=details.length?'<div style="font-weight:800;margin:8px 0;">أعلى الأرصدة المتبقية</div>'+details.map(x=>dashboardStudentLine(x.student,fmt(x.pay.remaining),x.pay.status==='red'?'#dc2626':x.pay.status==='yellow'?'#d97706':'#64748b')).join(''):'<div style="padding:12px;color:var(--muted);font-size:12px;">لا توجد أرصدة مالية متبقية.</div>';
+ const table=document.getElementById('dash-finance-table');
+ const rows=summaries.slice().sort((a,b)=>b.pay.remaining-a.pay.remaining);
+ if(table)table.innerHTML=rows.length?rows.map(x=>{
+  const schedule=getPaymentSchedule(x.student);
+  const next=schedule.map(item=>({info:x.pay.installments[item.type]})).filter(v=>v.info&&v.info.remaining>0).sort((a,b)=>String(a.info.dueDate).localeCompare(String(b.info.dueDate)))[0];
+  const dates=Object.values(allPayments[x.student.id]||{}).filter(rec=>rec.paid&&rec.paid_date).map(rec=>rec.paid_date).sort(),last=dates[dates.length-1]||'—';
+  const state=x.pay.status==='red'?'متأخر':x.pay.status==='yellow'?'مستحق حتى 5':x.pay.status==='green'?'مسدد بالكامل':(x.pay.totalPaid>0?'مسدد جزئيًا / غير مستحق':'غير مستحق');
+  const color=x.pay.status==='red'?'#dc2626':x.pay.status==='yellow'?'#d97706':x.pay.status==='green'?'#16a34a':'#64748b';
+  return '<tr style="border-bottom:1px solid var(--border);"><td>'+escapeHtml(x.student.name)+'</td><td>'+escapeHtml(x.student.enrollment_number||x.student.id)+'</td><td>'+escapeHtml(x.student.program||'—')+'</td><td>'+escapeHtml(x.student.branch||'—')+'</td><td>'+fmt(x.pay.totalDue)+'</td><td>'+fmt(x.pay.totalPaid)+'</td><td style="font-weight:800;color:#dc2626;">'+fmt(x.pay.remaining)+'</td><td>'+escapeHtml(next?.info?.dueDate||'—')+'</td><td>'+escapeHtml(last)+'</td><td style="font-weight:800;color:'+color+'">'+state+'</td></tr>';
+ }).join(''):'<tr><td colspan="10" style="text-align:center;padding:16px;color:var(--muted);">لا توجد بيانات طلاب.</td></tr>';
 }
 function renderDashboardDistribution(){
  const students=dashboardScopedStudents(),count=list=>Object.entries(list).sort((a,b)=>b[1]-a[1]),branches={},programs={},cohorts={};
