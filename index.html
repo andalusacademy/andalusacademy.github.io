@@ -6169,13 +6169,15 @@ function isCountedStudent(s) {
 // تصنيف موحد للفرع والنظام والدفعة في كل الإحصاءات والقوائم.
 function getStudentCohort(s) {
   const meta = [s?.system_name, s?.program].filter(Boolean).join(' ').toLowerCase();
-  const type = /احتراف|professional/.test(meta) ? 'professional' : (/أساس|اساس|basic/.test(meta) ? 'basic' : null);
+  const normalizedMeta = meta.replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+  const type = /احتراف|professional/.test(normalizedMeta) ? 'professional' : (/اساس|basic/.test(normalizedMeta) ? 'basic' : null);
   const reg = String(s?.id ?? s?.enrollment_number ?? '').replace(/\D/g, '');
   const branch = normalizeStudentsBranch(s?.branch);
-  let batch = null;
-  if (branch === 'كفر الدوار' && reg.startsWith('50')) batch = 8;
-  else if (branch === 'فرع اسكندرية' && reg.startsWith('51')) batch = 8;
-  else if (branch === 'كفر الدوار' && reg.startsWith('52')) batch = 10;
+  const batchMatch = normalizedMeta.match(/دفعة\s*(\d+)/);
+  let batch = batchMatch ? Number(batchMatch[1]) : null;
+  if (!batch && branch === 'كفر الدوار' && reg.startsWith('50')) batch = 8;
+  else if (!batch && branch === 'فرع اسكندرية' && reg.startsWith('51')) batch = 8;
+  else if (!batch && branch === 'كفر الدوار' && reg.startsWith('52')) batch = 10;
   return { branch, batch, type, key: type && batch ? type + batch : null };
 }
 function getCountedStudents() {
@@ -9611,9 +9613,9 @@ function getLegacyInstallmentNumber(payment) {
   let label=String(payment?.label||'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي');
   label=label.replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).toLowerCase();
   if(/مقدم|مقدمه/.test(label))return 0;
-  const numeric=label.match(/قسط\s*([0-9]+)/);if(numeric)return Number(numeric[1]);
+  const numeric=label.match(/قس[طك]\s*([0-9]+)/);if(numeric)return Number(numeric[1]);
   const words=[['اول',1],['الاول',1],['اولي',1],['الاولى',1],['ثاني',2],['الثاني',2],['ثانيه',2],['تاني',2],['ثالث',3],['الثالث',3],['رابع',4],['الرابع',4],['خامس',5],['الخامس',5],['سادس',6],['السادس',6],['سابع',7],['السابع',7],['ثامن',8],['الثامن',8],['تاسع',9],['التاسع',9],['عاشر',10],['العاشر',10],['حادي عشر',11],['الحادي عشر',11]];
-  for(const [word,number] of words)if(label.includes('قسط '+word)||label.includes('قسط'+word))return number;
+  for(const [word,number] of words)if(label.includes('قسط '+word)||label.includes('قسط'+word)||label.includes('قسك '+word)||label.includes('قسك'+word))return number;
   return null;
 }
 function getPaymentSchedule(student) {
