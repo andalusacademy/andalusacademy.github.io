@@ -22,17 +22,45 @@
   function findAiNav() {
     return document.getElementById('student-ai-admin-nav') || [...document.querySelectorAll('.sidebar-nav .nav-item')].find(el => /اشتراكات المساعد الذكي/.test(el.textContent || '')) || null;
   }
-  function openExistingSummary() {
-    closeGateway();
-    if (typeof window.showPage === 'function') { window.showPage('study-summaries'); return; }
-    const nav = findSummaryNav();
-    if (nav) { nav.click(); return; }
-    const page = document.getElementById('page-study-summaries');
-    if (page) {
-      document.querySelectorAll('[id^="page-"]').forEach(p => p.classList.remove('active'));
-      page.classList.add('active');
-      window.scrollTo({top:0,behavior:'smooth'});
+  let summaryOriginalHome = null;
+  function returnFromSummary() {
+    const page=document.getElementById('page-study-summaries');
+    if(page && summaryOriginalHome?.parent){
+      const home=summaryOriginalHome;
+      if(home.next && home.next.parentNode===home.parent) home.parent.insertBefore(page,home.next);
+      else home.parent.appendChild(page);
+      page.classList.remove('andalus-summary-standalone');
+      page.style.display='';
     }
+    summaryOriginalHome=null;
+    showGatewayHome();
+  }
+  function openExistingSummary() {
+    const page=document.getElementById('page-study-summaries');
+    const host=internalHost();
+    if(!page || !host){
+      alert('تعذر العثور على صفحة ملخصات الامتحانات الحالية.');
+      return;
+    }
+    if(!summaryOriginalHome) summaryOriginalHome={parent:page.parentNode,next:page.nextSibling};
+    enterStandalonePage(host);
+    host.innerHTML='';
+    page.classList.add('andalus-summary-standalone');
+    page.style.cssText='display:block!important;position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;min-height:100dvh;margin:0!important;padding:18px!important;box-sizing:border-box;overflow:visible!important;background:#f1f5f9;';
+    host.appendChild(page);
+    if(typeof window.showPage==='function') window.showPage('study-summaries');
+    document.querySelectorAll('[id^="page-"]').forEach(p=>{if(p!==page)p.classList.remove('active');});
+    page.classList.add('active');
+    page.style.display='block';
+    const back=document.createElement('button');
+    back.type='button';
+    back.id='andalus-summary-back-to-dashboard';
+    back.className='btn btn-outline';
+    back.textContent='↩ رجوع لبوابة الطلاب';
+    back.style.cssText='display:block;position:sticky;top:8px;z-index:1000;margin:0 0 14px auto;padding:10px 18px;background:#fff;border:1px solid #cbd5e1;border-radius:10px;font-weight:700;';
+    back.addEventListener('click',returnFromSummary);
+    page.insertBefore(back,page.firstChild);
+    window.scrollTo({top:0,behavior:'instant'});
   }
 
   function gatewayMarkup() {
