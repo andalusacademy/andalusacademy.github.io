@@ -39,7 +39,7 @@
     return `
       <div class="card-header" style="position:sticky;top:0;background:#fff;z-index:2">
         <div><h2 style="margin:0">🎓 بوابة الطلاب</h2><div style="font-size:13px;color:var(--muted);margin-top:4px">إدارة الخدمات الرقمية الخاصة بالطلاب من مكان واحد</div></div>
-        <button type="button" class="btn btn-outline" id="andulus-student-gateway-close">إغلاق</button>
+        <button type="button" class="btn btn-outline" id="andulus-student-gateway-close">↩ رجوع للوحة التحكم</button>
       </div>
       <div style="padding:22px">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;max-width:980px;margin:auto">
@@ -57,24 +57,31 @@
   function internalHost() {
     let host = document.getElementById(INTERNAL_ID);
     if (host) return host;
-    const grid = document.getElementById('nav-cards-grid');
-    if (!grid || !grid.parentElement) return null;
-    host = document.createElement('section');
+    host = document.createElement('main');
     host.id = INTERNAL_ID;
-    host.style.cssText = 'display:none;width:100%;max-width:100%;margin:0;padding:0;direction:rtl;box-sizing:border-box;';
-    grid.insertAdjacentElement('afterend', host);
+    host.style.cssText = 'display:none;position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;margin:0;padding:0;direction:rtl;box-sizing:border-box;overflow:auto;z-index:2147483000;background:#f1f5f9;';
+    document.body.appendChild(host);
     return host;
   }
+  function enterStandalonePage(host) {
+    if (!document.getElementById('andalus-gateway-standalone-style')) {
+      const style=document.createElement('style');
+      style.id='andalus-gateway-standalone-style';
+      style.textContent='body.and-alus-gateway-standalone{overflow:hidden!important} body.and-alus-gateway-standalone > :not(#'+INTERNAL_ID+'){display:none!important} #'+INTERNAL_ID+'{display:block!important} #'+INTERNAL_ID+' > .card{min-height:100dvh;border:0;border-radius:0!important}';
+      document.head.appendChild(style);
+    }
+    document.body.classList.add('and-alus-gateway-standalone');
+    host.style.display='block';
+  }
   function closeGateway() {
-    const host = internalHost(), grid = document.getElementById('nav-cards-grid');
+    const host = internalHost();
+    document.body.classList.remove('and-alus-gateway-standalone');
     if (host) { host.style.display='none'; host.innerHTML=''; }
-    if (grid) grid.style.display='';
   }
   function showGatewayHome() {
     const host=internalHost(), grid=document.getElementById('nav-cards-grid');
     if(!host) { alert('تعذر فتح بوابة الطلاب داخل مساحة النظام.'); return; }
-    if(grid) grid.style.display='none';
-    host.style.display='block';
+    enterStandalonePage(host);
     host.innerHTML='<div id="'+MODAL_ID+'" class="card" style="width:100%;max-width:100%;margin:0;position:relative;inset:auto;overflow:visible;border-radius:16px;box-shadow:none">'+gatewayMarkup()+'</div>';
     host.querySelector('#andulus-student-gateway-close').onclick=closeGateway;
     host.querySelector('#gateway-summaries').onclick=openExistingSummary;
@@ -189,8 +196,7 @@
   function openAiDashboard(){
     const host=internalHost(), grid=document.getElementById('nav-cards-grid');
     if(!host) { alert('تعذر فتح المدرس الخصوصي داخل مساحة النظام.'); return; }
-    if(grid) grid.style.display='none';
-    host.style.display='block';
+    enterStandalonePage(host);
     host.innerHTML='<div id="'+AI_MODAL_ID+'" class="card" style="width:100%;max-width:100%;margin:0;position:relative;inset:auto;overflow:visible;border-radius:16px;box-shadow:none"><div style="padding:18px;text-align:center">جاري فتح المدرس الخصوصي...</div></div>';
     window.scrollTo({top:0,behavior:'smooth'});
     loadAndRenderAi();
