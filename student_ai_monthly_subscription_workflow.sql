@@ -1,6 +1,14 @@
 -- Andalus AI Tutor: one monthly subscription (30 days / 2 hours daily)
 -- Applied to Supabase production project uvwarprsghwvrfmdaaqv
 
+alter table public.student_ai_plans
+  add column if not exists payment_provider text,
+  add column if not exists payment_wallet_number text;
+
+update public.student_ai_plans
+set payment_provider='محفظة اورانج', payment_wallet_number='01286868182', updated_at=now()
+where code='student_ai_monthly';
+
 update public.student_ai_plans
 set title='المدرس الخصوصي AI', monthly_minutes=120, updated_at=now()
 where code='student_ai_monthly';
@@ -12,7 +20,7 @@ begin
  if not coalesce(public.is_admin(),false) then return jsonb_build_object('ok',false,'reason','not_admin'); end if;
  select * into o from public.student_ai_orders where id=p_order_id for update;
  if not found then return jsonb_build_object('ok',false,'reason','order_not_found'); end if;
- if o.status not in ('payment_submitted','pending_payment') or nullif(btrim(coalesce(o.payment_reference,'')),'') is null then return jsonb_build_object('ok',false,'reason','payment_reference_required'); end if;
+ if o.status <> 'payment_submitted' or nullif(btrim(coalesce(o.payment_reference,'')),'') is null then return jsonb_build_object('ok',false,'reason','payment_reference_required'); end if;
  update public.student_ai_access set status='expired' where student_id=o.student_id and status='active' and expires_at<=now();
  update public.student_ai_access set status='revoked',expires_at=least(expires_at,now()) where student_id=o.student_id and status='active';
  v_exp:=v_start+interval '30 days';
