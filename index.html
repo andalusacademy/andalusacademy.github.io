@@ -1317,33 +1317,44 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           </div>
         </div>
 
-        <!-- EXAM GRADES OVERVIEW — الدور الأول / الدور الثاني -->
+        <!-- SMART EXAM GRADES -->
         <div id="page-exam-grades" class="page">
-          <div class="search-bar no-print" style="align-items:center;gap:10px;">
-            <div class="branch-filter-tabs" id="eg-round-tabs">
-              <button class="branch-tab active" data-round="1" onclick="setExamGradesRound(1)">📘 الدور الأول</button>
-              <button class="branch-tab" data-round="2" onclick="setExamGradesRound(2)">🔁 الدور الثاني <span id="eg-second-count" style="margin-right:4px;"></span></button>
+          <div class="card" style="padding:18px;margin-bottom:14px;background:linear-gradient(135deg,#152238,#263f70);color:#fff;">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+              <div><h2 style="font-size:20px;font-weight:900;">🎯 نظام رصد الدرجات الذكي</h2><p style="font-size:12px;opacity:.82;margin-top:5px;">كشف مستقل لكل مادة ومجموعة — الدرجة النهائية فقط</p></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-gold btn-sm" onclick="exportSelectedSubjectGrades()">⬇ تصدير كشف المادة</button>
+                <button class="btn btn-outline btn-sm" style="background:#fff;color:#152238;" onclick="document.getElementById('eg-import-file').click()">⬆ استيراد درجات Excel</button>
+                <input type="file" id="eg-import-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="previewSubjectGradesImport(this)">
+              </div>
             </div>
-            <select class="search-input" style="max-width:190px" id="eg-filter-program" onchange="renderExamGradesOverview()">
-              <option value="">كل الكورسات</option>
-            </select>
-            <select class="search-input" style="max-width:160px" id="eg-filter-branch" onchange="renderExamGradesOverview()">
-              <option value="">كل الفروع</option>
-              <option value="كفر الدوار">كفر الدوار</option>
-              <option value="فرع اسكندرية">فرع اسكندرية</option>
-            </select>
-            <button class="btn btn-outline btn-sm" onclick="loadExamGradesOverview()">↻ تحديث</button>
           </div>
-          <div id="eg-round-note" style="margin:0 0 14px;padding:12px 16px;border-radius:10px;background:#eff6ff;color:#1e40af;font-size:12px;font-weight:700;"></div>
+          <div class="card" style="padding:16px;margin-bottom:14px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;">
+              <div><label class="form-label">الفرع</label><select id="eg-filter-branch" class="search-input" onchange="renderExamGradesOverview()"><option value="">كل الفروع</option><option value="كفر الدوار">كفر الدوار</option><option value="فرع اسكندرية">فرع اسكندرية</option></select></div>
+              <div><label class="form-label">المجموعة / النظام</label><select id="eg-filter-program" class="search-input" onchange="renderExamGradesOverview()"><option value="">كل المجموعات</option></select></div>
+              <div><label class="form-label">المادة</label><select id="eg-filter-subject" class="search-input" onchange="renderExamGradesOverview()"><option value="">اختر المادة</option></select></div>
+              <div><label class="form-label">الدور</label><select id="eg-filter-round" class="search-input" onchange="setExamGradesRound(this.value)"><option value="1">الدور الأول</option><option value="2">الدور الثاني</option></select></div>
+              <div><label class="form-label">بحث بالاسم أو رقم القيد</label><input id="eg-search-student" class="search-input" placeholder="اكتب اسم الطالب أو رقم القيد..." oninput="renderExamGradesOverview()"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;">
+            <div class="card" style="padding:13px;text-align:center;"><div id="eg-stat-total" style="font-size:25px;font-weight:900;color:var(--navy);">0</div><small>إجمالي الطلاب</small></div>
+            <div class="card" style="padding:13px;text-align:center;"><div id="eg-stat-done" style="font-size:25px;font-weight:900;color:#16a34a;">0</div><small>تم رصدهم</small></div>
+            <div class="card" style="padding:13px;text-align:center;"><div id="eg-stat-pending" style="font-size:25px;font-weight:900;color:#d97706;">0</div><small>لم تُرصد درجاتهم</small></div>
+            <div class="card" style="padding:13px;text-align:center;"><div id="eg-stat-max" style="font-size:18px;font-weight:900;color:var(--navy);">—</div><small>الدرجة النهائية من</small></div>
+          </div>
           <div class="card">
-            <div class="card-header">
-              <h3 id="eg-title">🎯 درجات الامتحانات — الدور الأول</h3>
-              <button class="btn btn-gold btn-sm no-print" onclick="saveExamGradesOverview()">💾 حفظ الدرجات</button>
+            <div class="card-header" style="gap:10px;flex-wrap:wrap;">
+              <div><h3 id="eg-title">كشف درجات المادة</h3><div id="eg-round-note" style="font-size:11px;color:var(--muted);margin-top:4px;">اختر الفرع والمجموعة والمادة لعرض كشف الرصد.</div></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm" onclick="loadExamGradesOverview()">↻ تحديث</button><button class="btn btn-gold btn-sm no-print" onclick="saveExamGradesOverview()">💾 حفظ الدرجات</button></div>
             </div>
             <div style="overflow:auto;padding:0;">
-              <table id="exam-grades-overview-grid" class="grades-table" style="min-width:1100px;"></table>
+              <table id="exam-grades-overview-grid" class="grades-table" style="min-width:650px;"></table>
             </div>
+            <div style="padding:12px 16px;color:var(--muted);font-size:11px;">💡 اكتب الدرجة ثم اضغط Enter للانتقال للطالب التالي. الخانات الفارغة لا تمسح درجات محفوظة عند الحفظ.</div>
           </div>
+          <div id="eg-import-preview" class="card" style="display:none;padding:16px;margin-top:14px;"></div>
         </div>
 
         <!-- BREAK-EVEN POINT (نقطة التعادل) -->
@@ -11962,233 +11973,207 @@ async function saveExam() {
 }
 
 /* ============================================================
-   EXAM GRADES OVERVIEW — الدور الأول / الدور الثاني
-   - الدور الأول: كل الطلاب × كل المواد
-   - الدور الثاني: يظهر تلقائيًا لكل طالب/مادة رسب فيها في الدور الأول
-   - لا نحتاج أي جدول جديد؛ نستعمل grades.grade_1 / grades.grade_2 الموجودين بالفعل
+   SMART EXAM GRADES — مادة واحدة + مجموعة واحدة + الدرجة النهائية
+   يحافظ على جدول grades الحالي وحقول الدور الأول/الثاني.
    ============================================================ */
 let examGradesRound = 1;
 let allGradesOverviewData = [];
+let pendingSubjectGradesImport = null;
 
 function setExamGradesRound(round) {
   examGradesRound = Number(round) === 2 ? 2 : 1;
-  document.querySelectorAll('#eg-round-tabs .branch-tab').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.round) === examGradesRound);
-  });
+  const sel = document.getElementById('eg-filter-round');
+  if (sel) sel.value = String(examGradesRound);
   renderExamGradesOverview();
 }
-
 function examStudentCourseLabel(s) {
-  const program = s?.program || '—';
-  const system = s?.system_name ? ` — ${s.system_name}` : '';
-  return program + system;
+  return (s?.program || '—') + (s?.system_name ? ' — ' + s.system_name : '');
 }
-
+function examStudentNumber(s) {
+  const raw = s?.enrollment_number ?? s?.registration_number ?? s?.id ?? '';
+  const n = Number(String(raw).replace(/[^0-9]/g,''));
+  return Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER;
+}
 function getExamGradeRows() {
-  const branchFilter = document.getElementById('eg-filter-branch')?.value || '';
-  const programFilter = document.getElementById('eg-filter-program')?.value || '';
-  const gradesMap = new Map((allGradesOverviewData || []).map(g => [`${g.student_id}::${g.subject_id}`, g]));
+  const branch = document.getElementById('eg-filter-branch')?.value || '';
+  const course = document.getElementById('eg-filter-program')?.value || '';
+  const search = String(document.getElementById('eg-search-student')?.value || '').trim().toLocaleLowerCase('ar');
+  const gradesMap = new Map((allGradesOverviewData || []).map(g => [String(g.student_id)+'::'+String(g.subject_id),g]));
   const students = (allStudents || []).filter(s => {
-    if (['dismissed','final_dismissed'].includes(String(s.student_status || 'active'))) return false;
-    if (branchFilter && s.branch !== branchFilter) return false;
-    if (programFilter && examStudentCourseLabel(s) !== programFilter) return false;
+    const status = String(s.student_status || 'active').toLowerCase();
+    if (['dismissed','final_dismissed','expelled','withdrawn','deleted','inactive','suspended'].includes(status) || s.deleted_at || s.dismissed_at) return false;
+    if (branch && s.branch !== branch) return false;
+    if (course && examStudentCourseLabel(s) !== course) return false;
+    if (search && !(String(s.name||'').toLocaleLowerCase('ar').includes(search) || String(s.enrollment_number ?? s.registration_number ?? s.id ?? '').toLowerCase().includes(search))) return false;
     return true;
-  });
-  return { students, gradesMap };
+  }).sort((a,b) => examStudentNumber(a)-examStudentNumber(b) || String(a.name||'').localeCompare(String(b.name||''),'ar'));
+  return {students,gradesMap};
 }
-
 async function loadExamGradesOverview() {
   if (!allStudents.length) await loadStudents();
   if (!allSubjects.length) await loadSubjects();
-  const { data, error } = await sb.from('grades').select('*');
-  if (error) {
-    showToast('تعذر تحميل الدرجات: ' + error.message, 'error');
-    allGradesOverviewData = [];
-  } else {
-    allGradesOverviewData = data || [];
+  const {data,error} = await sb.from('grades').select('*');
+  if (error) { showToast('تعذر تحميل الدرجات: '+error.message,'error'); return; }
+  allGradesOverviewData = data || [];
+  const courseSel = document.getElementById('eg-filter-program');
+  if (courseSel) {
+    const old = courseSel.value;
+    const courses = [...new Set((allStudents||[]).filter(s=>!['dismissed','final_dismissed','expelled','withdrawn','deleted','inactive','suspended'].includes(String(s.student_status||'active').toLowerCase()) && !s.deleted_at && !s.dismissed_at).map(examStudentCourseLabel))].sort((a,b)=>a.localeCompare(b,'ar'));
+    courseSel.innerHTML = '<option value="">كل المجموعات</option>'+courses.map(x=>'<option value="'+escapeHtml(x)+'">'+escapeHtml(x)+'</option>').join('');
+    if (courses.includes(old)) courseSel.value=old;
   }
-
-  const programSel = document.getElementById('eg-filter-program');
-  if (programSel) {
-    const current = programSel.value;
-    const courses = [...new Set((allStudents || []).map(examStudentCourseLabel).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'ar'));
-    programSel.innerHTML = '<option value="">كل الكورسات</option>' + courses.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-    if (courses.includes(current)) programSel.value = current;
+  const subjectSel=document.getElementById('eg-filter-subject');
+  if(subjectSel){
+    const old=subjectSel.value;
+    subjectSel.innerHTML='<option value="">اختر المادة</option>'+(allSubjects||[]).slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ar')).map(x=>'<option value="'+escapeHtml(x.id)+'">'+escapeHtml(x.name)+'</option>').join('');
+    if((allSubjects||[]).some(x=>String(x.id)===old)) subjectSel.value=old;
+    else if((allSubjects||[]).length===1) subjectSel.value=String(allSubjects[0].id);
   }
   renderExamGradesOverview();
 }
-
 function renderExamGradesOverview() {
-  const table = document.getElementById('exam-grades-overview-grid');
-  if (!table) return;
-  const { students, gradesMap } = getExamGradeRows();
-  const subjects = allSubjects || [];
-
-  // حساب مواد الدور الثاني: أي مادة يوجد فيها طالب واحد على الأقل راسب في الدور الأول.
-  let displaySubjects = subjects;
-  if (examGradesRound === 2) {
-    displaySubjects = subjects.filter(subj => students.some(s => {
-      const g = gradesMap.get(`${s.id}::${subj.id}`);
-      const pass = subj.pass_grade_1 ?? subj.min_pass ?? 25;
-      return g?.grade_1 != null && Number(g.grade_1) < Number(pass);
-    }));
+  const table=document.getElementById('exam-grades-overview-grid'); if(!table)return;
+  const {students,gradesMap}=getExamGradeRows();
+  const subjectId=document.getElementById('eg-filter-subject')?.value||'';
+  const subject=(allSubjects||[]).find(x=>String(x.id)===String(subjectId));
+  const max=subject ? Number(examGradesRound===1?(subject.max_grade_1??100):(subject.max_grade_2??subject.max_grade_1??100)) : 0;
+  const gradeField=examGradesRound===1?'grade_1':'grade_2';
+  const pass=subject ? Number(examGradesRound===1?(subject.pass_grade_1??subject.min_pass??25):(subject.pass_grade_2??subject.pass_grade_1??subject.min_pass??25)) : 0;
+  const eligible=subject ? students.filter(s=>{
+    if(examGradesRound===1)return true;
+    const g=gradesMap.get(String(s.id)+'::'+String(subject.id));
+    const p=Number(subject.pass_grade_1??subject.min_pass??25);
+    return g?.grade_1!=null && Number(g.grade_1)<p;
+  }) : [];
+  let done=0;
+  const title=document.getElementById('eg-title');
+  if(title)title.textContent=subject ? 'كشف درجات مادة '+subject.name+' — '+(examGradesRound===1?'الدور الأول':'الدور الثاني') : 'كشف درجات المادة';
+  const note=document.getElementById('eg-round-note');
+  if(note)note.textContent=examGradesRound===2?'يعرض الطلاب الذين لم يجتازوا المادة في الدور الأول فقط.':'كل طالب يظهر مرة واحدة داخل المجموعة المختارة. الدرجة النهائية فقط.';
+  const stat=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
+  if(!subject){
+    table.innerHTML='<tbody><tr><td style="padding:30px;text-align:center;color:var(--muted);">اختر المادة لعرض كشف مستقل لها.</td></tr></tbody>';
+    stat('eg-stat-total',0);stat('eg-stat-done',0);stat('eg-stat-pending',0);stat('eg-stat-max','—');return;
   }
-
-  const eligibleStudents = examGradesRound === 1
-    ? students
-    : students.filter(s => displaySubjects.some(subj => {
-        const g = gradesMap.get(`${s.id}::${subj.id}`);
-        const pass = subj.pass_grade_1 ?? subj.min_pass ?? 25;
-        return g?.grade_1 != null && Number(g.grade_1) < Number(pass);
-      }));
-
-  const failedPairs = examGradesRound === 2 ? eligibleStudents.reduce((n, s) => n + displaySubjects.filter(subj => {
-    const g = gradesMap.get(`${s.id}::${subj.id}`);
-    const pass = subj.pass_grade_1 ?? subj.min_pass ?? 25;
-    return g?.grade_1 != null && Number(g.grade_1) < Number(pass);
-  }).length, 0) : 0;
-
-  const countEl = document.getElementById('eg-second-count');
-  if (countEl) countEl.textContent = examGradesRound === 2 ? `(${eligibleStudents.length} طالب / ${failedPairs} مادة راسبة)` : '';
-  const note = document.getElementById('eg-round-note');
-  const title = document.getElementById('eg-title');
-  if (examGradesRound === 1) {
-    if (note) note.innerHTML = '📘 <strong>الدور الأول:</strong> يتم تسجيل درجات جميع الطلاب في جميع المواد. بمجرد تسجيل درجة أقل من حد النجاح، يظهر الطالب والمادة تلقائيًا في كشف الدور الثاني.';
-    if (title) title.textContent = '🎯 درجات الامتحانات — الدور الأول';
-  } else {
-    if (note) note.innerHTML = '🔁 <strong>الدور الثاني:</strong> هذه القائمة تتكوّن تلقائيًا من الطلاب والمواد التي رسبوا فيها في الدور الأول فقط. درجة الدور الأول محفوظة للرجوع إليها، ودرجة الدور الثاني تُسجّل في نفس سجل الطالب.';
-    if (title) title.textContent = '🎯 درجات الامتحانات — الدور الثاني';
-  }
-
-  if (!eligibleStudents.length || !displaySubjects.length) {
-    table.innerHTML = `<tbody><tr><td style="padding:30px;text-align:center;color:var(--muted);">${examGradesRound === 2 ? '🎉 لا توجد مواد راسبة في الدور الأول حتى الآن.' : 'لا توجد بيانات طلاب أو مواد.'}</td></tr></tbody>`;
-    return;
-  }
-
-  const subjectHeaders = displaySubjects.map(subj => `
-    <th colspan="3" style="background:${examGradesRound === 1 ? '#dbeafe' : '#dcfce7'};color:${examGradesRound === 1 ? '#1d4ed8' : '#166534'};min-width:250px;">
-      ${escapeHtml(subj.name)}
-      <div style="font-size:10px;font-weight:700;margin-top:4px;opacity:.85;">عظمى / صغرى / الدرجة</div>
-    </th>`).join('');
-  const subHeaders = displaySubjects.map(() => `
-    <th style="background:#f8fafc;">العظمى</th>
-    <th style="background:#f8fafc;">الصغرى</th>
-    <th style="background:#f8fafc;">الدرجة</th>`).join('');
-
-  const body = eligibleStudents.map(s => {
-    const cells = displaySubjects.map(subj => {
-      const g = gradesMap.get(`${s.id}::${subj.id}`) || {};
-      const max = examGradesRound === 1 ? (subj.max_grade_1 ?? 100) : (subj.max_grade_2 ?? subj.max_grade_1 ?? 100);
-      const pass = examGradesRound === 1 ? (subj.pass_grade_1 ?? subj.min_pass ?? 25) : (subj.pass_grade_2 ?? subj.pass_grade_1 ?? subj.min_pass ?? 25);
-      const value = examGradesRound === 1 ? g.grade_1 : g.grade_2;
-      const firstFail = g.grade_1 != null && Number(g.grade_1) < Number(subj.pass_grade_1 ?? subj.min_pass ?? 25);
-      const isEligibleSecond = examGradesRound === 2 && firstFail;
-      const source = examGradesRound === 1 ? g.grade_1_source : g.grade_2_source;
-      const disabled = examGradesRound === 2 && !isEligibleSecond;
-      const valueHtml = disabled
-        ? '<span style="color:#cbd5e1;">—</span>'
-        : `<input type="number" class="exam-grade-grid-input" data-student="${escapeHtml(s.id)}" data-subject="${escapeHtml(subj.id)}" data-round="${examGradesRound}" value="${value != null ? escapeHtml(value) : ''}" min="0" max="${escapeHtml(max)}" step="0.01" style="width:80px;">`;
-      const resultHtml = value != null
-        ? `<div style="font-size:10px;margin-top:3px;color:${Number(value) >= Number(pass) ? '#16a34a' : '#dc2626'};font-weight:800;">${Number(value) >= Number(pass) ? '✓ ناجح' : '✗ راسب'}</div>`
-        : '';
-      return `<td>${max}</td><td>${pass}</td><td>${valueHtml}${resultHtml}${source === 'electronic' ? '<div class="badge badge-navy" style="font-size:8px;margin-top:3px;display:inline-block;">إلكتروني</div>' : ''}</td>`;
-    }).join('');
-    return `<tr>
-      <td style="position:sticky;right:0;background:#fff;z-index:1;"><strong>${escapeHtml(s.name)}</strong><div style="font-size:10px;color:var(--muted);">${escapeHtml(s.id)}</div></td>
-      <td style="min-width:190px;">${escapeHtml(examStudentCourseLabel(s))}</td>
-      ${cells}
-    </tr>`;
+  const rows=eligible.map((s,i)=>{
+    const g=gradesMap.get(String(s.id)+'::'+String(subject.id))||{};
+    const value=g[gradeField];
+    if(value!=null)done++;
+    const source=g[gradeField+'_source'];
+    return '<tr><td style="width:55px;">'+(i+1)+'</td><td style="min-width:115px;"><strong>'+escapeHtml(s.enrollment_number??s.registration_number??s.id)+'</strong></td><td style="min-width:190px;text-align:right;"><strong>'+escapeHtml(s.name||'')+'</strong><div style="font-size:10px;color:var(--muted);">'+escapeHtml(s.branch||'')+'</div></td><td style="min-width:140px;"><input type="number" class="exam-grade-grid-input" data-student="'+escapeHtml(s.id)+'" data-subject="'+escapeHtml(subject.id)+'" data-round="'+examGradesRound+'" value="'+(value!=null?escapeHtml(value):'')+'" min="0" max="'+max+'" step="0.01" placeholder="—" style="width:105px;padding:9px;border:1.5px solid var(--border);border-radius:8px;text-align:center;font-weight:800;font-size:15px;"></td><td style="min-width:90px;">'+(value==null?'<span class="badge badge-gray">لم تُرصد</span>':Number(value)>=pass?'<span class="badge badge-success">ناجح</span>':'<span class="badge badge-danger">راسب</span>')+(source==='electronic'?'<div style="font-size:9px;color:#1d4ed8;">درجة إلكترونية</div>':'')+'</td></tr>';
   }).join('');
-
-  table.innerHTML = `<thead>
-    <tr>
-      <th rowspan="2" style="min-width:180px;position:sticky;right:0;z-index:3;background:#f8fafc;">اسم الطالب</th>
-      <th rowspan="2" style="min-width:190px;background:#f8fafc;">الكورس المشترك فيه</th>
-      ${subjectHeaders}
-    </tr>
-    <tr>${subHeaders}</tr>
-  </thead><tbody>${body}</tbody>`;
+  table.innerHTML='<thead><tr><th>#</th><th>رقم القيد</th><th>اسم الطالب</th><th>الدرجة النهائية / '+max+'</th><th>الحالة</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" style="padding:25px;text-align:center;">لا يوجد طلاب مطابقون لهذه المجموعة.</td></tr>')+'</tbody>';
+  stat('eg-stat-total',eligible.length);stat('eg-stat-done',done);stat('eg-stat-pending',eligible.length-done);stat('eg-stat-max',max);
+  table.querySelectorAll('.exam-grade-grid-input').forEach((input,i,arr)=>input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();arr[i+1]?.focus();}}));
 }
-
-async function saveExamGradesOverview() {
-  const inputs = [...document.querySelectorAll('.exam-grade-grid-input')];
-  if (!inputs.length) { showToast('لا توجد درجات لإدخالها', 'info'); return; }
-  const records = [];
-  const expected = [];
-  let invalidCount = 0;
-  const seenPairs = new Set();
-  const existingRows = Array.isArray(allGradesOverviewData) ? allGradesOverviewData : [];
-  inputs.forEach(inp => {
-    const value = inp.value.trim();
-    const round = Number(inp.dataset.round);
-    const studentId = String(inp.dataset.student || '').trim();
-    const subjectId = String(inp.dataset.subject || '').trim();
-    const max = Number(inp.max);
-    const pairKey = studentId + '::' + subjectId;
-    if (!studentId || !subjectId || ![1, 2].includes(round) || seenPairs.has(pairKey)) {
-      inp.classList.add('invalid');
-      invalidCount++;
-      return;
-    }
-    if (value !== '' && (!Number.isFinite(Number(value)) || Number(value) < 0 || (Number.isFinite(max) && Number(value) > max))) {
-      inp.classList.add('invalid');
-      invalidCount++;
-      return;
-    }
-    inp.classList.remove('invalid');
-    seenPairs.add(pairKey);
-    const old = existingRows.find(g => String(g.student_id) === studentId && String(g.subject_id) === subjectId) || {};
-    const rec = {
-      student_id: studentId,
-      subject_id: subjectId,
-      grade_1: old.grade_1 ?? null,
-      grade_2: old.grade_2 ?? null,
-      grade_1_source: old.grade_1_source ?? null,
-      grade_2_source: old.grade_2_source ?? null,
-      grade_1_note: old.grade_1_note ?? null,
-      grade_2_note: old.grade_2_note ?? null,
-      updated_at: new Date().toISOString()
-    };
-    if (old.id) rec.id = old.id;
-    rec[round === 1 ? 'grade_1' : 'grade_2'] = value === '' ? null : Number(value);
-    rec[round === 1 ? 'grade_1_source' : 'grade_2_source'] = value === '' ? null : 'paper';
-    records.push(rec);
-    expected.push({ student_id: studentId, subject_id: subjectId, column: round === 1 ? 'grade_1' : 'grade_2', value: value === '' ? null : Number(value) });
-  });
-  if (invalidCount) {
-    showToast('راجع الخانات المحددة بالأحمر: تحقق من الطالب والمادة، ومن أن الدرجة بين صفر والدرجة العظمى.', 'error');
-    return;
-  }
-  const saveBtn = document.querySelector('button[onclick="saveExamGradesOverview()"]');
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.dataset.originalText = saveBtn.textContent; saveBtn.textContent = 'جاري الحفظ والتحقق...'; }
-  try {
-    const { error: saveError } = await sb.from('grades').upsert(records, { onConflict: 'student_id,subject_id' });
-    if (saveError) throw saveError;
-
-    // لا نعلن نجاح الحفظ إلا بعد إعادة قراءة القيم من قاعدة البيانات ومطابقتها.
-    const studentIds = [...new Set(expected.map(x => x.student_id))];
-    const subjectIds = [...new Set(expected.map(x => x.subject_id))];
-    const { data: savedRows, error: verifyError } = await sb.from('grades')
-      .select('student_id,subject_id,grade_1,grade_2')
-      .in('student_id', studentIds)
-      .in('subject_id', subjectIds);
-    if (verifyError) throw verifyError;
-    const savedMap = new Map((savedRows || []).map(g => [String(g.student_id) + '::' + String(g.subject_id), g]));
-    const mismatches = expected.filter(x => {
-      const row = savedMap.get(x.student_id + '::' + x.subject_id);
-      const actual = row ? row[x.column] : null;
-      return x.value == null ? actual != null : actual == null || Number(actual) !== x.value;
+function currentSubjectGradeContext(){
+  const {students}=getExamGradeRows();
+  const subjectId=document.getElementById('eg-filter-subject')?.value||'';
+  const subject=(allSubjects||[]).find(x=>String(x.id)===String(subjectId));
+  return {students,subject,round:examGradesRound,branch:document.getElementById('eg-filter-branch')?.value||'',course:document.getElementById('eg-filter-program')?.value||''};
+}
+function exportSelectedSubjectGrades(){
+  if(typeof XLSX==='undefined'){showToast('مكتبة Excel غير متاحة حالياً','error');return;}
+  const {students,subject,round,branch,course}=currentSubjectGradeContext();
+  if(!subject){showToast('اختر المادة أولاً','error');return;}
+  const gradesMap=new Map((allGradesOverviewData||[]).map(g=>[String(g.student_id)+'::'+String(g.subject_id),g]));
+  const field=round===1?'grade_1':'grade_2';
+  const max=Number(round===1?(subject.max_grade_1??100):(subject.max_grade_2??subject.max_grade_1??100));
+  const eligible=round===1?students:students.filter(s=>{const g=gradesMap.get(String(s.id)+'::'+String(subject.id));return g?.grade_1!=null&&Number(g.grade_1)<Number(subject.pass_grade_1??subject.min_pass??25);});
+  const rows=eligible.map(s=>({ 'رقم القيد':s.enrollment_number??s.registration_number??s.id,'اسم الطالب':s.name,'الدرجة النهائية':gradesMap.get(String(s.id)+'::'+String(subject.id))?.[field]??'','المادة':subject.name,'الفرع':s.branch||'','المجموعة':examStudentCourseLabel(s),'الدور':round,'الدرجة العظمى':max }));
+  const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:16},{wch:30},{wch:18},{wch:24},{wch:18},{wch:28},{wch:10},{wch:16}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'درجات المادة');
+  const safe=(x)=>String(x||'كل').replace(/[\\/:*?"<>|]/g,'-');
+  XLSX.writeFile(wb,'درجات_'+safe(subject.name)+'_'+safe(branch)+'_'+safe(course)+'_الدور'+round+'.xlsx');
+}
+async function previewSubjectGradesImport(input){
+  try{
+    if(!input.files?.length)return;
+    if(typeof XLSX==='undefined')throw new Error('مكتبة Excel غير متاحة');
+    const {students,subject,round}=currentSubjectGradeContext();
+    if(!subject)throw new Error('اختر المادة والمجموعة قبل استيراد الملف');
+    const buf=await input.files[0].arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+    const byNumber=new Map(students.map(s=>[String(s.enrollment_number??s.registration_number??s.id).trim(),s]));
+    const seen=new Set(),valid=[],issues=[];
+    const max=Number(round===1?(subject.max_grade_1??100):(subject.max_grade_2??subject.max_grade_1??100));
+    rows.forEach((r,i)=>{
+      const number=String(r['رقم القيد']??r.registration_number??r.enrollment_number??'').trim();
+      const raw=r['الدرجة النهائية']??r.grade??r['الدرجة']??'';
+      if(!number){issues.push('صف '+(i+2)+': رقم القيد غير موجود');return;}
+      const student=byNumber.get(number);
+      if(!student){issues.push('صف '+(i+2)+': رقم القيد '+number+' غير موجود ضمن المجموعة المختارة');return;}
+      if(seen.has(number)){issues.push('صف '+(i+2)+': رقم القيد '+number+' مكرر');return;}
+      seen.add(number);
+      if(raw===''||raw==null)return;
+      const value=Number(raw);
+      if(!Number.isFinite(value)||value<0||value>max){issues.push('صف '+(i+2)+': درجة غير صحيحة للطالب '+number+' (المسموح 0 إلى '+max+')');return;}
+      valid.push({student,student_id:String(student.id),subject_id:String(subject.id),value});
     });
-    if (mismatches.length) throw new Error('لم يتم تأكيد حفظ ' + mismatches.length + ' درجة بعد إعادة القراءة من قاعدة البيانات.');
-    try { await logActivity('edit', `حفظ درجات ${examGradesRound === 1 ? 'الدور الأول' : 'الدور الثاني'} من شاشة درجات الامتحانات`); } catch (logErr) { console.warn('Grade save activity log failed', logErr); }
-    showToast('✅ تم حفظ الدرجات والتحقق منها داخل قاعدة البيانات');
-    await loadExamGradesOverview();
-  } catch (e) {
-    console.error('Exam grades save/verify failed:', e);
-    showToast('❌ لم يتم تأكيد حفظ الدرجات في قاعدة البيانات: ' + (e?.message || 'خطأ غير معروف'), 'error');
-  } finally {
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '💾 حفظ الدرجات'; delete saveBtn.dataset.originalText; }
-  }
+    pendingSubjectGradesImport={valid,subject,round,issues};
+    const box=document.getElementById('eg-import-preview');
+    box.style.display='block';
+    box.innerHTML='<h3 style="margin-bottom:10px;">مراجعة ملف الدرجات قبل الحفظ</h3><p style="font-size:13px;margin-bottom:8px;">المادة: <strong>'+escapeHtml(subject.name)+'</strong> — '+(round===1?'الدور الأول':'الدور الثاني')+'</p><div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;"><span>درجات صالحة: <strong style="color:#16a34a;">'+valid.length+'</strong></span><span>ملاحظات: <strong style="color:#dc2626;">'+issues.length+'</strong></span></div>'+(issues.length?'<div style="max-height:130px;overflow:auto;background:#fff7ed;padding:9px;border-radius:8px;font-size:11px;margin-bottom:10px;">'+issues.map(escapeHtml).join('<br>')+'</div>':'')+'<p style="font-size:11px;color:var(--muted);margin-bottom:12px;">لن تُمس الخانات الفارغة. الدرجات الموجودة التي سيجري استبدالها ستظهر في تأكيد الحفظ.</p><button class="btn btn-gold btn-sm" onclick="commitSubjectGradesImport()" '+(!valid.length?'disabled':'')+'>اعتماد '+valid.length+' درجة صحيحة</button> <button class="btn btn-outline btn-sm" onclick="cancelSubjectGradesImport()">إلغاء</button>';
+    box.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }catch(e){showToast('تعذر قراءة ملف الدرجات: '+e.message,'error');}
+  finally{input.value='';}
+}
+function cancelSubjectGradesImport(){pendingSubjectGradesImport=null;const b=document.getElementById('eg-import-preview');if(b){b.style.display='none';b.innerHTML='';}}
+async function commitSubjectGradesImport(){
+  const pack=pendingSubjectGradesImport;if(!pack?.valid?.length)return;
+  const field=pack.round===1?'grade_1':'grade_2';
+  const changes=pack.valid.map(x=>{const old=(allGradesOverviewData||[]).find(g=>String(g.student_id)===x.student_id&&String(g.subject_id)===x.subject_id);return {...x,old,willReplace:old?.[field]!=null&&Number(old[field])!==x.value};});
+  const replaceCount=changes.filter(x=>x.willReplace).length;
+  if(!confirm('سيتم استيراد '+changes.length+' درجة للمادة '+pack.subject.name+'.\nسيتم تحديث '+replaceCount+' درجة محفوظة مسبقاً، مع الاحتفاظ بباقي بيانات سجل كل طالب. هل تعتمد؟'))return;
+  try{
+    const records=changes.map(x=>{
+      const old=x.old||{};
+      const rec={student_id:x.student_id,subject_id:x.subject_id,grade_1:old.grade_1??null,grade_2:old.grade_2??null,grade_1_source:old.grade_1_source??null,grade_2_source:old.grade_2_source??null,grade_1_note:old.grade_1_note??null,grade_2_note:old.grade_2_note??null,updated_at:new Date().toISOString()};
+      if(old.id)rec.id=old.id;
+      rec[field]=x.value;rec[field+'_source']='paper';
+      return rec;
+    });
+    const {error}=await sb.from('grades').upsert(records,{onConflict:'student_id,subject_id'});if(error)throw error;
+    const ids=records.map(x=>x.student_id);
+    const {data,error:verifyError}=await sb.from('grades').select('student_id,subject_id,'+field).in('student_id',ids).eq('subject_id',pack.subject.id);
+    if(verifyError)throw verifyError;
+    const saved=new Map((data||[]).map(x=>[String(x.student_id),x]));
+    if(records.some(x=>Number(saved.get(x.student_id)?.[field])!==x[field]))throw new Error('تعذر تأكيد جميع الدرجات بعد الحفظ');
+    try{await logActivity('edit','استيراد '+records.length+' درجة Excel لمادة '+pack.subject.name);}catch(e){console.warn(e);}
+    showToast('تم استيراد وحفظ '+records.length+' درجة والتحقق منها بنجاح');
+    cancelSubjectGradesImport();await loadExamGradesOverview();
+  }catch(e){console.error(e);showToast('لم يكتمل استيراد الدرجات: '+e.message,'error');}
+}
+async function saveExamGradesOverview(){
+  const inputs=[...document.querySelectorAll('.exam-grade-grid-input')];
+  if(!inputs.length){showToast('لا توجد درجات ظاهرة للحفظ','info');return;}
+  const records=[],expected=[],seen=new Set();let invalid=0;
+  inputs.forEach(inp=>{
+    const raw=inp.value.trim();if(raw==='')return;
+    const studentId=String(inp.dataset.student||''),subjectId=String(inp.dataset.subject||''),round=Number(inp.dataset.round),value=Number(raw),max=Number(inp.max);
+    const key=studentId+'::'+subjectId;
+    if(!studentId||!subjectId||![1,2].includes(round)||seen.has(key)||!Number.isFinite(value)||value<0||value>max){inp.style.borderColor='#dc2626';invalid++;return;}
+    seen.add(key);inp.style.borderColor='';
+    const old=(allGradesOverviewData||[]).find(g=>String(g.student_id)===studentId&&String(g.subject_id)===subjectId)||{};
+    const rec={student_id:studentId,subject_id:subjectId,grade_1:old.grade_1??null,grade_2:old.grade_2??null,grade_1_source:old.grade_1_source??null,grade_2_source:old.grade_2_source??null,grade_1_note:old.grade_1_note??null,grade_2_note:old.grade_2_note??null,updated_at:new Date().toISOString()};
+    if(old.id)rec.id=old.id;
+    const field=round===1?'grade_1':'grade_2';rec[field]=value;rec[field+'_source']='paper';
+    records.push(rec);expected.push({student_id:studentId,subject_id:subjectId,field,value});
+  });
+  if(invalid){showToast('راجع الدرجات المحددة بالأحمر؛ يجب أن تكون بين صفر والدرجة العظمى.','error');return;}
+  if(!records.length){showToast('لم يتم إدخال درجات جديدة. الخانات الفارغة لم تُغيّر.','info');return;}
+  const btn=document.querySelector('button[onclick="saveExamGradesOverview()"]');if(btn){btn.disabled=true;btn.textContent='جاري الحفظ...';}
+  try{
+    const {error}=await sb.from('grades').upsert(records,{onConflict:'student_id,subject_id'});if(error)throw error;
+    const ids=[...new Set(records.map(x=>x.student_id))],subjectIds=[...new Set(records.map(x=>x.subject_id))];
+    const {data,error:ve}=await sb.from('grades').select('student_id,subject_id,grade_1,grade_2').in('student_id',ids).in('subject_id',subjectIds);if(ve)throw ve;
+    const map=new Map((data||[]).map(x=>[String(x.student_id)+'::'+String(x.subject_id),x]));
+    if(expected.some(x=>Number(map.get(x.student_id+'::'+x.subject_id)?.[x.field])!==x.value))throw new Error('لم يتم تأكيد كل الدرجات بعد إعادة القراءة');
+    try{await logActivity('edit','حفظ درجات مادة من شاشة رصد الدرجات الذكي');}catch(e){console.warn(e);}
+    showToast('تم حفظ '+records.length+' درجة والتحقق منها بنجاح');await loadExamGradesOverview();
+  }catch(e){console.error(e);showToast('تعذر تأكيد حفظ الدرجات: '+e.message,'error');}
+  finally{if(btn){btn.disabled=false;btn.textContent='💾 حفظ الدرجات';}}
 }
 
 async function deleteExam(examId) {
