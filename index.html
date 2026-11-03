@@ -907,7 +907,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
               <div class="stat-card"><div class="stat-label">متأخر بعد فترة السماح</div><div class="stat-value" id="dash-finance-late" style="color:#dc2626">0</div></div>
               <div class="stat-card"><div class="stat-label">لم يحن موعده</div><div class="stat-value" id="dash-finance-notdue">0</div></div>
             </div>
-            <div style="overflow:auto;max-height:480px;padding:0 14px 14px;"><table style="width:100%;min-width:900px;border-collapse:collapse;"><thead><tr><th>الطالب</th><th>رقم القيد</th><th>المجموعة / البرنامج</th><th>الفرع</th><th>المطلوب</th><th>المدفوع</th><th>المتبقي</th><th>الاستحقاق القادم</th><th>آخر سداد</th><th>الحالة</th></tr></thead><tbody id="dash-finance-table"></tbody></table></div>
+            <div style="overflow:auto;max-height:480px;padding:0 14px 14px;"><table style="width:100%;min-width:900px;border-collapse:collapse;"><thead><tr><th>الطالب</th><th>رقم القيد</th><th>المجموعة / البرنامج</th><th>الفرع</th><th>المطلوب</th><th>المدفوع</th><th>إيصالات غير موزعة</th><th>المتبقي</th><th>الاستحقاق القادم</th><th>آخر سداد</th><th>الحالة</th></tr></thead><tbody id="dash-finance-table"></tbody></table></div>
           </div>
           <div class="card no-print" id="dashboard-distribution" style="margin-bottom:18px;">
             <div class="card-header"><h3>👥 توزيع الطلاب حسب الفرع والبرنامج والدفعة</h3></div>
@@ -5432,9 +5432,9 @@ function renderDashboardRiskPanels(){
  document.getElementById('risk-absence-count').textContent=absence.length;
  document.getElementById('risk-absence-total').textContent=absence.length?'طلاب تجاوزوا حد الغياب المسموح (25%).':'لا يوجد طلاب بلغوا حد 25% غياب.';
  document.getElementById('risk-absence-list').innerHTML=absence.map(x=>dashboardStudentLine(x.student,x.rate+'% غياب','#b91c1c')).join('')||'<div style="padding:12px;color:var(--muted);font-size:12px;">لا توجد حالات تحتاج متابعة.</div>';
- const overdue=finance.filter(x=>x.pay.status==='red'),overdueTotal=overdue.reduce((sum,x)=>sum+x.pay.overdueAmount+x.pay.lateFeesDue,0);
+ const overdue=finance.filter(x=>x.pay.status==='red'),overdueTotal=overdue.reduce((sum,x)=>sum+x.pay.overdueAmount+x.pay.lateFeesDue,0),unallocatedTotal=finance.reduce((sum,x)=>sum+x.pay.unallocatedPaid,0);
  document.getElementById('risk-finance-count').textContent=finance.length;
- document.getElementById('risk-finance-total').textContent='متأخرون فعليًا: '+overdue.length+' · المتأخر المستحق: '+money(overdueTotal)+' · إجمالي المتبقي: '+money(finance.reduce((sum,x)=>sum+x.pay.remaining,0));
+ document.getElementById('risk-finance-total').textContent='متأخرون فعليًا: '+overdue.length+' · المتأخر المستحق: '+money(overdueTotal)+' · إجمالي المتبقي: '+money(finance.reduce((sum,x)=>sum+x.pay.remaining,0))+' · إيصالات غير موزعة: '+money(unallocatedTotal);
  document.getElementById('risk-finance-list').innerHTML=finance.map(x=>dashboardStudentLine(x.student,(x.pay.status==='red'?'متأخر':x.pay.status==='yellow'?'مستحق':'غير مستحق')+' · '+money(x.pay.remaining),x.pay.status==='red'?'#dc2626':x.pay.status==='yellow'?'#d97706':'#64748b')).join('')||'<div style="padding:12px;color:var(--muted);font-size:12px;">لا توجد أرصدة متبقية.</div>';
  document.getElementById('risk-academic-count').textContent=academic.length;
  const passedStudents=students.map(s=>getStudentAcademicRisk(s)).filter(r=>r.hasGrades&&r.failed===0).length;
@@ -5457,8 +5457,8 @@ function renderDashboardFinance(){
   const dates=Object.values(allPayments[x.student.id]||{}).filter(rec=>rec.paid&&rec.paid_date).map(rec=>rec.paid_date).sort(),last=dates[dates.length-1]||'—';
   const state=x.pay.status==='red'?'متأخر':x.pay.status==='yellow'?'مستحق حتى 5':x.pay.status==='green'?'مسدد بالكامل':(x.pay.totalPaid>0?'مسدد جزئيًا / غير مستحق':'غير مستحق');
   const color=x.pay.status==='red'?'#dc2626':x.pay.status==='yellow'?'#d97706':x.pay.status==='green'?'#16a34a':'#64748b';
-  return '<tr style="border-bottom:1px solid var(--border);"><td>'+escapeHtml(x.student.name)+'</td><td>'+escapeHtml(x.student.enrollment_number||x.student.id)+'</td><td>'+escapeHtml(x.student.program||'—')+'</td><td>'+escapeHtml(x.student.branch||'—')+'</td><td>'+fmt(x.pay.totalDue)+'</td><td>'+fmt(x.pay.totalPaid)+'</td><td style="font-weight:800;color:#dc2626;">'+fmt(x.pay.remaining)+'</td><td>'+escapeHtml(next?.info?.dueDate||'—')+'</td><td>'+escapeHtml(last)+'</td><td style="font-weight:800;color:'+color+'">'+state+'</td></tr>';
- }).join(''):'<tr><td colspan="10" style="text-align:center;padding:16px;color:var(--muted);">لا توجد بيانات طلاب.</td></tr>';
+  return '<tr style="border-bottom:1px solid var(--border);"><td>'+escapeHtml(x.student.name)+'</td><td>'+escapeHtml(x.student.enrollment_number||x.student.id)+'</td><td>'+escapeHtml(x.student.program||'—')+'</td><td>'+escapeHtml(x.student.branch||'—')+'</td><td>'+fmt(x.pay.totalDue)+'</td><td>'+fmt(x.pay.totalPaid)+'</td><td>'+fmt(x.pay.unallocatedPaid)+'</td><td style="font-weight:800;color:#dc2626;">'+fmt(x.pay.remaining)+'</td><td>'+escapeHtml(next?.info?.dueDate||'—')+'</td><td>'+escapeHtml(last)+'</td><td style="font-weight:800;color:'+color+'">'+state+'</td></tr>';
+ }).join(''):'<tr><td colspan="11" style="text-align:center;padding:16px;color:var(--muted);">لا توجد بيانات طلاب.</td></tr>';
 }
 function renderDashboardDistribution(){
  const students=dashboardScopedStudents(),count=list=>Object.entries(list).sort((a,b)=>b[1]-a[1]),branches={},programs={},cohorts={};
@@ -9641,7 +9641,7 @@ function getStudentPaymentSummary(student,schedule=getPaymentSchedule(student),p
   const matched={},unmatched=[];
   legacy.forEach(rec=>{const number=getLegacyInstallmentNumber(rec),type=number===0?'مقدم':(number>0?'قسط_'+number:null);if(type&&scheduleTypes.has(type)){if(!matched[type])matched[type]=[];matched[type].push(rec);}else unmatched.push(rec);});
   const today=new Date();today.setHours(0,0,0,0);
-  let totalPaid=0,overdueAmount=0,lateFeesDue=0,hasYellow=false,allInstallmentsPaid=schedule.length>0,hasPartial=false;
+  let totalPaid=0,overdueAmount=0,lateFeesDue=0,hasYellow=false,hasExtraRed=false,hasExtraYellow=false,allInstallmentsPaid=schedule.length>0,hasPartial=false;
   const installments={};
   schedule.forEach(item=>{
     const direct=paymentMap[item.type]||{},directPaid=direct.paid?(Number(direct.amount)>0?Number(direct.amount):item.amount):0;
@@ -9660,9 +9660,17 @@ function getStudentPaymentSummary(student,schedule=getPaymentSchedule(student),p
     const paidDate=paidDates.sort().slice(-1)[0]||'';
     installments[item.type]={amount:dueAmount,paidAmount,remaining,isPaid,paidDate,dueDate:dueText,legacyLabels:receipts.map(rec=>rec.label||rec.payment_type),lateFeePaid:feePaid,lateFeeExempted:feeExempted,late};
   });
+  const fixedTypes=new Set(FIXED_EXTRA_ITEMS.map(item=>item.type));
+  records.forEach(rec=>{
+    if(!rec||!rec.payment_type||scheduleTypes.has(rec.payment_type)||fixedTypes.has(rec.payment_type)||rec.payment_type==='_notes'||rec.payment_type==='رسوم_كاملة'||rec.is_discount||rec.paid||rec.applicable===false||!rec.due_date)return;
+    const due=new Date(rec.due_date+(String(rec.due_date).length===10?'T00:00:00':''));
+    if(isNaN(due.getTime()))return;
+    const grace=new Date(due);grace.setDate(grace.getDate()+5);grace.setHours(23,59,59,999);
+    if(today>grace)hasExtraRed=true;else if(today>=due)hasExtraYellow=true;
+  });
   const unmatchedPaid=unmatched.reduce((sum,rec)=>sum+(Number(rec.amount)||0),0);totalPaid+=unmatchedPaid;
   const totalDue=getStudentCourseTotal(student),remaining=Math.max(0,totalDue-totalPaid);
-  const status=!schedule.length?'gray':(overdueAmount>0||lateFeesDue>0?'red':(hasYellow?'yellow':(allInstallmentsPaid||remaining<=0.009?'green':'gray')));
+  const status=overdueAmount>0||lateFeesDue>0||hasExtraRed?'red':(hasYellow||hasExtraYellow?'yellow':(!schedule.length?'gray':(allInstallmentsPaid||remaining<=0.009?'green':'gray')));
   return {status,totalDue,totalPaid,remaining,overdueAmount,lateFeesDue,partial:hasPartial||(totalPaid>0&&remaining>0),installments,unallocatedPaid:unmatchedPaid};
 }
 async function ensurePaymentSchedule(s) {
@@ -9928,7 +9936,7 @@ function renderStudentFinance(s, container) {
     const schedItem = schedule.find(i => i.type === type);
     const dueStr = rec.due_date || schedItem?.due || '';
     const dueDate = dueStr ? new Date(dueStr) : null;
-    const cutoff = dueDate ? new Date(dueDate.getFullYear(), dueDate.getMonth(), 5) : null;
+    const cutoff = dueDate ? (type === 'مقدم' ? new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + 5) : new Date(dueDate.getFullYear(), dueDate.getMonth(), 5)) : null;
     const paidDate = rec.paid_date ? new Date(rec.paid_date) : null;
     const isLate = cutoff && ((!rec.paid && today > cutoff) || (rec.paid && paidDate && paidDate > cutoff));
     const lateFeeAmt = rec.late_fee_amount || LATE_FEE_DEFAULT;
