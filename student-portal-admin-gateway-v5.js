@@ -71,7 +71,9 @@
     const card = document.getElementById('andalus-student-gateway-card') ||
       [...document.querySelectorAll('#nav-cards-grid .nav-card')].find(el => /مكتبة\\s*ملخصات\\s*الامتحانات/.test(el.textContent || ''));
     if (!card) return false;
+    if (card.dataset.portalGatewayReady === '1' && /بوابة الطلاب/.test(card.textContent || '')) return true;
     card.id = 'andalus-student-gateway-card';
+    card.dataset.portalGatewayReady = '1';
     card.classList.add('admin-only');
     card.innerHTML = '<span class="nav-card-icon">🎓</span><span>بوابة الطلاب</span>';
     card.onclick = openGateway;
