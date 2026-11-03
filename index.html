@@ -12104,6 +12104,9 @@ async function previewSubjectGradesImport(input){
       if(!number){issues.push('صف '+(i+2)+': رقم القيد غير موجود');return;}
       const student=byNumber.get(number);
       if(!student){issues.push('صف '+(i+2)+': رقم القيد '+number+' غير موجود ضمن المجموعة المختارة');return;}
+      if(r['المادة'] && String(r['المادة']).trim()!==String(subject.name).trim()){issues.push('صف '+(i+2)+': الملف يحتوي على مادة مختلفة عن المادة المختارة');return;}
+      if(r['الدور']!=='' && r['الدور']!=null && Number(r['الدور'])!==round){issues.push('صف '+(i+2)+': الدور في الملف لا يطابق الدور المختار');return;}
+      if(round===2){const oldGrade=(allGradesOverviewData||[]).find(g=>String(g.student_id)===String(student.id)&&String(g.subject_id)===String(subject.id));const pass=Number(subject.pass_grade_1??subject.min_pass??25);if(oldGrade?.grade_1==null||Number(oldGrade.grade_1)>=pass){issues.push('صف '+(i+2)+': الطالب غير مستحق للدور الثاني في هذه المادة');return;}}
       if(seen.has(number)){issues.push('صف '+(i+2)+': رقم القيد '+number+' مكرر');return;}
       seen.add(number);
       if(raw===''||raw==null)return;
