@@ -5606,8 +5606,9 @@ function updateDashboard() {
   renderCenterMood();
   renderDailySummary();
   const bf = dashboardBranch;
-  const studentsInScope = bf ? allStudents.filter(s => s.branch === bf) : allStudents;
-  const leadsInScope = bf ? allLeads.filter(l => l.branch === bf) : allLeads;
+  const countedStudents = getCountedStudents();
+  const studentsInScope = bf ? countedStudents.filter(s => normalizeStudentsBranch(s.branch) === normalizeStudentsBranch(bf)) : countedStudents;
+  const leadsInScope = bf ? allLeads.filter(l => normalizeStudentsBranch(l.branch) === normalizeStudentsBranch(bf)) : allLeads;
 
   document.getElementById('stat-total').textContent = studentsInScope.length;
   document.getElementById('stat-total-sub').textContent = bf ? `فرع ${bf} — اضغط للعرض` : 'مسجلين (كل الفروع) — اضغط للعرض';
@@ -6091,8 +6092,23 @@ function isCountedStudent(s) {
   if (!id || !name || ['0','1','2'].includes(id) || ['0','امنيه','يمنى'].includes(name)) return false;
   return true;
 }
+// تصنيف موحد للفرع والنظام والدفعة في كل الإحصاءات والقوائم.
+function getStudentCohort(s) {
+  const meta = [s?.system_name, s?.program].filter(Boolean).join(' ').toLowerCase();
+  const type = /احتراف|professional/.test(meta) ? 'professional' : (/أساس|اساس|basic/.test(meta) ? 'basic' : null);
+  const reg = String(s?.id ?? s?.enrollment_number ?? '').replace(/\D/g, '');
+  const branch = normalizeStudentsBranch(s?.branch);
+  let batch = null;
+  if (branch === 'كفر الدوار' && reg.startsWith('50')) batch = 8;
+  else if (branch === 'فرع اسكندرية' && reg.startsWith('51')) batch = 8;
+  else if (branch === 'كفر الدوار' && reg.startsWith('52')) batch = 10;
+  return { branch, batch, type, key: type && batch ? type + batch : null };
+}
 function getCountedStudents() {
   return (allStudents || []).filter(isCountedStudent);
+}
+function getCountedStudentsByCohort(cohort) {
+  return getCountedStudents().filter(s => getStudentCohort(s).key === cohort);
 }
 
 function getFilteredStudents() {
@@ -6105,24 +6121,8 @@ function getFilteredStudents() {
     const mq = !q || String(s.name || '').toLowerCase().includes(q) || String(s.id || '').toLowerCase().includes(q);
     const mb = !branch || normalizeStudentsBranch(s.branch) === normalizeStudentsBranch(branch);
     const mp = !prog || (s.program_id + '|' + (s.system_name || '')) === prog || (s.program_id + '|') === prog;
-    const systemMeta = [s.system_name, s.program].filter(Boolean).join(' ').toLowerCase();
-    const professional = /احتراف|professional/.test(systemMeta);
-    const basic = /أساس|اساس|basic/.test(systemMeta);
-
-    // تحديد الدفعة من الفرع وبادئة رقم القيد حسب تقسيم المركز.
-    // رقم القيد محفوظ في s.id.
-    const reg = String(s.id ?? s.enrollment_number ?? s.registration_number ?? '').replace(/\D/g, '');
-    const studentBranch = normalizeStudentsBranch(s.branch);
-    let batch = null;
-    if (studentBranch === 'كفر الدوار' && reg.startsWith('50')) batch = 8;
-    else if (studentBranch === 'كفر الدوار' && reg.startsWith('52')) batch = 10;
-    else if (studentBranch === 'فرع اسكندرية' && reg.startsWith('51')) batch = 8;
-
-    const mc = category === 'all' ||
-      (category === 'professional8' && batch === 8 && professional) ||
-      (category === 'basic8' && batch === 8 && basic) ||
-      (category === 'professional10' && batch === 10 && professional) ||
-      (category === 'basic10' && batch === 10 && basic);
+    const cohort = getStudentCohort(s);
+    const mc = category === 'all' || cohort.key === category;
     return mq && mb && mp && mc;
   });
 }
@@ -13898,7 +13898,7 @@ async function renderExecutiveDashboard() {
 
   const newStudents = allStudents.filter(s => s.date && s.date >= monthStart);
   document.getElementById('exec-new-students').textContent = newStudents.length;
-  document.getElementById('exec-total-students').textContent = allStudents.length;
+  document.getElementById('exec-total-students').textContent = getCountedStudents().length;
 
   const newLeads = (allLeads || []).filter(l => l.created_at && l.created_at >= monthStart);
   document.getElementById('exec-new-leads').textContent = newLeads.length;
