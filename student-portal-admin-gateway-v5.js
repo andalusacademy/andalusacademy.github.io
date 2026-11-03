@@ -29,8 +29,8 @@
       const home=summaryOriginalHome;
       if(home.next && home.next.parentNode===home.parent) home.parent.insertBefore(page,home.next);
       else home.parent.appendChild(page);
-      page.classList.remove('andalus-summary-standalone');
-      page.style.display='';
+      page.className=home.className;
+      if(home.style===null) page.removeAttribute('style'); else page.setAttribute('style',home.style);
     }
     summaryOriginalHome=null;
     showGatewayHome();
@@ -42,7 +42,7 @@
       alert('تعذر العثور على صفحة ملخصات الامتحانات الحالية.');
       return;
     }
-    if(!summaryOriginalHome) summaryOriginalHome={parent:page.parentNode,next:page.nextSibling};
+    if(!summaryOriginalHome) summaryOriginalHome={parent:page.parentNode,next:page.nextSibling,style:page.getAttribute('style'),className:page.className};
     enterStandalonePage(host);
     host.innerHTML='';
     page.classList.add('andalus-summary-standalone');
