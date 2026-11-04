@@ -9650,7 +9650,7 @@ function isCourseReceiptPayment(rec) {
 }
 function getStudentPaymentSummary(student,schedule=getPaymentSchedule(student),paymentMap=allPayments[student.id]||{}) {
   const records=Object.values(paymentMap||{}),scheduleTypes=new Set(schedule.map(item=>item.type));
-  const legacy=records.filter(rec=>rec&&rec.is_discount===true&&rec.paid===true&&rec.applicable!==false&&!scheduleTypes.has(rec.payment_type));
+  const legacy=records.filter(rec=>rec&&rec.is_discount===true&&rec.paid===true&&rec.applicable!==false&&!scheduleTypes.has(rec.payment_type)&&!records.some(receipt=>isCourseReceiptPayment(receipt)&&Number(receipt.amount)===Number(rec.amount)&&String(receipt.paid_date||'')===String(rec.paid_date||'')));
   const matched={},unmatched=[];
   legacy.forEach(rec=>{const number=getLegacyInstallmentNumber(rec),type=number===0?'مقدم':(number>0?'قسط_'+number:null);if(type&&scheduleTypes.has(type)){if(!matched[type])matched[type]=[];matched[type].push(rec);}else unmatched.push(rec);});
   const today=new Date();today.setHours(0,0,0,0);
