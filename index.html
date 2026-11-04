@@ -1292,12 +1292,16 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           </div>
 
           <div class="card" style="margin-top:18px">
-            <div class="card-header">
-              <h3>🏆 لوحة الأوائل العامة (بمتوسط الدرجات)</h3>
-              <button class="btn btn-gold btn-sm" onclick="loadLeaderboard()">تحديث</button>
+            <div class="card-header" style="flex-wrap:wrap;gap:10px;">
+              <h3>🏆 أوائل المتدربين حسب الدفعة — أفضل 50 متدربًا</h3>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-gold btn-sm" onclick="loadLeaderboard(8)">دفعة 8</button>
+                <button class="btn btn-gold btn-sm" onclick="loadLeaderboard(10)">دفعة 10</button>
+              </div>
             </div>
-            <table><thead><tr><th>#</th><th>الطالب</th><th>الفرع</th><th>البرنامج</th><th>متوسط الدرجات</th></tr></thead>
-            <tbody id="leaderboard-table"><tr><td colspan="5"><div class="empty-state"><div class="emoji">🏆</div><h4>اضغط تحديث لعرض الترتيب</h4></div></td></tr></tbody></table>
+            <div id="leaderboard-batch-label" style="padding:8px 16px;color:var(--muted);font-size:12px;">اختر الدفعة لعرض أفضل 50 متدربًا من الفرعين معًا.</div>
+            <div style="overflow-x:auto;"><table><thead><tr><th>الترتيب</th><th>المتدرب</th><th>الفرع</th><th>البرنامج</th><th>متوسط الدرجات</th></tr></thead>
+            <tbody id="leaderboard-table"><tr><td colspan="5"><div class="empty-state"><div class="emoji">🏆</div><h4>اختر دفعة 8 أو دفعة 10 لعرض الأوائل</h4></div></td></tr></tbody></table></div>
           </div>
         </div>
 
@@ -7172,32 +7176,41 @@ async function loadTopStudents() {
   </tr>`).join('');
 }
 
-async function loadLeaderboard() {
+async function loadLeaderboard(batch) {
   const tbody = document.getElementById('leaderboard-table');
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">جاري الحساب...</td></tr>';
+  const label = document.getElementById('leaderboard-batch-label');
+  if (!tbody) return;
+  if (![8, 10].includes(Number(batch))) {
+    if (label) label.textContent = 'اختر الدفعة لعرض أفضل 50 متدربًا من الفرعين معًا.';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:18px;color:var(--muted)">اختر دفعة 8 أو دفعة 10.</td></tr>';
+    return;
+  }
+  batch = Number(batch);
+  if (label) label.textContent = 'دفعة ' + batch + ' — أفضل 50 متدربًا من كفر الدوار والإسكندرية معًا، دون فصل حسب الفرع أو النظام.';
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">جاري حساب أوائل دفعة ' + batch + '...</td></tr>';
   if (!allGradesGlobal.length) await loadRiskData();
 
   const ranked = allStudents
-    .filter(s => s.program_id)
+    .filter(s => isCountedStudent(s) && getStudentCohort(s).batch === batch)
     .map(s => ({ student: s, pct: getStudentGradePct(s.id) }))
     .filter(x => x.pct !== null)
-    .sort((a, b) => b.pct - a.pct);
+    .sort((a, b) => b.pct - a.pct || String(a.student.name || '').localeCompare(String(b.student.name || ''), 'ar'));
 
   if (!ranked.length) {
-    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="emoji">🏆</div><h4>لا توجد درجات مسجَّلة بعد لحساب الترتيب</h4></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="emoji">🏆</div><h4>لا توجد درجات مسجلة لطلاب دفعة ' + batch + ' حتى الآن</h4></div></td></tr>';
     return;
   }
 
+  const top = ranked.slice(0, 50);
   const medals = ['🥇', '🥈', '🥉'];
-  tbody.innerHTML = ranked.map((r, i) => `<tr style="${i < 3 ? 'background:#fffbeb;' : ''}">
+  tbody.innerHTML = top.map((r, i) => `<tr style="${i < 3 ? 'background:#fffbeb;' : ''}">
     <td><strong>${medals[i] || (i + 1)}</strong></td>
     <td>${escapeHtml(r.student.name)}</td>
-    <td><span class="badge badge-navy">${escapeHtml(r.student.branch)}</span></td>
+    <td><span class="badge badge-navy">${escapeHtml(r.student.branch || '—')}</span></td>
     <td>${escapeHtml(r.student.program || '—')}</td>
     <td><span class="badge ${r.pct >= 85 ? 'badge-success' : r.pct >= 65 ? 'badge-warning' : 'badge-danger'}">${r.pct}%</span></td>
   </tr>`).join('');
 }
-
 /* ============================================================
    PROFILE
    ============================================================ */
