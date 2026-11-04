@@ -6308,10 +6308,15 @@ function updateStudentsBranchCounts() {
   if (b) b.textContent = 'عدد الطلاب: ' + count('فرع اسكندرية');
 }
 function renderStudents(list) {
-  // ترتيب قائمة الطلاب حسب رقم القيد ترتيبًا طبيعيًا رقميًا (4001، 4002، 40010 لا كنصوص).
-  const fullData = [...(list || getFilteredStudents())].sort((a, b) =>
-    String(a.id ?? '').localeCompare(String(b.id ?? ''), 'ar', { numeric: true, sensitivity: 'base' })
-  );
+  // ترتيب قائمة الطلاب حسب الدفعة أولًا على مستوى الفرعين وكل الأنظمة؛ ثم رقم القيد داخل الدفعة.
+  const fullData = [...(list || getFilteredStudents())].sort((a, b) => {
+    const batchA = getStudentCohort(a).batch ?? Number.MAX_SAFE_INTEGER;
+    const batchB = getStudentCohort(b).batch ?? Number.MAX_SAFE_INTEGER;
+    if (batchA !== batchB) return batchA - batchB;
+    return String(a.id ?? a.enrollment_number ?? '').localeCompare(
+      String(b.id ?? b.enrollment_number ?? ''), 'ar', { numeric: true, sensitivity: 'base' }
+    );
+  });
   document.getElementById('student-count').textContent = fullData.length + ' طالب';
   updateStudentsBranchCounts();
   const tbody = document.getElementById('students-table');
