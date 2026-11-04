@@ -9627,7 +9627,8 @@ function getPaymentSchedule(student) {
   if(!system||totalDue<=0)return [];
   const reg=student.date||student.enrollment_date||new Date().toISOString().split('T')[0];
   const basic=system==='النظام الأساسي',months=basic?8:11,standard=basic?700:750;
-  const advance=Math.min(2000,totalDue),balance=Math.max(0,totalDue-advance);
+  // لا نفترض قيمة مقدمة ثابتة؛ تُسجل المقدمة بالمبلغ الفعلي الذي أدخله المسؤول.
+  const advance=0,balance=Math.max(0,totalDue-advance);
   let installments=[];
   if(balance>0){
     if(balance>=standard*(months-1)&&balance<=standard*months){installments=Array(months).fill(standard);installments[months-1]=balance-standard*(months-1);}
@@ -9650,7 +9651,21 @@ function isCourseReceiptPayment(rec) {
 }
 function getStudentPaymentSummary(student,schedule=getPaymentSchedule(student),paymentMap=allPayments[student.id]||{}) {
   const records=Object.values(paymentMap||{}),scheduleTypes=new Set(schedule.map(item=>item.type));
-  const legacy=records.filter(rec=>rec&&rec.is_discount===true&&rec.paid===true&&rec.applicable!==false&&!scheduleTypes.has(rec.payment_type)&&!records.some(receipt=>isCourseReceiptPayment(receipt)&&Number(receipt.amount)===Number(rec.amount)&&String(receipt.paid_date||'')===String(rec.paid_date||'')));
+  const dailyCourseReceipts=records.filter(isCourseReceiptPayment);
+  // بعض إيصالات الإيراد اليومي لها سجل قديم مطابق من نوع is_discount؛
+  // نطابق المبلغ وتاريخ الدفع مرة واحدة فقط حتى لا يُحسب الإيصال مرتين.
+  const usedDailyReceiptIds=new Set(),duplicateLegacyIds=new Set();
+  records.filter(rec=>rec&&rec.is_discount===true&&rec.paid===true).forEach(rec=>{
+    const amount=Number(rec.amount)||0,date=String(rec.paid_date||'').slice(0,10);
+    if(!amount||!date)return;
+    const match=dailyCourseReceipts.find(receipt=>
+      !usedDailyReceiptIds.has(receipt.id)&&
+      (Number(receipt.amount)||0)===amount&&
+      String(receipt.paid_date||'').slice(0,10)===date
+    );
+    if(match){usedDailyReceiptIds.add(match.id);duplicateLegacyIds.add(rec.id);}
+  });
+  const legacy=records.filter(rec=>rec&&rec.is_discount===true&&rec.paid===true&&rec.applicable!==false&&!scheduleTypes.has(rec.payment_type)&&!duplicateLegacyIds.has(rec.id));
   const matched={},unmatched=[];
   legacy.forEach(rec=>{const number=getLegacyInstallmentNumber(rec),type=number===0?'مقدم':(number>0?'قسط_'+number:null);if(type&&scheduleTypes.has(type)){if(!matched[type])matched[type]=[];matched[type].push(rec);}else unmatched.push(rec);});
   const today=new Date();today.setHours(0,0,0,0);
