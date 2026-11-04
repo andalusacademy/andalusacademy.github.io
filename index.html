@@ -4965,7 +4965,7 @@ async function syncExamScoreToGrades(exam, studentId, score, note) {
   };
   const result = existing
     ? await sb.from('grades').update(updates).eq('id', existing.id)
-    : await sb.from('grades').insert(updates);
+    : await sb.from('grades').insert({ ...updates, id: createGradeRowId() });
   if (result.error) {
     console.error('تعذر حفظ الدرجة الإلكترونية:', result.error);
     showToast('تم تسليم الامتحان لكن تعذر حفظ الدرجة في سجل الدرجات: ' + result.error.message, 'error');
@@ -7374,6 +7374,13 @@ async function loadStudentTimeline() {
         ${e.body ? `<div style="font-size:12px;color:#475569;">${e.body}</div>` : ''}
       </div>`).join('') + `</div>`;
 }
+function toEnglishDigits(value) {
+  return String(value ?? '').replace(/[٠-٩۰-۹]/g, d => { const code=d.charCodeAt(0); return String(code>=0x06F0 && code<=0x06F9 ? code-0x06F0 : code-0x0660); }).replace(/٫/g,'.').replace(/[٬,]/g,'');
+}
+function createGradeRowId() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') return globalThis.crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);});
+}
 
 /* GRADES */
 async function loadGrades() {
@@ -7401,10 +7408,10 @@ async function loadGrades() {
     return `<tr>
       <td>${escapeHtml(subj.name)}</td>
       <td>${escapeHtml(subj.max_grade_1)}</td>
-      <td><input type="number" class="grade-input g1-input" data-subj="${escapeHtml(subj.id)}" value="${escapeHtml(g1)}" min="0" max="${escapeHtml(subj.max_grade_1)}">${elec1}</td>
+      <td><input type="text" inputmode="decimal" lang="en" dir="ltr" oninput="this.value=toEnglishDigits(this.value)" style="font-family:Arial,sans-serif;direction:ltr;text-align:center;" class="grade-input g1-input" data-subj="${escapeHtml(subj.id)}" value="${escapeHtml(g1)}" min="0" max="${escapeHtml(subj.max_grade_1)}">${elec1}</td>
       <td>${g1 !== '' ? `<span class="${pass1 ? 'pass' : 'fail'}">${pass1 ? 'ناجح ✓' : 'راسب ✗'}</span>` : '—'}</td>
       <td>${escapeHtml(subj.max_grade_2)}</td>
-      <td><input type="number" class="grade-input g2-input" data-subj="${escapeHtml(subj.id)}" value="${escapeHtml(g2)}" min="0" max="${escapeHtml(subj.max_grade_2)}">${elec2}</td>
+      <td><input type="text" inputmode="decimal" lang="en" dir="ltr" oninput="this.value=toEnglishDigits(this.value)" style="font-family:Arial,sans-serif;direction:ltr;text-align:center;" class="grade-input g2-input" data-subj="${escapeHtml(subj.id)}" value="${escapeHtml(g2)}" min="0" max="${escapeHtml(subj.max_grade_2)}">${elec2}</td>
       <td>${g2 !== '' ? `<span class="${pass2 ? 'pass' : 'fail'}">${pass2 ? 'ناجح ✓' : 'راسب ✗'}</span>` : '—'}</td>
     </tr>`;
   });
@@ -7442,12 +7449,14 @@ function getGrade(pct, failed) {
 async function saveGrades() {
   const g1Inputs = document.querySelectorAll('.g1-input');
   const g2Inputs = document.querySelectorAll('.g2-input');
+  const { data: existingGrades } = await sb.from('grades').select('id,subject_id').eq('student_id', currentProfileId);
+  const existingGradeIds = new Map((existingGrades || []).map(g => [String(g.subject_id), g.id]));
   const records = [];
   g1Inputs.forEach((inp, i) => {
     const subjId = inp.dataset.subj;
-    const g1 = inp.value !== '' ? parseFloat(inp.value) : null;
-    const g2 = g2Inputs[i]?.value !== '' ? parseFloat(g2Inputs[i].value) : null;
-    records.push({ student_id: currentProfileId, subject_id: subjId, grade_1: g1, grade_2: g2, updated_at: new Date().toISOString() });
+    const g1 = inp.value !== '' ? parseFloat(toEnglishDigits(inp.value)) : null;
+    const g2 = g2Inputs[i]?.value !== '' ? parseFloat(toEnglishDigits(g2Inputs[i].value)) : null;
+    records.push({ id: existingGradeIds.get(String(subjId)) || createGradeRowId(), student_id: currentProfileId, subject_id: subjId, grade_1: g1, grade_2: g2, updated_at: new Date().toISOString() });
   });
   const { error } = await sb.from('grades').upsert(records, { onConflict: 'student_id,subject_id' });
   if (error) { showToast('خطأ في الحفظ', 'error'); return; }
@@ -12173,7 +12182,7 @@ function renderExamGradesOverview() {
     const value=g[gradeField];
     if(value!=null)done++;
     const source=g[gradeField+'_source'];
-    return '<tr><td style="width:55px;">'+(i+1)+'</td><td style="min-width:115px;"><strong>'+escapeHtml(s.enrollment_number??s.registration_number??s.id)+'</strong></td><td style="min-width:190px;text-align:right;"><strong>'+escapeHtml(s.name||'')+'</strong><div style="font-size:10px;color:var(--muted);">'+escapeHtml(s.branch||'')+'</div></td><td style="min-width:140px;"><input type="number" class="exam-grade-grid-input" data-student="'+escapeHtml(s.id)+'" data-subject="'+escapeHtml(subject.id)+'" data-round="'+examGradesRound+'" value="'+(value!=null?escapeHtml(value):'')+'" min="0" max="'+max+'" step="0.01" placeholder="—" style="width:105px;padding:9px;border:1.5px solid var(--border);border-radius:8px;text-align:center;font-weight:800;font-size:15px;"></td><td style="min-width:90px;">'+(value==null?'<span class="badge badge-gray">لم تُرصد</span>':Number(value)>=pass?'<span class="badge badge-success">ناجح</span>':'<span class="badge badge-danger">راسب</span>')+(source==='electronic'?'<div style="font-size:9px;color:#1d4ed8;">درجة إلكترونية</div>':'')+'</td></tr>';
+    return '<tr><td style="width:55px;">'+(i+1)+'</td><td style="min-width:115px;"><strong>'+escapeHtml(s.enrollment_number??s.registration_number??s.id)+'</strong></td><td style="min-width:190px;text-align:right;"><strong>'+escapeHtml(s.name||'')+'</strong><div style="font-size:10px;color:var(--muted);">'+escapeHtml(s.branch||'')+'</div></td><td style="min-width:140px;"><input type="text" inputmode="decimal" lang="en" dir="ltr" oninput="this.value=toEnglishDigits(this.value)" class="exam-grade-grid-input" data-student="'+escapeHtml(s.id)+'" data-subject="'+escapeHtml(subject.id)+'" data-round="'+examGradesRound+'" value="'+(value!=null?escapeHtml(value):'')+'" min="0" max="'+max+'" step="0.01" placeholder="—" style="width:105px;padding:9px;border:1.5px solid var(--border);border-radius:8px;text-align:center;font-weight:800;font-size:15px;"></td><td style="min-width:90px;">'+(value==null?'<span class="badge badge-gray">لم تُرصد</span>':Number(value)>=pass?'<span class="badge badge-success">ناجح</span>':'<span class="badge badge-danger">راسب</span>')+(source==='electronic'?'<div style="font-size:9px;color:#1d4ed8;">درجة إلكترونية</div>':'')+'</td></tr>';
   }).join('');
   table.innerHTML='<thead><tr><th>#</th><th>رقم القيد</th><th>اسم الطالب</th><th>الدرجة النهائية / '+max+'</th><th>الحالة</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" style="padding:25px;text-align:center;">لا يوجد طلاب مطابقون لهذه المجموعة.</td></tr>')+'</tbody>';
   stat('eg-stat-total',eligible.length);stat('eg-stat-done',done);stat('eg-stat-pending',eligible.length-done);stat('eg-stat-max',max);
@@ -12223,7 +12232,7 @@ async function previewSubjectGradesImport(input){
       if(seen.has(number)){issues.push('صف '+(i+2)+': رقم القيد '+number+' مكرر');return;}
       seen.add(number);
       if(raw===''||raw==null)return;
-      const value=Number(raw);
+      const value=Number(toEnglishDigits(raw));
       if(!Number.isFinite(value)||value<0||value>max){issues.push('صف '+(i+2)+': درجة غير صحيحة للطالب '+number+' (المسموح 0 إلى '+max+')');return;}
       valid.push({student,student_id:String(student.id),subject_id:String(subject.id),value});
     });
@@ -12246,7 +12255,7 @@ async function commitSubjectGradesImport(){
     const records=changes.map(x=>{
       const old=x.old||{};
       const rec={student_id:x.student_id,subject_id:x.subject_id,grade_1:old.grade_1??null,grade_2:old.grade_2??null,grade_1_source:old.grade_1_source??null,grade_2_source:old.grade_2_source??null,grade_1_note:old.grade_1_note??null,grade_2_note:old.grade_2_note??null,updated_at:new Date().toISOString()};
-      if(old.id)rec.id=old.id;
+      rec.id=old.id||createGradeRowId();
       rec[field]=x.value;rec[field+'_source']='paper';
       return rec;
     });
@@ -12267,13 +12276,13 @@ async function saveExamGradesOverview(){
   const records=[],expected=[],seen=new Set();let invalid=0;
   inputs.forEach(inp=>{
     const raw=inp.value.trim();if(raw==='')return;
-    const studentId=String(inp.dataset.student||''),subjectId=String(inp.dataset.subject||''),round=Number(inp.dataset.round),value=Number(raw),max=Number(inp.max);
+    const studentId=String(inp.dataset.student||''),subjectId=String(inp.dataset.subject||''),round=Number(inp.dataset.round),value=Number(toEnglishDigits(raw)),max=Number(inp.max);
     const key=studentId+'::'+subjectId;
     if(!studentId||!subjectId||![1,2].includes(round)||seen.has(key)||!Number.isFinite(value)||value<0||value>max){inp.style.borderColor='#dc2626';invalid++;return;}
     seen.add(key);inp.style.borderColor='';
     const old=(allGradesOverviewData||[]).find(g=>String(g.student_id)===studentId&&String(g.subject_id)===subjectId)||{};
     const rec={student_id:studentId,subject_id:subjectId,grade_1:old.grade_1??null,grade_2:old.grade_2??null,grade_1_source:old.grade_1_source??null,grade_2_source:old.grade_2_source??null,grade_1_note:old.grade_1_note??null,grade_2_note:old.grade_2_note??null,updated_at:new Date().toISOString()};
-    if(old.id)rec.id=old.id;
+    rec.id=old.id||createGradeRowId();
     const field=round===1?'grade_1':'grade_2';rec[field]=value;rec[field+'_source']='paper';
     records.push(rec);expected.push({student_id:studentId,subject_id:subjectId,field,value});
   });
