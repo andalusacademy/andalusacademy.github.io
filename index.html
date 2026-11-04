@@ -4159,8 +4159,7 @@ async function renderParentPortalDashboard() {
     if (rec.paid) totalPaid += amount;
     return { ...item, rec, amount };
   });
-  const savedTotalDue = Number(student.total_due) || 0;
-  const totalDue = SYSTEM_TOTAL_DUE[student.system_name] ?? savedTotalDue;
+  const totalDue = getStudentCourseTotal(student);
   const remaining = Math.max(0, totalDue - totalPaid);
   const today = new Date().toISOString().split('T')[0];
   const nextDue = scheduleRows
@@ -9608,8 +9607,11 @@ function getStudentPaymentSystem(student) {
   return null;
 }
 function getStudentCourseTotal(student) {
-  if(student&&student.total_due!==null&&student.total_due!==undefined&&String(student.total_due).trim()!=='')return Math.max(0,Number(student.total_due)||0);
-  const system=getStudentPaymentSystem(student);return system?Number(SYSTEM_TOTAL_DUE[system]||0):0;
+  // إجمالي الكورس ثابت حسب النظام المختار، ولا يتغير بسبب قيمة قديمة محفوظة في total_due.
+  const system=getStudentPaymentSystem(student);
+  if(system && Object.prototype.hasOwnProperty.call(SYSTEM_TOTAL_DUE,system)) return Number(SYSTEM_TOTAL_DUE[system]);
+  // احتفاظ بالتوافق مع البرامج القديمة التي لا تحمل اسم نظام معروف.
+  return Math.max(0,Number(student?.total_due)||0);
 }
 function getLegacyInstallmentNumber(payment) {
   let label=String(payment?.label||'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي');
