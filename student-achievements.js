@@ -48,8 +48,75 @@ async function loadStudentPortalAchievements(phone) {
   }
 }
 
-async function loadAchievementsAdmin() {
+let adminAchievementSelectedBatch = null;
+
+function ensureAchievementBatchControls(rankBody) {
+  const card = rankBody?.closest('.card');
+  if (!card || document.getElementById('ach-batch-controls')) return;
+  const wrap = document.createElement('div');
+  wrap.id = 'ach-batch-controls';
+  wrap.style.cssText = 'padding:0 16px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+  wrap.innerHTML =
+    '<strong style="font-size:12px;color:var(--navy);margin-left:6px;">عرض ترتيب الدفعة:</strong>' +
+    '<button type="button" class="btn btn-outline btn-sm" data-ach-batch="8" onclick="loadAchievementsAdmin(8)">دفعة 8</button>' +
+    '<button type="button" class="btn btn-outline btn-sm" data-ach-batch="10" onclick="loadAchievementsAdmin(10)">دفعة 10</button>' +
+    '<span id="ach-batch-label" style="font-size:11px;color:var(--muted);flex-basis:100%;line-height:1.8;">اختر دفعة لعرض أفضل 50 متدربًا من الفرعين معًا.</span>';
+  const tableWrap = rankBody.closest('div[style*="overflow"]') || rankBody.parentElement;
+  card.insertBefore(wrap, tableWrap);
+}
+
+function renderAdminAchievementRanking(batch) {
+  const rankBody = document.getElementById('ach-ranking-table');
+  if (!rankBody) return;
+  ensureAchievementBatchControls(rankBody);
+  const label = document.getElementById('ach-batch-label');
+  document.querySelectorAll('#ach-batch-controls [data-ach-batch]').forEach(button => {
+    const active = Number(button.dataset.achBatch) === Number(batch);
+    button.classList.toggle('btn-gold', active);
+    button.classList.toggle('btn-outline', !active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  if (![8, 10].includes(Number(batch))) {
+    if (label) label.textContent = 'اختر دفعة 8 أو دفعة 10 لعرض أفضل 50 متدربًا من الفرعين معًا.';
+    rankBody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:18px;color:var(--muted);">اختر دفعة 8 أو دفعة 10 لعرض الترتيب.</td></tr>';
+    return;
+  }
+  if (label) label.textContent = 'دفعة ' + batch + ' — أفضل 50 متدربًا من كفر الدوار والإسكندرية معًا، دون فصل حسب الفرع أو النظام. الترتيب حسب النتيجة الإجمالية.';
+  const sums = new Map();
+  adminAchievementRows.forEach(a => {
+    const current = sums.get(String(a.student_id)) || { points: 0, activity: 0 };
+    current.points += Number(a.points || 0);
+    current.activity += Number(a.activity_points || 0);
+    sums.set(String(a.student_id), current);
+  });
+  const ranked = allStudents
+    .filter(student => isCountedStudent(student) && getStudentCohort(student).batch === Number(batch))
+    .map(student => {
+      const exam = getStudentGradePct(student.id);
+      const attRows = allAttendanceGlobal.filter(a => String(a.student_id) === String(student.id) && (a.status === 'حاضر' || a.status === 'غائب'));
+      const attendance = attRows.length ? Math.round(attRows.filter(a => a.status === 'حاضر').length / attRows.length * 100) : null;
+      const scoreData = sums.get(String(student.id)) || { points: 0, activity: 0 };
+      const achievement = Math.min(100, scoreData.points);
+      const activity = Math.min(100, scoreData.activity);
+      const components = [{ value: exam, weight: 50 }, { value: attendance, weight: 25 }, { value: achievement, weight: 15 }, { value: activity, weight: 10 }];
+      const availableWeight = components.reduce((sum, component) => sum + (component.value === null ? 0 : component.weight), 0);
+      const total = availableWeight ? Math.round(components.reduce((sum, component) => sum + (component.value === null ? 0 : component.value * component.weight), 0) / availableWeight) : null;
+      return { student, exam, attendance, achievement, activity, total, availableWeight };
+    })
+    .filter(row => row.total !== null)
+    .sort((a, b) => b.total - a.total || String(a.student.name || '').localeCompare(String(b.student.name || ''), 'ar'));
+  if (!ranked.length) {
+    rankBody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:18px;color:var(--muted);">لا توجد بيانات دراسية أو حضور أو نقاط مسجلة لطلاب دفعة ' + batch + ' حتى الآن.</td></tr>';
+    return;
+  }
+  const top = ranked.slice(0, 50);
+  rankBody.innerHTML = top.map((row, index) => '<tr' + (index < 3 ? ' style="background:#fffbeb;"' : '') + '><td><strong>' + (['🥇','🥈','🥉'][index] || (index + 1)) + '</strong></td><td>' + escapeHtml(row.student.name) + '</td><td>' + escapeHtml(row.student.branch || '—') + '</td><td>' + (row.exam === null ? '—' : row.exam + '%') + '</td><td>' + (row.attendance === null ? '—' : row.attendance + '%') + '</td><td>' + row.achievement + '%</td><td>' + row.activity + '%</td><td><strong>' + row.total + '%</strong><div style="font-size:10px;color:var(--muted)">الأوزان المتاحة: ' + row.availableWeight + '%</div></td></tr>').join('');
+  if (label) label.textContent += ' — عدد المؤهلين: ' + ranked.length + '، المعروض: ' + top.length + '.';
+}
+
+async function loadAchievementsAdmin(batch) {
   if (!currentUser || currentUser.role !== 'admin') { showToast('عرض الإنجازات والترتيب متاح للمدير فقط', 'error'); return; }
+  if ([8, 10].includes(Number(batch))) adminAchievementSelectedBatch = Number(batch);
   const studentSelect = document.getElementById('ach-student');
   if (studentSelect) {
     const prior = studentSelect.value;
@@ -59,6 +126,7 @@ async function loadAchievementsAdmin() {
   const recordsBody = document.getElementById('ach-records-table');
   const rankBody = document.getElementById('ach-ranking-table');
   if (recordsBody) recordsBody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:15px;">جاري تحميل الإنجازات...</td></tr>';
+  ensureAchievementBatchControls(rankBody);
   try {
     const { data, error } = await sb.from('student_achievements').select('*').order('achievement_date', { ascending: false });
     if (error) throw error;
@@ -71,26 +139,7 @@ async function loadAchievementsAdmin() {
   try {
     await loadRiskData();
     if (!allSubjects.length) await loadSubjects();
-    const sums = new Map();
-    adminAchievementRows.forEach(a => {
-      const s = sums.get(a.student_id) || { points: 0, activity: 0 };
-      s.points += Number(a.points || 0);
-      s.activity += Number(a.activity_points || 0);
-      sums.set(a.student_id, s);
-    });
-    const ranked = allStudents.filter(student => !['dismissed','final_dismissed'].includes(String(student.student_status || 'active'))).map(student => {
-      const exam = getStudentGradePct(student.id);
-      const attRows = allAttendanceGlobal.filter(a => a.student_id === student.id && (a.status === 'حاضر' || a.status === 'غائب'));
-      const attendance = attRows.length ? Math.round(attRows.filter(a => a.status === 'حاضر').length / attRows.length * 100) : null;
-      const scoreData = sums.get(student.id) || { points: 0, activity: 0 };
-      const achievement = Math.min(100, scoreData.points);
-      const activity = Math.min(100, scoreData.activity);
-      const components = [{ value: exam, weight: 50 }, { value: attendance, weight: 25 }, { value: achievement, weight: 15 }, { value: activity, weight: 10 }];
-      const availableWeight = components.reduce((sum,c) => sum + (c.value === null ? 0 : c.weight), 0);
-      const total = availableWeight ? Math.round(components.reduce((sum,c) => sum + (c.value === null ? 0 : c.value * c.weight), 0) / availableWeight) : null;
-      return { student, exam, attendance, achievement, activity, total, availableWeight };
-    }).filter(x => x.total !== null).sort((a,b) => b.total-a.total || String(a.student.name).localeCompare(String(b.student.name), 'ar'));
-    if (rankBody) rankBody.innerHTML = ranked.length ? ranked.map((r,i) => '<tr><td><strong>' + (['🥇','🥈','🥉'][i] || (i+1)) + '</strong></td><td>' + escapeHtml(r.student.name) + '</td><td>' + escapeHtml(r.student.branch || '—') + '</td><td>' + (r.exam === null ? '—' : r.exam + '%') + '</td><td>' + (r.attendance === null ? '—' : r.attendance + '%') + '</td><td>' + r.achievement + '%</td><td>' + r.activity + '%</td><td><strong>' + r.total + '%</strong><div style="font-size:10px;color:var(--muted)">الأوزان المتاحة: ' + r.availableWeight + '%</div></td></tr>').join('') : '<tr><td colspan="8" style="text-align:center;padding:18px;color:var(--muted);">لا توجد بيانات كافية للترتيب بعد.</td></tr>';
+    renderAdminAchievementRanking(adminAchievementSelectedBatch);
   } catch (e) {
     if (rankBody) rankBody.innerHTML = '<tr><td colspan="8" style="color:#b91c1c;padding:15px;">تعذر حساب الترتيب: ' + escapeHtml(e.message || '') + '</td></tr>';
   }
