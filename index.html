@@ -9728,7 +9728,33 @@ async function loadPayments() {
 }
 
 function getStudentPayStatus(student) {
-  return getStudentPaymentSummary(student);
+  const schedule = getPaymentSchedule(student);
+  const payments = allPayments[student.id] || {};
+  const summary = getStudentPaymentSummary(student, schedule, payments);
+  const scheduleTypes = new Set(schedule.map(item => item.type));
+  const fixedTypes = new Set(FIXED_EXTRA_ITEMS.map(item => item.type));
+  let extraLateFeesPaid = 0, extraLate = false, extraDue = false;
+  Object.values(payments).forEach(rec => {
+    if (!rec || !rec.payment_type || scheduleTypes.has(rec.payment_type) ||
+        fixedTypes.has(rec.payment_type) || rec.payment_type === '_notes' ||
+        rec.payment_type === 'رسوم_كاملة' || rec.applicable === false) return;
+    // رسوم المصروفات المستقلة لا تخصم من إجمالي الكورس ولا تضاف إلى محصل الكورس.
+    // لكنها تظل ظاهرة في حالة المتابعة، وغرامتها المدفوعة تُسجل كبند مستقل.
+    if (rec.late_fee_paid) extraLateFeesPaid += Number(rec.late_fee_amount || LATE_FEE_DEFAULT);
+    if (rec.is_discount || rec.paid || !rec.due_date) return;
+    const due = new Date(rec.due_date + (String(rec.due_date).length === 10 ? 'T00:00:00' : ''));
+    if (isNaN(due.getTime())) return;
+    due.setHours(0, 0, 0, 0);
+    const graceEnd = new Date(due);
+    graceEnd.setDate(graceEnd.getDate() + 5);
+    graceEnd.setHours(23, 59, 59, 999);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (today > graceEnd) extraLate = true;
+    else if (today >= due) extraDue = true;
+  });
+  const status = summary.status === 'red' || extraLate ? 'red' :
+    (summary.status === 'yellow' || extraDue ? 'yellow' : summary.status);
+  return { ...summary, status, extraLateFeesPaid };
 }
 
 function populatePayProgramFilter() {
