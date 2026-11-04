@@ -12134,9 +12134,21 @@ function getExamGradeRows() {
 async function loadExamGradesOverview() {
   if (!allStudents.length) await loadStudents();
   if (!allSubjects.length) await loadSubjects();
-  const {data,error} = await sb.from('grades').select('*');
-  if (error) { showToast('تعذر تحميل الدرجات: '+error.message,'error'); return; }
-  allGradesOverviewData = data || [];
+  // Supabase REST may cap an un-ranged select at 1000 rows.
+  // Fetch every grade in stable pages so recently added rows are not silently omitted.
+  const pageSize = 1000;
+  let allGradeRows = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data: page, error } = await sb.from('grades')
+      .select('*')
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) { showToast('تعذر تحميل الدرجات: ' + error.message, 'error'); return; }
+    const rows = page || [];
+    allGradeRows = allGradeRows.concat(rows);
+    if (rows.length < pageSize) break;
+  }
+  allGradesOverviewData = allGradeRows;
   const courseSel = document.getElementById('eg-filter-program');
   if (courseSel) {
     const old = courseSel.value;
