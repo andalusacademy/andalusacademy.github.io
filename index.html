@@ -9637,6 +9637,17 @@ function getPaymentSchedule(student) {
   installments.forEach((amount,index)=>schedule.push({type:'قسط_'+(index+1),label:'القسط '+(ordinals[index]||(index+1)),amount,due:fmtDate(addMonths(reg,index+1))}));
   return schedule;
 }
+function isCourseReceiptPayment(rec) {
+  if (!rec || rec.paid !== true || !String(rec.payment_type || '').startsWith('daily_revenue:')) return false;
+  const label = String(rec.label || '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي')
+    .replace(/[ًٌٍَُِّْ]/g, '').toLowerCase().trim();
+  if (!label) return false;
+  // استبعاد البنود المستقلة والمبالغ المختلطة التي لا يمكن فصل مكوناتها بأمان.
+  if (/انجليزي|انجليزى|انجليز|فتح\s*ملف|شنط|ادوات|بالطو|مصروفات|غرامه|اعاده\s*قيد|ايراد\s*يومي/.test(label)) return false;
+  // إيصالات المقدمة والأقساط ومبالغ الكورس فقط؛ لا نعتمد على applicable
+  // لأن الإيصالات القديمة الصحيحة للمقدمة محفوظة بقيمة applicable=false.
+  return /قسط|مقدم|مقدمه|تقديم|تقدبم|كورس/.test(label);
+}
 function getStudentPaymentSummary(student,schedule=getPaymentSchedule(student),paymentMap=allPayments[student.id]||{}) {
   const records=Object.values(paymentMap||{}),scheduleTypes=new Set(schedule.map(item=>item.type));
   const legacy=records.filter(rec=>rec&&rec.is_discount===true&&rec.paid===true&&rec.applicable!==false&&!scheduleTypes.has(rec.payment_type));
@@ -9670,10 +9681,15 @@ function getStudentPaymentSummary(student,schedule=getPaymentSchedule(student),p
     const grace=new Date(due);grace.setDate(grace.getDate()+5);grace.setHours(23,59,59,999);
     if(today>grace)hasExtraRed=true;else if(today>=due)hasExtraYellow=true;
   });
-  const unmatchedPaid=unmatched.reduce((sum,rec)=>sum+(Number(rec.amount)||0),0);totalPaid+=unmatchedPaid;
+  const unmatchedPaid=unmatched.reduce((sum,rec)=>sum+(Number(rec.amount)||0),0);
+  // إيصالات التحصيل اليومية المؤكدة الخاصة بالمقدمة/الأقساط/الكورس؛
+  // منفصلة عن سجلات الأقساط المباشرة، ولا تشمل المصروفات المستقلة.
+  const courseReceiptRows=records.filter(isCourseReceiptPayment);
+  const courseReceiptPaid=courseReceiptRows.reduce((sum,rec)=>sum+(Number(rec.amount)||0),0);
+  totalPaid+=unmatchedPaid+courseReceiptPaid;
   const totalDue=getStudentCourseTotal(student),remaining=Math.max(0,totalDue-totalPaid);
   const status=overdueAmount>0||lateFeesDue>0||hasExtraRed?'red':(hasYellow||hasExtraYellow?'yellow':(!schedule.length?'gray':(allInstallmentsPaid||remaining<=0.009?'green':'gray')));
-  return {status,totalDue,totalPaid,remaining,overdueAmount,lateFeesDue,partial:hasPartial||(totalPaid>0&&remaining>0),installments,unallocatedPaid:unmatchedPaid};
+  return {status,totalDue,totalPaid,remaining,overdueAmount,lateFeesDue,partial:hasPartial||(totalPaid>0&&remaining>0),installments,unallocatedPaid:unmatchedPaid+courseReceiptPaid};
 }
 async function ensurePaymentSchedule(s) {
   if(!s||!s.program_id)return;
