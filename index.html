@@ -3987,6 +3987,9 @@ let examCurrentExam = null;   // الامتحان الجاري حاليًا
 let examCurrentAttempt = null;
 let examQuestionsForStudent = [];
 let examTimerInterval = null;
+let examTimerSyncInterval = null;
+let examTimerEndsAt = 0;
+let examTimerSyncBusy = false;
 let examSubmitLock = false;
 let examVisibilityHandler = null;
 let examLastCorrectData = [];
@@ -4691,8 +4694,13 @@ async function examStudentLogin() {
 
 function examStudentLogout() {
   if (examTestMode) { exitExamTestMode(); return; }
+  if (examCurrentAttempt && examCurrentAttempt.status === 'in_progress' && document.getElementById('exam-active-screen')?.style.display !== 'none') {
+    submitExam(false, false, true);
+    return;
+  }
   examStudent = null; examCurrentExam = null; examCurrentAttempt = null; examFaceVerifiedStudentId = null; examFaceVerificationToken = null; examStudentPhone = '';
   if (examTimerInterval) clearInterval(examTimerInterval);
+  if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
   document.getElementById('exam-login-id').value = '';
   document.getElementById('exam-login-pass').value = '';
   showExamScreen('exam-login-screen');
@@ -4719,7 +4727,7 @@ async function loadAvailableExamsForStudent() {
     const status = e.attempt_status;
     const until = new Date(e.available_until).toLocaleString('ar-EG', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
     let actionHtml;
-    if (status === 'submitted') actionHtml = '<span class="badge badge-success">✓ تم التسليم مسبقًا</span>';
+    if (status === 'submitted') actionHtml = '<div class="badge badge-success">✓ تم التسليم نهائيًا</div><div style="margin-top:7px;font-weight:800;color:var(--navy)">درجتك: '+(Number(e.attempt_score)||0)+' / '+(Number(e.attempt_max_score)||100)+'</div>';
     else if (status === 'in_progress') actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="resumeExam('${e.id}')">▶ استكمال الامتحان</button>`;
     else actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="requestExamStart('${e.id}')">▶ بدء الامتحان</button>`;
     return `<div class="exam-avail-item"><h4>${escapeHtml(e.title)}</h4><p>${escapeHtml(subj)} · المدة: ${Number(e.duration_minutes)||0} دقيقة — متاح حتى ${escapeHtml(until)}</p>${actionHtml}</div>`;
@@ -4878,17 +4886,17 @@ async function resumeExam(examId) {
     showToast(resumeMessages[result?.reason] || error?.message || 'تعذر استكمال الامتحان.', 'error');
     return;
   }
-  if (!Array.isArray(result.questions) || !result.questions.length) {
-    showToast('لا توجد أسئلة محملة في هذه المحاولة. لم نبدأ المؤقت ولم نستهلك وقتًا.', 'error');
-    showExamScreen('exam-select-screen');
-    return;
-  }
   const exam = result.exam, attempt = result.attempt;
   if (!exam || !attempt) return;
   if (attempt.status === 'submitted') {
-    if (attempt.flagged_cheating) showToast('🚫 تم إلغاء هذا الامتحان مسبقًا بسبب اكتشاف محاولة غش — النتيجة: راسب', 'error');
-    else showToast('لقد سلّمت هذا الامتحان من قبل', 'error');
+    if (attempt.flagged_cheating) showToast('🚫 تم تسليم الامتحان وإلغاء نتيجته بسبب مخالفة مسجلة.', 'error');
+    else showToast('انتهى الامتحان بالتسليم. درجتك: '+(Number(attempt.score)||0)+' / '+(Number(attempt.max_score)||100), 'success');
     await loadAvailableExamsForStudent();
+    showExamScreen('exam-select-screen');
+    return;
+  }
+  if (!Array.isArray(result.questions) || !result.questions.length) {
+    showToast('لا توجد أسئلة محملة في هذه المحاولة. لم نبدأ المؤقت ولم نستهلك وقتًا.', 'error');
     showExamScreen('exam-select-screen');
     return;
   }
@@ -4971,15 +4979,16 @@ function activateExamCopyProtection(){
 
 function startExamTimer() {
   if (examTimerInterval) clearInterval(examTimerInterval);
+  if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
   activateExamCopyProtection();
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
   const durationMs = Math.max(15000, Number(examCurrentExam.duration_seconds) > 0 ? Number(examCurrentExam.duration_seconds) * 1000 : (Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000);
   const durationEnd = startedAt + durationMs;
   const scheduledEnd = examCurrentExam.available_until ? new Date(examCurrentExam.available_until).getTime() : durationEnd;
-  const endsAt = Math.min(durationEnd, Number.isFinite(scheduledEnd) ? scheduledEnd : durationEnd);
+  examTimerEndsAt = Math.min(durationEnd, Number.isFinite(scheduledEnd) ? scheduledEnd : durationEnd);
 
   function tick() {
-    const remaining = endsAt - Date.now();
+    const remaining = examTimerEndsAt - Date.now();
     const display = document.getElementById('exam-timer-display');
     if (remaining <= 0) {
       display.textContent = '00:00';
@@ -4996,13 +5005,38 @@ function startExamTimer() {
   tick();
   examTimerInterval = setInterval(tick, 1000);
   activateCheatingDetection();
+  // مزامنة الوقت مع الخادم حتى تظهر زيادة الوقت أو إعادة ضبطه دون تحديث الصفحة.
+  if (!examTestMode) examTimerSyncInterval = setInterval(async () => {
+    if (examTimerSyncBusy || !examCurrentAttempt || examCurrentAttempt.status !== 'in_progress' || examSubmitLock) return;
+    examTimerSyncBusy = true;
+    try {
+      const { data, error } = await sb.rpc('student_exam_resume_attempt', {
+        p_exam_id: examCurrentExam?.id, p_student_id: examStudent?.id,
+        p_phone: examStudentPhone, p_face_token: examFaceVerificationToken
+      });
+      if (!error && data?.ok && data.attempt?.status === 'in_progress') {
+        const serverStart = new Date(data.attempt.started_at).getTime();
+        const serverDuration = Math.max(15000, Number(data.exam?.duration_seconds) * 1000);
+        const serverEnd = data.exam?.available_until ? Math.min(serverStart + serverDuration, new Date(data.exam.available_until).getTime()) : serverStart + serverDuration;
+        if (Number.isFinite(serverEnd)) {
+          examTimerEndsAt = serverEnd;
+          examCurrentAttempt.started_at = data.attempt.started_at;
+          examCurrentExam.duration_seconds = data.exam.duration_seconds;
+        }
+      } else if (!error && data?.ok && data.attempt?.status === 'submitted') {
+        examCurrentAttempt.status = 'submitted';
+        if (examTimerInterval) clearInterval(examTimerInterval);
+        if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
+        await loadAvailableExamsForStudent();
+        showExamScreen('exam-select-screen');
+      }
+    } catch (syncError) { console.warn('تعذر مزامنة وقت الامتحان:', syncError); }
+    finally { examTimerSyncBusy = false; }
+  }, 10000);
 }
 
-let examPageUnloading = false;
-window.addEventListener('beforeunload', () => { examPageUnloading = true; });
-
-// ✅ كشف الغش: أي خروج من الصفحة (تبديل تبويب، تصغير، فتح تطبيق آخر) يُنهي الامتحان فورًا
-// لكن إعادة تحميل الصفحة (ريفرش) لا تُعتبر غشًا — الطالب يستكمل بنفس الوقت المتبقي
+// مغادرة الصفحة أو إخفاء التبويب تُنهي المحاولة نهائيًا.
+// pagehide احتياطي للمتصفحات التي لا تطلق visibilitychange قبل الإغلاق.
 async function logExamViolation(eventName,details){
   if(!examCurrentAttempt||examCurrentAttempt.status==='submitted')return;
   if(examTestMode){examTestViolationCount++;showToast('🧪 تم تسجيل مغادرة تجريبية رقم '+examTestViolationCount+' — دون أي أثر على السجلات.','info');return;}
@@ -5010,11 +5044,21 @@ async function logExamViolation(eventName,details){
   if(error||!data?.ok){console.warn('تعذر تسجيل مخالفة الامتحان:',error||data?.reason);return;}
   examCurrentAttempt.violation_count=data.violation_count;showToast('⚠️ تم تسجيل مغادرة الصفحة للمراجعة الإدارية. لم يتم إلغاء إجاباتك تلقائيًا.','warning');
 }
+function finalizeExamOnExit(source) {
+  if (!examCurrentAttempt || examCurrentAttempt.status === 'submitted' || examSubmitLock) return;
+  if (examTestMode) { finishExamTestMode(); return; }
+  console.info('تسليم الامتحان بسبب مغادرة الصفحة:', source);
+  submitExam(false, false, true);
+}
 function activateCheatingDetection(){
   if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
-  examVisibilityHandler=function(){if(examPageUnloading||!document.hidden||examSubmitLock||!examCurrentAttempt||examCurrentAttempt.status==='submitted')return;logExamViolation('visibility_hidden','انتقل المتصفح إلى تبويب أو تطبيق آخر أثناء الامتحان');};
+  examVisibilityHandler=function(){
+    if(!document.hidden||examSubmitLock||!examCurrentAttempt||examCurrentAttempt.status==='submitted')return;
+    finalizeExamOnExit('visibilitychange');
+  };
   document.addEventListener('visibilitychange',examVisibilityHandler);
 }
+window.addEventListener('pagehide', () => finalizeExamOnExit('pagehide'));
 
 function confirmSubmitExam() {
   const answeredCount = Object.keys(examCurrentAttempt.answers || {}).length;
@@ -5032,13 +5076,14 @@ function confirmSubmitExam() {
   }
 }
 
-async function submitExam(autoSubmitted, cheatingDetected) {
+async function submitExam(autoSubmitted, cheatingDetected, exitTriggered) {
   if (examTestMode) { finishExamTestMode(); return; }
   deactivateExamCopyProtection();
   document.getElementById('exam-result-note').textContent = 'شكرًا لأدائك الامتحان. النتيجة مسجَّلة في النظام.';
   if (examSubmitLock) return;
   examSubmitLock = true;
   if (examTimerInterval) clearInterval(examTimerInterval);
+  if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
   if (examVisibilityHandler) document.removeEventListener('visibilitychange', examVisibilityHandler);
 
   const answers = examCurrentAttempt.answers || {};
@@ -5059,13 +5104,15 @@ async function submitExam(autoSubmitted, cheatingDetected) {
     console.error('تعذر حفظ تسليم الامتحان:', submitError || submitResult?.reason);
     showToast('تعذر حفظ تسليم الامتحان: تحقق من اتصال الإنترنت وصلاحية التحقق بالوجه.', 'error');
     examSubmitLock = false;
-    startExamTimer();
+    if (!exitTriggered) startExamTimer();
+    else console.error('لم يتمكن الخادم من تأكيد التسليم عند مغادرة الصفحة؛ يجب مراجعة المحاولة من الإدارة.');
     return;
   }
   finalScore = Number(submitResult.score) || 0;
   maxScore = Number(submitResult.max_score) || maxScore;
   cheatingDetected = !!submitResult.flagged_cheating;
   examCurrentAttempt = { ...examCurrentAttempt, answers: submitResult.answers || answers, status: 'submitted', score: finalScore, max_score: maxScore, flagged_cheating: cheatingDetected };
+  if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
   examLastCorrectData = submitResult.correct_data || [];
   examLastAnswers = submitResult.answers || answers;
 
@@ -13108,6 +13155,32 @@ function viewExamAttemptAudit(attemptId){
   modal.classList.add('open');
 }
 
+async function adminReopenExamAttempt(attemptId, restartFromZero) {
+  const examId = currentExamResultsData?.exam?.id;
+  if (!attemptId || !examId) return;
+  let extraMinutes = 0;
+  if (restartFromZero) {
+    if (!confirm('إعادة الامتحان من البداية؟ سيتم مسح إجابات ونتيجة المحاولة السابقة وبدء وقت كامل جديد.')) return;
+  } else {
+    const raw = prompt('كم دقيقة إضافية تريد منحها؟ سيُعاد فتح المحاولة مع الاحتفاظ بالإجابات السابقة، ويضاف هذا الوقت إلى المدة الأصلية.', '5');
+    if (raw === null) return;
+    extraMinutes = Number(String(raw).trim());
+    if (!Number.isInteger(extraMinutes) || extraMinutes < 1 || extraMinutes > 180) {
+      showToast('أدخل عدد دقائق صحيحًا من 1 إلى 180.', 'error');
+      return;
+    }
+  }
+  const { data, error } = await sb.rpc('admin_reopen_exam_attempt', {
+    p_attempt_id: attemptId, p_extra_minutes: extraMinutes, p_restart: !!restartFromZero
+  });
+  if (error || !data?.ok) {
+    showToast(error?.message || 'تعذر إعادة فتح المحاولة.', 'error');
+    return;
+  }
+  showToast(data.message || 'تمت إعادة فتح المحاولة.');
+  await viewExamResults(examId);
+}
+
 async function adminAdjustExamTime(attemptId, resetFull) {
   const examId = currentExamResultsData?.exam?.id;
   if (!attemptId || !examId) return;
@@ -13189,7 +13262,7 @@ async function viewExamResults(examId) {
     if (a.flagged_cheating) statusBadge = '<span class="badge badge-danger">🚫 راسب — اشتباه غش</span>';
     else if (pct >= 50) statusBadge = '<span class="badge badge-success">✓ ناجح</span>';
     else statusBadge = '<span class="badge badge-danger">✗ راسب</span>';
-    return '<tr><td><strong>'+escapeHtml(s.enrollment_number || s.id)+'</strong></td><td>'+escapeHtml(s.name)+'</td><td>'+a.score+' / '+a.max_score+'</td><td><span class="badge '+(pct>=50?'badge-success':'badge-danger')+'">'+pct+'%</span></td><td>'+ (Number(a.correct_count)||0) +'</td><td>'+ (Number(a.incorrect_count)||0) +'</td><td>'+ (Number(a.unanswered_count)||0) +'</td><td>'+statusBadge+'</td><td style="font-size:12px;">'+timeTaken+'</td><td>'+ (Number(a.violation_count)||0) +' <button class="btn btn-outline btn-sm" onclick="viewExamAttemptAudit(\''+a.id+'\')">تفاصيل</button></td></tr>';
+    return '<tr><td><strong>'+escapeHtml(s.enrollment_number || s.id)+'</strong></td><td>'+escapeHtml(s.name)+'</td><td>'+a.score+' / '+a.max_score+'</td><td><span class="badge '+(pct>=50?'badge-success':'badge-danger')+'">'+pct+'%</span></td><td>'+ (Number(a.correct_count)||0) +'</td><td>'+ (Number(a.incorrect_count)||0) +'</td><td>'+ (Number(a.unanswered_count)||0) +'</td><td>'+statusBadge+'</td><td style="font-size:12px;">'+timeTaken+'</td><td>'+ (Number(a.violation_count)||0) +' <button class="btn btn-outline btn-sm" onclick="viewExamAttemptAudit(\''+a.id+'\')">تفاصيل</button><br><button class="btn btn-success btn-sm" style="margin-top:5px" onclick="adminReopenExamAttempt(\''+a.id+'\',false)">إعادة فتح + وقت</button> <button class="btn btn-outline btn-sm" style="margin-top:5px" onclick="adminReopenExamAttempt(\''+a.id+'\',true)">إعادة من البداية</button></td></tr>';
   }).join('');
 }
 
