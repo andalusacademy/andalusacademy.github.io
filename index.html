@@ -5099,8 +5099,13 @@ async function finalizeExamOnExit(source) {
   if (examTimerInterval) clearInterval(examTimerInterval);
   if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
   console.warn('مخالفة مغادرة الامتحان — تسليم تلقائي:', source);
-  try { await logExamViolation('tab_hidden', String(source || 'page_hidden')); }
-  catch (e) { console.warn('تعذر تسجيل تفاصيل المخالفة:', e); }
+  try {
+    await Promise.race([
+      logExamViolation('tab_hidden', String(source || 'page_hidden')),
+      new Promise(resolve => setTimeout(resolve, 350))
+    ]);
+  } catch (e) { console.warn('تعذر تسجيل تفاصيل المخالفة:', e); }
+  // لا ننتظر تسجيل سجل المخالفة إلى ما لا نهاية؛ أولوية المغادرة هي إرسال التسليم فورًا.
   await submitExam(true, true, true);
 }
 function activateCheatingDetection(){
