@@ -4825,6 +4825,7 @@ function finishExamTestMode(){
  deactivateExamCopyProtection();
  if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler,true);
  if(window.__andalusExamPageHideHandler)window.removeEventListener('pagehide',window.__andalusExamPageHideHandler,true);
+ if(window.__andalusExamBlurHandler)window.removeEventListener('blur',window.__andalusExamBlurHandler,true);
  const answers=examCurrentAttempt?.answers||{};let earned=0,rawMax=0;examQuestionsForStudent.forEach(q=>{const p=Number(q.points)||1;rawMax+=p;if(answers[q.id]===q.correct_answer)earned+=p;});
  const max=Number(examCurrentExam.total_score)||rawMax;const score=rawMax?Math.round((earned/rawMax*max)*100)/100:0;
  examCurrentAttempt.status='submitted';document.getElementById('exam-result-emoji').textContent='🧪';document.getElementById('exam-result-title').textContent='انتهت التجربة — هذه ليست نتيجة رسمية';
@@ -4835,6 +4836,7 @@ function exitExamTestMode(){
  deactivateExamCopyProtection();
  if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler,true);
  if(window.__andalusExamPageHideHandler)window.removeEventListener('pagehide',window.__andalusExamPageHideHandler,true);
+ if(window.__andalusExamBlurHandler)window.removeEventListener('blur',window.__andalusExamBlurHandler,true);
  examTestMode=false;examSubmitLock=false;document.getElementById('exam-test-banner').style.display='none';document.getElementById('exam-portal-screen').style.display=examTestOriginalPortalDisplay;
  examStudent=null;examCurrentExam=null;examCurrentAttempt=null;examQuestionsForStudent=[];examStudentPhone='';examFaceVerificationToken=null;examSkippedQuestions=new Set();renderExamQuestionsList();
  showToast('تم الخروج من وضع التجربة. لم يتم تسجيل أي نتيجة رسمية.');
@@ -5111,12 +5113,17 @@ async function finalizeExamOnExit(source) {
 function activateCheatingDetection(){
   if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler,true);
   if(window.__andalusExamPageHideHandler)window.removeEventListener('pagehide',window.__andalusExamPageHideHandler,true);
+  if(window.__andalusExamBlurHandler)window.removeEventListener('blur',window.__andalusExamBlurHandler,true);
   examVisibilityHandler=function(){
     if(document.visibilityState === 'hidden') void finalizeExamOnExit('visibility_hidden');
   };
   document.addEventListener('visibilitychange',examVisibilityHandler,true);
   window.__andalusExamPageHideHandler=function(){ void finalizeExamOnExit('pagehide'); };
   window.addEventListener('pagehide',window.__andalusExamPageHideHandler,true);
+  window.__andalusExamBlurHandler=function(){
+    if(document.visibilityState !== 'hidden') void finalizeExamOnExit('window_blur_or_new_window');
+  };
+  window.addEventListener('blur',window.__andalusExamBlurHandler,true);
 }
 
 function confirmSubmitExam() {
@@ -5127,6 +5134,7 @@ function confirmSubmitExam() {
     : 'هل أنت متأكد من تسليم الامتحان؟ لا يمكن التراجع بعد التسليم.';
   // تعطيل مؤقت لكشف الغش وقت ظهور نافذة التأكيد، تجنبًا لأي تعارض فى بعض المتصفحات
   if (examVisibilityHandler) document.removeEventListener('visibilitychange', examVisibilityHandler, true);
+  if (window.__andalusExamBlurHandler) window.removeEventListener('blur', window.__andalusExamBlurHandler, true);
   const confirmed = confirm(msg);
   if (confirmed) {
     submitExam(false);
@@ -5145,6 +5153,7 @@ async function submitExam(autoSubmitted, cheatingDetected, exitTriggered) {
   if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
   if (examVisibilityHandler) document.removeEventListener('visibilitychange', examVisibilityHandler, true);
   if (window.__andalusExamPageHideHandler) window.removeEventListener('pagehide', window.__andalusExamPageHideHandler, true);
+  if (window.__andalusExamBlurHandler) window.removeEventListener('blur', window.__andalusExamBlurHandler, true);
 
   const answers = examCurrentAttempt.answers || {};
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
