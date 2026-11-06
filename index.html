@@ -5059,13 +5059,12 @@ function finalizeExamOnExit(source) {
 }
 function activateCheatingDetection(){
   if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
-  examVisibilityHandler=function(){
-    if(!document.hidden||examSubmitLock||!examCurrentAttempt||examCurrentAttempt.status==='submitted')return;
-    finalizeExamOnExit('visibilitychange');
-  };
+  // التنقل المؤقت إلى واتساب أو تطبيق آخر على الهاتف لا ينهي الامتحان ولا ينشئ مخالفة.
+  // يستمر احتساب الوقت من ساعة النهاية المحفوظة، وعند العودة يستكمل الطالب من نفس المحاولة.
+  examVisibilityHandler=function(){ return; };
   document.addEventListener('visibilitychange',examVisibilityHandler);
 }
-window.addEventListener('pagehide', () => finalizeExamOnExit('pagehide'));
+// لا نسلّم الامتحان بسبب pagehide؛ التسليم يكون بزر الطالب أو عند انتهاء الوقت فقط.
 
 function confirmSubmitExam() {
   const answeredCount = Object.keys(examCurrentAttempt.answers || {}).length;
@@ -13150,18 +13149,45 @@ function exportExamQuestionsExcel() {
 /* ----- نتائج الامتحان ----- */
 let currentExamResultsData = { exam: null, sorted: [], attemptMap: {} };
 
-function viewExamAttemptAudit(attemptId){
-  const attempt=Object.values(currentExamResultsData.attemptMap||{}).find(a=>a.id===attemptId);
-  if(!attempt){showToast('لم يتم العثور على سجل المحاولة.','error');return;}
+async function viewExamAttemptAudit(attemptId){
+  let attempt=Object.values(currentExamResultsData.attemptMap||{}).find(a=>String(a.id)===String(attemptId));
+  // سجل المحاولات المستقل يفتح المحاولة مباشرة حتى لو لم تكن ضمن نتائج الامتحان الحالية.
+  if(!attempt){
+    const {data,error}=await sb.from('exam_attempts').select('*').eq('id',attemptId).maybeSingle();
+    if(error||!data){showToast(error?.message||'لم يتم العثور على سجل المحاولة في قاعدة البيانات.','error');return;}
+    attempt=data;
+  }
+  const exam=allExams.find(e=>String(e.id)===String(attempt.exam_id))||{};
+  const student=allStudents.find(s=>String(s.id)===String(attempt.student_id))||{};
   const log=Array.isArray(attempt.violation_log)?attempt.violation_log:[];
+  const answers=attempt.answers&&typeof attempt.answers==='object'?attempt.answers:{};
+  const order=Array.isArray(attempt.question_order)?attempt.question_order:[];
+  let questions=[];
+  if(order.length){
+    const {data}=await sb.from('exam_questions').select('id,question_text,question_type,correct_answer,option_a,option_b,option_c,option_d,points').in('id',order);
+    const map=new Map((data||[]).map(q=>[String(q.id),q]));
+    questions=order.map(id=>map.get(String(id))).filter(Boolean);
+  }
+  const answerLabel=(q,v)=>{
+    if(v===undefined||v===null||v==='')return 'لم يجب';
+    if(q.question_type==='truefalse')return v==='true'?'صح':v==='false'?'غلط':String(v);
+    const key=String(v).toLowerCase();
+    return ({a:q.option_a,b:q.option_b,c:q.option_c,d:q.option_d})[key]||String(v);
+  };
+  const questionRows=questions.map((q,i)=>{
+    const given=answers[q.id],correct=q.correct_answer;
+    const isAnswered=given!==undefined&&given!==null&&given!=='';
+    const isCorrect=isAnswered&&String(given)===String(correct);
+    return '<tr><td>'+(i+1)+'</td><td>'+escapeHtml(q.question_text||'')+'</td><td>'+escapeHtml(answerLabel(q,given))+'</td><td>'+escapeHtml(answerLabel(q,correct))+'</td><td><span class="badge '+(!isAnswered?'badge-warning':(isCorrect?'badge-success':'badge-danger'))+'">'+(!isAnswered?'لم يجب':(isCorrect?'صحيحة':'خاطئة'))+'</span></td></tr>';
+  }).join('');
+  const accepted=attempt.policy_accepted_at?new Date(attempt.policy_accepted_at).toLocaleString('ar-EG'):'لم تسجل';
+  const statusText=attempt.status==='submitted'?'تم التسليم':attempt.status==='in_progress'?'جارية':attempt.status==='abandoned'?'لم يتم التسليم — متروكة':attempt.status||'غير معروف';
+  const items=log.length?log.map((v,i)=>'<div style="padding:10px;border-bottom:1px solid var(--border)"><strong>ملاحظة '+(i+1)+': '+escapeHtml(v.event||'')+'</strong><div style="font-size:12px;color:var(--muted)">'+escapeHtml(v.details||'')+'</div><small>'+escapeHtml(v.occurred_at?new Date(v.occurred_at).toLocaleString('ar-EG'):'')+'</small></div>').join(''):'<div class="empty-state">لا توجد مخالفات مسجلة لهذه المحاولة.</div>';
   let modal=document.getElementById('modal-exam-attempt-audit');
   if(!modal){modal=document.createElement('div');modal.id='modal-exam-attempt-audit';modal.className='modal-overlay';document.body.appendChild(modal);}
-  const accepted=attempt.policy_accepted_at?new Date(attempt.policy_accepted_at).toLocaleString('ar-EG'):'لم تسجل';
-  const items=log.length?log.map((v,i)=>'<div style="padding:10px;border-bottom:1px solid var(--border)"><strong>مخالفة '+(i+1)+': '+escapeHtml(v.event||'مغادرة الصفحة')+'</strong><div style="font-size:12px;color:var(--muted)">'+escapeHtml(v.details||'')+'</div><small>'+escapeHtml(v.occurred_at?new Date(v.occurred_at).toLocaleString('ar-EG'):'')+'</small></div>').join(''):'<div class="empty-state">لا توجد مخالفات مسجلة لهذه المحاولة.</div>';
-  modal.innerHTML='<div class="modal" style="max-width:680px"><div class="modal-header"><h3>🛡 سجل أمان المحاولة</h3><button class="modal-close" onclick="closeModal(\'modal-exam-attempt-audit\')">×</button></div><div class="modal-body"><p><strong>موافقة السياسة:</strong> '+escapeHtml(accepted)+'</p><p><strong>إصدار السياسة:</strong> '+escapeHtml(attempt.policy_version||'—')+'</p><p><strong>عدد المخالفات:</strong> '+(Number(attempt.violation_count)||0)+'</p><hr>'+items+'</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal(\'modal-exam-attempt-audit\')">إغلاق</button></div></div>';
+  modal.innerHTML='<div class="modal" style="max-width:900px;max-height:90vh;overflow:auto"><div class="modal-header"><h3>📋 سجل تفاصيل المحاولة</h3><button class="modal-close" onclick="closeModal(\'modal-exam-attempt-audit\')">×</button></div><div class="modal-body"><p><strong>الطالب:</strong> '+escapeHtml(student.name||attempt.student_id)+' — <strong>الامتحان:</strong> '+escapeHtml(exam.title||attempt.exam_id)+'</p><p><strong>الحالة:</strong> '+escapeHtml(statusText)+' — <strong>الدخول:</strong> '+escapeHtml(attempt.started_at?new Date(attempt.started_at).toLocaleString('ar-EG'):'—')+' — <strong>التسليم:</strong> '+escapeHtml(attempt.submitted_at?new Date(attempt.submitted_at).toLocaleString('ar-EG'):'—')+'</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:12px 0"><div class="card"><b>'+(attempt.score??'—')+' / '+(attempt.max_score??'—')+'</b><small>الدرجة</small></div><div class="card"><b>'+(attempt.correct_count??'—')+'</b><small>صحيح</small></div><div class="card"><b>'+(attempt.incorrect_count??'—')+'</b><small>خطأ</small></div><div class="card"><b>'+(attempt.unanswered_count??Math.max(0,order.length-Object.keys(answers).length))+'</b><small>لم يجب</small></div><div class="card"><b>'+Object.keys(answers).length+' / '+order.length+'</b><small>إجابات محفوظة</small></div></div><p><strong>موافقة السياسة:</strong> '+escapeHtml(accepted)+' — <strong>إصدار السياسة:</strong> '+escapeHtml(attempt.policy_version||'—')+'</p><h4>تفاصيل الإجابات</h4><div style="overflow:auto"><table style="width:100%;min-width:650px"><thead><tr><th>#</th><th>السؤال</th><th>إجابة الطالب</th><th>الإجابة الصحيحة</th><th>الحالة</th></tr></thead><tbody>'+(questionRows||'<tr><td colspan="5">لا توجد أسئلة أو إجابات متاحة لهذا السجل.</td></tr>')+'</tbody></table></div><h4 style="margin-top:18px">الملاحظات والمخالفات ('+log.length+')</h4>'+items+'</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal(\'modal-exam-attempt-audit\')">إغلاق</button></div></div>';
   modal.classList.add('open');
 }
-
 async function adminReopenExamAttempt(attemptId, restartFromZero) {
   const examId = currentExamResultsData?.exam?.id;
   if (!attemptId || !examId) return;
@@ -13240,7 +13266,7 @@ async function viewExamResults(examId) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#b91c1c;padding:18px">تعذر تحميل نتائج المحاولات: '+escapeHtml(attemptsError.message)+'</td></tr>';
     return;
   }
-  const attemptMap = {}; (attempts || []).slice().sort((a,b) => new Date(a.started_at||0)-new Date(b.started_at||0)).forEach(a => attemptMap[a.student_id] = a);
+  const attemptMap = {}; (attempts || []).slice().sort((a,b) => new Date(a.started_at||0)-new Date(b.started_at||0)).forEach(a => { const old=attemptMap[a.student_id]; if(!old || new Date(a.started_at||0)>=new Date(old.started_at||0)) attemptMap[a.student_id] = a; });
 
   if (!matchingStudents.length) {
     tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="emoji">📊</div><h4>لا يوجد طلاب مستهدفون لهذا الامتحان</h4></div></td></tr>';
