@@ -12815,6 +12815,9 @@ async function saveExamQuestions() {
     if(!q.correct_answer){showToast('⚠️ سؤال '+(i+1)+' بدون تحديد الإجابة الصحيحة','error');return;}
     if(q.question_type==='mcq'&&(!q.option_a||!q.option_b)){showToast('⚠️ سؤال '+(i+1)+' يحتاج اختيارين على الأقل','error');return;}
   }
+  const {count:attemptCount,error:attemptCheckError}=await sb.from('exam_attempts').select('id',{count:'exact',head:true}).eq('exam_id',editingExamId);
+  if(attemptCheckError){showToast('تعذر التأكد من وجود محاولات سابقة؛ لم نغيّر الأسئلة: '+attemptCheckError.message,'error');return;}
+  if((attemptCount||0)>0){showToast('لا يمكن تعديل بنك أسئلة هذا الامتحان بعد بدء أول محاولة؛ حفاظًا على إجابات الطلاب وسجلهم. أنشئ امتحانًا جديدًا إذا أردت نسخة بأسئلة مختلفة.','error');return;}
   const toInsert=examQuestionsDraft.map((q,i)=>({
     exam_id:editingExamId,question_text:String(q.question_text||'').trim(),question_type:q.question_type||'mcq',
     option_a:q.option_a||null,option_b:q.option_b||null,option_c:q.option_c||null,option_d:q.option_d||null,
