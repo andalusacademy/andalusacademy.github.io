@@ -41,7 +41,7 @@ BEGIN
   RETURN jsonb_build_object('ok',true);
 END;
 $function$
-
+;
 CREATE OR REPLACE FUNCTION public.student_exam_submit_attempt(p_attempt_id uuid, p_student_id text, p_phone text, p_face_token uuid, p_answers jsonb, p_cheating boolean DEFAULT false)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -151,3 +151,4 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $function$
 
+;
