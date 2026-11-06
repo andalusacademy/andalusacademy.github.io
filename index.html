@@ -3859,14 +3859,14 @@ async function doLogout() {
   if (new URLSearchParams(window.location.search).get('weekly-quiz') === '1') {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('student-portal-screen').style.display = 'block';
-    showStudentPortalLoginStep();
+    setTimeout(() => showStudentPortalLoginStep(), 0);
     return;
   }
   // بوابة الطالب الموحّدة تُعرض فورًا قبل أي تحميل لإعدادات الإدارة أو استعلامات الشبكة.
   if (params.get('student-portal') === '1') {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('student-portal-screen').style.display = 'block';
-    showStudentPortalLoginStep();
+    setTimeout(() => showStudentPortalLoginStep(), 0);
     return;
   }
 
