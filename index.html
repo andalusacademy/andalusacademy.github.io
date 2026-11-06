@@ -2788,6 +2788,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
         </div>
         <input type="hidden" id="exam-duration" value="25"><div class="form-group2"><label>⏱️ وقت الامتحان</label><div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface,#f8fafc);font-size:13px;line-height:1.8;">يُحسب تلقائيًا حسب عدد الأسئلة الفعلي: <strong>15 ثانية لكل سؤال</strong> — بحد أقصى 100 سؤال للمتدرب.</div></div>
         <div class="form-group2"><label>توزيع مستويات صعوبة الأسئلة لكل طالب (المجموع 100%)</label><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><label style="font-size:12px">سهل %<input type="number" id="exam-mix-easy" min="0" max="100" value="20"></label><label style="font-size:12px">متوسط %<input type="number" id="exam-mix-medium" min="0" max="100" value="60"></label><label style="font-size:12px">صعب %<input type="number" id="exam-mix-hard" min="0" max="100" value="20"></label></div><small style="color:var(--muted)">إذا لم يتوفر عدد كافٍ من مستوى معين، يكمل النظام العدد عشوائيًا من بقية المستويات.</small></div>
+        <div class="form-group2"><label>عدد الأسئلة حسب النوع لكل طالب (اختياري — الحد الأقصى 100)</label><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px"><label style="font-size:12px">اختيار من متعدد<input type="number" id="exam-type-mcq" min="0" max="100" value="0"></label><label style="font-size:12px">صح / خطأ<input type="number" id="exam-type-truefalse" min="0" max="100" value="0"></label></div><small style="color:var(--muted)">اكتب مثلًا 40 اختيار + 40 صح/خطأ. إذا تركت القيمتين صفرًا، يختار النظام تلقائيًا من بنك الأسئلة حتى 100 سؤال. وإذا نقص نوع معيّن، يكمل العدد من الأسئلة المتاحة دون تكرار.</small></div>
         <div class="form-group2"><label>الدرجة الكلية للامتحان *</label><input type="number" id="exam-total-score" min="1" value="100" placeholder="مثال: 50"></div>
         <div class="form-group2">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -2843,7 +2844,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
   <div class="modal" style="max-width:680px">
     <div class="modal-header"><h3 id="modal-exam-results-title">نتائج الامتحان</h3><button class="modal-close" onclick="closeModal('modal-exam-results')">×</button></div>
     <div class="modal-body">
-      <table><thead><tr><th>رقم القيد</th><th>الاسم</th><th>الدرجة</th><th>النسبة</th><th>الحالة</th><th>الوقت المستغرق</th><th>سجل المحاولة</th></tr></thead>
+      <table><thead><tr><th>رقم القيد</th><th>الاسم</th><th>الدرجة</th><th>النسبة</th><th>صحيح</th><th>خطأ</th><th>لم يجب</th><th>الحالة</th><th>الوقت المستغرق</th><th>سجل المحاولة</th></tr></thead>
       <tbody id="exam-results-table"></tbody></table>
     </div>
     <div class="modal-footer">
@@ -12423,6 +12424,8 @@ async function saveExam() {
   }
   if (total_score <= 0) { showToast('⚠️ أدخل الدرجة الكلية للامتحان', 'error'); return; }
   if (Object.values(question_mix).some(v=>!Number.isFinite(v)||v<0||v>100) || mixTotal !== 100) { showToast('⚠️ مجموع نسب السهل والمتوسط والصعب يجب أن يساوي 100%.', 'error'); return; }
+  const typeMixTotal=(Number(document.getElementById('exam-type-mcq')?.value)||0)+(Number(document.getElementById('exam-type-truefalse')?.value)||0);
+  if(typeMixTotal>100){showToast('⚠️ مجموع أعداد أنواع الأسئلة لا يمكن أن يتجاوز 100 سؤال.', 'error');return;}
   if (new Date(until) <= new Date(from)) {
     showToast('⚠️ وقت النهاية لازم يكون بعد وقت البداية', 'error'); return;
   }
@@ -12432,6 +12435,7 @@ async function saveExam() {
   const examData = {
     title, subject_id, program_id: firstPid, system_name: firstSys || null, program_combos: combos,
     branch, duration_minutes, total_score, question_mix,
+    question_type_mix: { mcq:Number(document.getElementById('exam-type-mcq')?.value)||0, truefalse:Number(document.getElementById('exam-type-truefalse')?.value)||0 },
     show_answers_after_submit, is_placement_test,
     available_from: new Date(from).toISOString(),
     available_until: new Date(until).toISOString(),
@@ -13064,23 +13068,35 @@ function viewExamAttemptAudit(attemptId){
 
 async function viewExamResults(examId) {
   const exam = allExams.find(e => e.id === examId);
-  document.getElementById('modal-exam-results-title').textContent = '📊 نتائج: ' + (exam?.title || '');
+  if (!exam) { showToast('تعذر العثور على الامتحان.', 'error'); return; }
+  document.getElementById('modal-exam-results-title').textContent = '📊 نتائج: ' + (exam.title || '');
   const tbody = document.getElementById('exam-results-table');
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">جاري التحميل...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--muted)">جاري التحميل...</td></tr>';
   document.getElementById('modal-exam-results').classList.add('open');
 
-  // كل الطلاب المطابقين للبرنامج/الفرع/النظام (نفس نطاق ظهور الامتحان للطالب)
-  const matchingStudents = allStudents.filter(s => s.branch === exam.branch && examMatchesStudent(exam, s));
+  let matchingStudents = allStudents.filter(s => s.branch === exam.branch && examMatchesStudent(exam, s));
+  if (exam.targeting_mode) {
+    const { data: targets, error: targetError } = await sb.from('exam_student_targets').select('student_id').eq('exam_id', examId);
+    if (targetError) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#b91c1c;padding:18px">تعذر تحميل قائمة الطلاب المستهدفين: '+escapeHtml(targetError.message)+'</td></tr>';
+      return;
+    }
+    const targetIds = new Set((targets || []).map(t => String(t.student_id)));
+    matchingStudents = matchingStudents.filter(s => targetIds.has(String(s.id)));
+  }
 
-  const { data: attempts } = await sb.from('exam_attempts').select('*').eq('exam_id', examId);
+  const { data: attempts, error: attemptsError } = await sb.from('exam_attempts').select('*').eq('exam_id', examId);
+  if (attemptsError) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#b91c1c;padding:18px">تعذر تحميل نتائج المحاولات: '+escapeHtml(attemptsError.message)+'</td></tr>';
+    return;
+  }
   const attemptMap = {}; (attempts || []).forEach(a => attemptMap[a.student_id] = a);
 
   if (!matchingStudents.length) {
-    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="emoji">📊</div><h4>لا يوجد طلاب مطابقين لهذا الامتحان</h4></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="emoji">📊</div><h4>لا يوجد طلاب مستهدفون لهذا الامتحان</h4></div></td></tr>';
     return;
   }
 
-  // ترتيب: من امتحن (بالدرجة الأعلى أولًا) ثم من لم يمتحن فى الآخر
   const sorted = [...matchingStudents].sort((a, b) => {
     const aa = attemptMap[a.id], bb = attemptMap[b.id];
     const aScore = (aa && aa.status === 'submitted') ? aa.score : -1;
@@ -13092,33 +13108,18 @@ async function viewExamResults(examId) {
   tbody.innerHTML = sorted.map(s => {
     const a = attemptMap[s.id];
     if (!a) {
-      return `<tr style="background:#fef2f2;">
-        <td><strong>${escapeHtml(s.id)}</strong></td><td>${escapeHtml(s.name)}</td><td>0 / ${exam.total_score || 100}</td>
-        <td><span class="badge badge-danger">0%</span></td><td><span class="badge badge-danger">❌ لم يبدأ الامتحان</span></td><td>—</td><td>—</td>
-      </tr>`;
+      return '<tr style="background:#fef2f2;"><td><strong>'+escapeHtml(s.enrollment_number || s.id)+'</strong></td><td>'+escapeHtml(s.name)+'</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-danger">❌ لم يبدأ الامتحان</span></td><td>—</td><td>—</td></tr>';
     }
     if (a.status !== 'submitted') {
-      return `<tr style="background:#fffbeb;">
-        <td><strong>${escapeHtml(s.id)}</strong></td><td>${escapeHtml(s.name)}</td><td>—</td><td>—</td>
-        <td><span class="badge badge-warning">⏳ محاولة جارية</span></td><td>—</td>
-        <td>${Number(a.violation_count)||0} <button class="btn btn-outline btn-sm" onclick="viewExamAttemptAudit('${a.id}')">تفاصيل</button></td>
-      </tr>`;
+      return '<tr style="background:#fffbeb;"><td><strong>'+escapeHtml(s.enrollment_number || s.id)+'</strong></td><td>'+escapeHtml(s.name)+'</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-warning">⏳ محاولة جارية</span></td><td>—</td><td>'+ (Number(a.violation_count)||0) +' <button class="btn btn-outline btn-sm" onclick="viewExamAttemptAudit(\''+a.id+'\')">تفاصيل</button></td></tr>';
     }
     const pct = a.max_score > 0 ? Math.round(a.score / a.max_score * 100) : 0;
-    const timeTaken = a.time_taken_seconds ? `${Math.floor(a.time_taken_seconds / 60)} د ${a.time_taken_seconds % 60} ث` : '—';
+    const timeTaken = a.time_taken_seconds != null ? Math.floor(a.time_taken_seconds / 60) + ' د ' + (a.time_taken_seconds % 60) + ' ث' : '—';
     let statusBadge;
     if (a.flagged_cheating) statusBadge = '<span class="badge badge-danger">🚫 راسب — اشتباه غش</span>';
     else if (pct >= 50) statusBadge = '<span class="badge badge-success">✓ ناجح</span>';
     else statusBadge = '<span class="badge badge-danger">✗ راسب</span>';
-    return `<tr>
-      <td><strong>${escapeHtml(s.id)}</strong></td>
-      <td>${escapeHtml(s.name)}</td>
-      <td>${a.score} / ${a.max_score}</td>
-      <td><span class="badge ${pct >= 50 ? 'badge-success' : 'badge-danger'}">${pct}%</span></td>
-      <td>${statusBadge}</td>
-      <td style="font-size:12px;">${timeTaken}</td>
-      <td>${Number(a.violation_count)||0} <button class="btn btn-outline btn-sm" onclick="viewExamAttemptAudit('${a.id}')">تفاصيل</button></td>
-    </tr>`;
+    return '<tr><td><strong>'+escapeHtml(s.enrollment_number || s.id)+'</strong></td><td>'+escapeHtml(s.name)+'</td><td>'+a.score+' / '+a.max_score+'</td><td><span class="badge '+(pct>=50?'badge-success':'badge-danger')+'">'+pct+'%</span></td><td>'+ (Number(a.correct_count)||0) +'</td><td>'+ (Number(a.incorrect_count)||0) +'</td><td>'+ (Number(a.unanswered_count)||0) +'</td><td>'+statusBadge+'</td><td style="font-size:12px;">'+timeTaken+'</td><td>'+ (Number(a.violation_count)||0) +' <button class="btn btn-outline btn-sm" onclick="viewExamAttemptAudit(\''+a.id+'\')">تفاصيل</button></td></tr>';
   }).join('');
 }
 
