@@ -16,13 +16,13 @@
   $('#ear-search').oninput=e=>{search=e.target.value.trim().toLowerCase();render();};
   $('#ear-filter').onchange=e=>{filter=e.target.value;render();};
  }
- function student(id){return (window.allStudents||[]).find(s=>String(s.id)===String(id))||{};}
- function exam(id){return (window.allExams||[]).find(e=>String(e.id)===String(id))||{};}
- function status(a){if(a.status==='submitted')return 'تم التسليم';if(a.status==='in_progress')return 'لم يسلم — محاولة جارية';return a.status||'غير معروف';}
+ function student(id){const list=typeof allStudents!=='undefined'?allStudents:(window.allStudents||[]);return list.find(s=>String(s.id)===String(id))||{};}
+ function exam(id){const list=typeof allExams!=='undefined'?allExams:(window.allExams||[]);return list.find(e=>String(e.id)===String(id))||{};}
+ function status(a){if(a.status==='submitted')return 'تم التسليم';if(a.status==='in_progress')return 'لم يسلم — محاولة جارية';if(a.status==='abandoned')return 'محاولة متروكة / لم تسلم';return a.status||'غير معروف';}
  async function load(){
   mount();const body=$('#ear-body');if(!body)return;body.innerHTML='<tr><td colspan="10" style="text-align:center;padding:18px">جاري تحميل سجل المحاولات...</td></tr>';
-  if(!window.sb){body.innerHTML='<tr><td colspan="10">قاعدة البيانات غير متاحة</td></tr>';return;}
-  const {data,error}=await window.sb.from('exam_attempts').select('*').order('started_at',{ascending:false}).limit(2000);
+  const db=typeof sb!=='undefined'?sb:window.sb;if(!db){body.innerHTML='<tr><td colspan="10">قاعدة البيانات غير متاحة</td></tr>';return;}
+  const {data,error}=await db.from('exam_attempts').select('*').order('started_at',{ascending:false}).limit(2000);
   if(error){body.innerHTML='<tr><td colspan="10" style="color:#b91c1c">تعذر تحميل السجل: '+esc(error.message)+'</td></tr>';return;}
   rows=data||[];render();
  }
