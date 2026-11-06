@@ -2841,11 +2841,11 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 
 <!-- MODAL: EXAM RESULTS -->
 <div class="modal-overlay" id="modal-exam-results">
-  <div class="modal" style="max-width:680px">
+  <div class="modal" style="max-width:1000px">
     <div class="modal-header"><h3 id="modal-exam-results-title">نتائج الامتحان</h3><button class="modal-close" onclick="closeModal('modal-exam-results')">×</button></div>
     <div class="modal-body">
-      <table><thead><tr><th>رقم القيد</th><th>الاسم</th><th>الدرجة</th><th>النسبة</th><th>صحيح</th><th>خطأ</th><th>لم يجب</th><th>الحالة</th><th>الوقت المستغرق</th><th>سجل المحاولة</th></tr></thead>
-      <tbody id="exam-results-table"></tbody></table>
+      <div style="width:100%;overflow-x:auto"><table style="min-width:920px"><thead><tr><th>رقم القيد</th><th>الاسم</th><th>الدرجة</th><th>النسبة</th><th>صحيح</th><th>خطأ</th><th>لم يجب</th><th>الحالة</th><th>الوقت المستغرق</th><th>سجل المحاولة</th></tr></thead>
+      <tbody id="exam-results-table"></tbody></table></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-excel" onclick="exportExamResults()">📥 تصدير Excel</button>
