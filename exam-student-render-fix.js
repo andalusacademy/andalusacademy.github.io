@@ -127,7 +127,7 @@
  #exam-portal-screen #exam-active-screen #exam-questions-wrap .exam-question-actions{
    display:flex!important;align-items:center!important;justify-content:flex-start!important;
    gap:10px!important;flex-wrap:wrap!important;margin-top:24px!important;padding-top:16px!important;
-   border-top:1px solid #e5eaf2!important;direction:rtl!important;
+   border-top:1px solid #e5eaf2!important;direction:ltr!important;
  }
  #exam-portal-screen #exam-active-screen #exam-questions-wrap .exam-question-actions button{
    min-height:46px!important;min-width:128px!important;padding:10px 18px!important;
