@@ -4728,7 +4728,7 @@ async function ensurePortalSubjects() {
 
 async function isStudentEligibleForExam(exam, student, options = {}) {
   if (!exam || !student) return false;
-  if (String(exam.branch || '') !== String(student.branch || '')) return false;
+  if (exam.targeting_mode !== true && String(exam.branch || '') !== String(student.branch || '') && String(exam.branch || '') !== 'الفرعين') return false;
   if (!examMatchesStudent(exam, student)) return false;
   if (!options.allowPastWindow) {
     const now = Date.now();
@@ -4853,7 +4853,16 @@ async function resumeExam(examId) {
     p_phone: examStudentPhone, p_face_token: examFaceVerificationToken
   });
   if (error || !result?.ok) {
-    showToast(result?.reason === 'verification_required' ? 'انتهت صلاحية التحقق بالوجه. أعد تسجيل الدخول.' : 'تعذر استكمال الامتحان.', 'error');
+    const resumeMessages = {
+      verification_required: 'انتهت صلاحية التحقق بالوجه. أعد تسجيل الدخول.',
+      attempt_not_found: 'لم يتم العثور على محاولة الامتحان الحالية لهذا الحساب.',
+      student_not_targeted: 'هذا الامتحان غير مخصص لحسابك.',
+      program_not_allowed: 'هذا الامتحان غير مخصص لبرنامجك.',
+      branch_not_allowed: 'هذا الامتحان غير مخصص لفرعك.',
+      round2_not_eligible: 'لا تستوفي شروط استكمال امتحان الدور الثاني.',
+      no_questions: 'لم يتم العثور على أسئلة مرتبطة بمحاولتك. تواصل مع الإدارة.'
+    };
+    showToast(resumeMessages[result?.reason] || error?.message || 'تعذر استكمال الامتحان.', 'error');
     return;
   }
   const exam = result.exam, attempt = result.attempt;
@@ -11870,6 +11879,8 @@ function sessionMatchesStudent(session, student) {
 // ✅ نفس منطق sessionMatchesStudent لكن للامتحانات (تدعم امتحان لأكتر من برنامج فى نفس الوقت — v4.9)
 function examMatchesStudent(exam, student) {
   if (!exam || !student) return false;
+  // Individual targeting: the explicit target list is authoritative.
+  if (exam.targeting_mode === true) return true;
   if (exam.program_combos && Array.isArray(exam.program_combos) && exam.program_combos.length) {
     return exam.program_combos.some(c => {
       const [pid, sys] = String(c).split('|');
