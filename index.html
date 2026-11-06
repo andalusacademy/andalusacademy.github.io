@@ -4790,7 +4790,8 @@ function sampleExamQuestionsByDifficulty(pool,limit,mix){
 function finishExamTestMode(){
  deactivateExamCopyProtection();
  if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
- const answers=examCurrentAttempt?.answers||{};let score=0,max=0;examQuestionsForStudent.forEach(q=>{const p=Number(q.points)||1;max+=p;if(answers[q.id]===q.correct_answer)score+=p;});
+ const answers=examCurrentAttempt?.answers||{};let earned=0,rawMax=0;examQuestionsForStudent.forEach(q=>{const p=Number(q.points)||1;rawMax+=p;if(answers[q.id]===q.correct_answer)earned+=p;});
+ const max=Number(examCurrentExam.total_score)||rawMax;const score=rawMax?Math.round((earned/rawMax*max)*100)/100:0;
  examCurrentAttempt.status='submitted';document.getElementById('exam-result-emoji').textContent='🧪';document.getElementById('exam-result-title').textContent='انتهت التجربة — هذه ليست نتيجة رسمية';
  document.getElementById('exam-result-score').textContent=score+' / '+max;document.getElementById('exam-result-note').textContent='وضع تجربة فقط. لم يتم حفظ محاولة أو درجة أو إشعار أو أي سجل رسمي للطالب.';
  document.getElementById('exam-answers-review').style.display='none';document.getElementById('exam-test-banner').style.display='none';examSubmitLock=false;showExamScreen('exam-result-screen');
