@@ -4770,7 +4770,7 @@ function startExamTestMode(){
  examStudent={id:testStudentId,name:'وضع التجربة — قيد '+testStudentId};examStudentPhone='';examFaceVerificationToken=null;
  examCurrentExam={id:'test-exam',title:document.getElementById('modal-exam-q-title').textContent.replace('📝 أسئلة: ','')||'امتحان تجريبي',duration_seconds:examQuestionsForStudent.length*15,total_score:examQuestionsForStudent.reduce((n,q)=>n+(Number(q.points)||1),0),available_until:null,show_answers_after_submit:true};
  examCurrentAttempt={id:'test-attempt',started_at:new Date().toISOString(),answers:{},status:'in_progress'};examCurrentQuestionIndex=0;examSkippedQuestions=new Set();
- document.getElementById('exam-portal-screen').style.display='block';document.getElementById('exam-test-banner').style.display='block';renderExamQuestionsForStudent({});showExamScreen('exam-active-screen');startExamTimer();
+ document.getElementById('exam-portal-screen').style.display='block';document.getElementById('exam-test-banner').textContent='🧪 وضع تجربة — رقم القيد: '+testStudentId+' — لا يتم حفظ نتيجة رسمية';document.getElementById('exam-test-banner').style.display='block';renderExamQuestionsForStudent({});showExamScreen('exam-active-screen');startExamTimer();
 }
 function finishExamTestMode(){
  if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
@@ -12009,8 +12009,9 @@ function renderExamAdminStats() {
   const published = allExams.filter(e => e.is_published === true).length;
   const questionTotal = allExams.reduce((n,e) => n + (e.question_count || 0), 0);
   const noQuestions = allExams.filter(e => !e.question_count).length;
+  const drafts = total - published;
   const stat = (value,label,color) => '<div class="card" style="padding:14px;text-align:center"><div style="font-size:25px;font-weight:900;color:'+color+'">'+value+'</div><div style="font-size:12px;color:var(--muted)">'+label+'</div></div>';
-  box.innerHTML = stat(total,'إجمالي الامتحانات','var(--navy)') + stat(published,'امتحانات في نافذة الإتاحة','#15803d') + stat(questionTotal,'إجمالي الأسئلة','#2563eb') + stat(noQuestions,'امتحانات بلا أسئلة','#d97706');
+  box.innerHTML = stat(total,'إجمالي الامتحانات','var(--navy)') + stat(published,'امتحانات منشورة','#15803d') + stat(drafts,'مسودات غير منشورة','#d97706') + stat(questionTotal,'إجمالي الأسئلة','#2563eb') + stat(noQuestions,'امتحانات بلا أسئلة','#b45309');
 }
 
 function renderExamsTable() {
@@ -12299,7 +12300,7 @@ function openGeneratedExamSettings() {
   document.getElementById('exam-total-score').value = pointsTotal || exam.questions.length;
   const publishButton = document.querySelector('#modal-exam button[onclick="saveExam()"]');
   if (publishButton) publishButton.textContent = '💾 حفظ المسودة والأسئلة';
-  showToast('حدد الفرع والبرنامج والمدة وموعد الامتحان، ثم اضغط نشر الامتحان.');
+  showToast('حدد الفرع والبرنامج والموعد، ثم احفظ المسودة وأضف الأسئلة وجرّبها قبل النشر.');
 }
 
 function openCreateExam() {
