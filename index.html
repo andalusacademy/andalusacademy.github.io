@@ -4764,12 +4764,12 @@ async function recordExamPolicyAcceptance(attemptId){
  if(error||!data?.ok){console.error('تعذر حفظ الموافقة:',error||data?.reason);return false;}return true;
 }
 function startExamTestMode(){
- const testStudentId=(prompt('أدخل رقم القيد الذي سيظهر في وضع التجربة. استخدم 0 للتجربة الخاصة بك:','0')||'').trim();if(!testStudentId)return;
+ const testStudentId='0';
  if(!examQuestionsDraft.length){showToast('أضف أسئلة أو استوردها أولًا ثم ابدأ التجربة.','error');return;}
  const invalid=examQuestionsDraft.findIndex(q=>!String(q.question_text||'').trim()||!q.correct_answer||(q.question_type!=='truefalse'&&(!q.option_a||!q.option_b)));
  if(invalid>=0){showToast('راجع السؤال رقم '+(invalid+1)+' وحدد النص والإجابة والاختيارات المطلوبة.','error');return;}
  const sourceExam=allExams.find(e=>e.id===editingExamId)||{};
- const shuffled=sampleExamQuestionsByDifficulty(examQuestionsDraft,100,sourceExam.question_mix||{easy:20,medium:60,hard:20});
+ const shuffled=sampleExamQuestionsForTest(examQuestionsDraft,100,sourceExam.question_mix||{easy:20,medium:60,hard:20},sourceExam.question_type_mix||{});
  examQuestionsForStudent=shuffled.map((q,i)=>({...q,id:'test-q-'+i,question_type:q.question_type||'mcq'}));
  examTestOriginalPortalDisplay=document.getElementById('exam-portal-screen').style.display||'none';examTestMode=true;examTestViolationCount=0;
  examStudent={id:testStudentId,name:'وضع التجربة — قيد '+testStudentId};examStudentPhone='';examFaceVerificationToken=null;
@@ -4788,6 +4788,18 @@ function sampleExamQuestionsByDifficulty(pool,limit,mix){
  const remaining=pool.filter(q=>!pickedIds.has(q));
  return examShuffleArray([...picked,...examShuffleArray(remaining).slice(0,Math.max(total-picked.length,0))]);
 }
+function sampleExamQuestionsForTest(pool,limit,difficultyMix,typeMix){
+ const total=Math.min(pool.length,limit);
+ const mcq=Math.max(0,Number(typeMix.mcq)||0),tf=Math.max(0,Number(typeMix.truefalse)||0);
+ if(mcq+tf===0)return sampleExamQuestionsByDifficulty(pool,limit,difficultyMix);
+ const picked=[
+   ...examShuffleArray(pool.filter(q=>q.question_type==='truefalse')).slice(0,tf),
+   ...examShuffleArray(pool.filter(q=>q.question_type!=='truefalse')).slice(0,mcq)
+ ];
+ const used=new Set(picked);
+ return examShuffleArray([...picked,...examShuffleArray(pool.filter(q=>!used.has(q))).slice(0,Math.max(total-picked.length,0))]).slice(0,total);
+}
+
 function finishExamTestMode(){
  deactivateExamCopyProtection();
  if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
@@ -4818,7 +4830,8 @@ async function startExam(examId) {
       exam_unavailable: 'الامتحان غير متاح الآن.',
       program_not_allowed: 'هذا الامتحان غير مخصص لبرنامجك.',
       round2_not_eligible: 'لا يمكنك دخول الدور الثاني لأن شرط الرسوب في الدور الأول غير متحقق.',
-      no_questions: 'لا توجد أسئلة في هذا الامتحان بعد.'
+      no_questions: 'لا توجد أسئلة في هذا الامتحان بعد.',
+      student_not_targeted: 'هذا الامتحان غير مخصص لحسابك.'
     };
     showToast(messages[result?.reason] || error?.message || 'تعذر بدء الامتحان.', 'error');
     return;
@@ -13315,16 +13328,16 @@ function exportExamResults() {
     const a = attemptMap[s.id];
     if (!a || a.status !== 'submitted') {
       return {
-        'رقم القيد': s.id, 'الاسم': s.name, 'الدرجة': 0, 'من': exam.total_score || 100,
-        'النسبة': '0%', 'الحالة': 'راسب — لم يحضر الامتحان', 'الوقت المستغرق': '—'
+        'رقم القيد': s.enrollment_number || s.id, 'الاسم': s.name, 'الدرجة': '—', 'من': exam.total_score || 100,
+        'النسبة': '—', 'صحيح': '—', 'خطأ': '—', 'لم يجب': '—', 'الحالة': 'لم يبدأ الامتحان', 'الوقت المستغرق': '—'
       };
     }
     const pct = a.max_score > 0 ? Math.round(a.score / a.max_score * 100) : 0;
     const timeTaken = a.time_taken_seconds ? `${Math.floor(a.time_taken_seconds / 60)} د ${a.time_taken_seconds % 60} ث` : '—';
     let status = a.flagged_cheating ? 'راسب — اشتباه غش' : (pct >= 50 ? 'ناجح' : 'راسب');
     return {
-      'رقم القيد': s.id, 'الاسم': s.name, 'الدرجة': a.score, 'من': a.max_score,
-      'النسبة': pct + '%', 'الحالة': status, 'الوقت المستغرق': timeTaken
+      'رقم القيد': s.enrollment_number || s.id, 'الاسم': s.name, 'الدرجة': a.score, 'من': a.max_score,
+      'النسبة': pct + '%', 'صحيح': Number(a.correct_count)||0, 'خطأ': Number(a.incorrect_count)||0, 'لم يجب': Number(a.unanswered_count)||0, 'الحالة': status, 'الوقت المستغرق': timeTaken
     };
   });
 
