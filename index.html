@@ -478,7 +478,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 @media(max-width:380px){#student-portal-card{padding:20px 15px}.student-portal-grid{gap:8px!important}.student-portal-tile{min-height:118px;padding:12px 7px!important}.student-portal-tile .tile-icon{width:44px;height:44px;font-size:23px}.student-portal-tile .tile-label{font-size:12px}}
 @media(min-width:540px){.student-portal-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}.student-portal-tile{min-height:140px}}
 </style>
-</head>
+<style id="exam-portal-enhancements">#exam-portal-screen{z-index:9998;position:relative}#exam-portal-screen .exam-questions-wrap{padding:10px 12px 30px}#exam-portal-screen .exam-q-card{background:#fff;border:1px solid #e4e8f2;border-radius:16px;box-shadow:0 8px 24px rgba(21,34,56,.08)}#exam-portal-screen .exam-option-label{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid #dbe2ee;border-radius:11px;margin:8px 0;cursor:pointer}#exam-portal-screen .exam-option-label.selected{border-color:#1d4ed8;background:#eff6ff}#exam-portal-screen .exam-timer{position:sticky;top:0;z-index:4;margin:0 auto;max-width:900px;text-align:center}#modal-exam-questions .modal{max-width:980px!important}@media(max-width:640px){#exam-portal-screen .exam-option-label{font-size:13px}#exam-portal-screen .exam-timer{font-size:25px}}</style></head>
 <body>
 
 <!-- STUDENT EXAM PORTAL (مستقلة تمامًا عن نظام الموظفين) -->
@@ -515,6 +515,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 
   <!-- شاشة الامتحان نفسه -->
   <div id="exam-active-screen" style="display:none;">
+    <div id="exam-test-banner" style="display:none;text-align:center;padding:8px 12px;background:#fff7ed;color:#9a3412;font-weight:800;">🧪 وضع تجربة — لا يتم حفظ نتيجة رسمية</div>
     <div class="exam-timer" id="exam-timer-display">00:00</div>
     <div class="exam-questions-wrap" id="exam-questions-wrap"></div>
     <div style="text-align:center;padding:20px;">
@@ -528,7 +529,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
       <div style="font-size:50px;margin-bottom:10px;" id="exam-result-emoji">🎉</div>
       <h2 id="exam-result-title">تم تسليم الامتحان</h2>
       <div style="font-size:36px;font-weight:900;color:var(--navy);margin:18px 0;" id="exam-result-score">—</div>
-      <p style="color:var(--muted);font-size:13px;">شكرًا لأدائك الامتحان. النتيجة مسجَّلة في النظام.</p>
+      <p id="exam-result-note" style="color:var(--muted);font-size:13px;">شكرًا لأدائك الامتحان. النتيجة مسجَّلة في النظام.</p>
       <button class="btn btn-outline" style="width:100%;margin-top:18px;" onclick="examStudentLogout()">🚪 خروج</button>
     </div>
     <div id="exam-answers-review" style="display:none;max-width:720px;width:100%;margin-top:24px;background:#fff;border-radius:14px;padding:22px;"></div>
@@ -1360,6 +1361,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <button class="btn btn-info" onclick="copyStudentExamLink()">🔗 نسخ رابط بوابة الامتحانات فقط</button>
             <button class="btn btn-info" style="background:#1a2a4a;" onclick="copyUnifiedStudentPortalLink()">🔗 نسخ رابط بوابة الطالب</button>
           </div>
+          <div id="exam-admin-overview" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-bottom:14px;"></div>
           <div class="card">
             <div class="card-header"><h3>📋 الامتحانات الإلكترونية</h3><button class="btn btn-danger btn-sm" onclick="bulkDeleteRows({rowClass:'exam-row-cb',table:'exams',selectAllId:'select-all-exams',label:'امتحان',onSuccess:loadExams})">🗑 حذف المحدد</button></div>
             <table><thead><tr><th style="width:30px"><input type="checkbox" id="select-all-exams" onchange="toggleAllCheckboxes(this,'exam-row-cb')"></th><th>العنوان</th><th>المادة</th><th>البرنامج/الفرع</th><th>الدور</th><th>المدة</th><th>متاح من — إلى</th><th>النتائج</th><th>—</th></tr></thead>
@@ -2818,6 +2820,9 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
         <button class="btn btn-outline btn-sm" onclick="downloadExamQuestionsTemplate()">⬇️ قالب إكسيل بالإجابات</button>
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('exam-q-import-input').click()">📥 استيراد من إكسيل</button>
         <input type="file" id="exam-q-import-input" accept=".xlsx,.xls" style="display:none" onchange="importExamQuestionsExcel(this)">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('exam-q-document-input').click()">📄 استيراد Word / PDF</button>
+        <input type="file" id="exam-q-document-input" accept=".docx,.pdf" style="display:none" onchange="importExamQuestionsDocument(this)">
+        <button class="btn btn-outline btn-sm" onclick="openMergeExamQuestions()">🧩 دمج بنك أسئلة</button>
         <button class="btn btn-outline btn-sm" onclick="exportExamQuestionsExcel()">📤 تصدير أسئلة الامتحان ده</button>
       </div>
       <p style="font-size:11px;color:var(--muted);margin:-8px 0 14px;">💡 طريقتين لعمل الامتحان: تضيف الأسئلة يدويًا بزرار "إضافة سؤال جديد" تحت، أو تملى القالب بره وتستورده — الاستيراد بيضيف للأسئلة الموجودة (مش بيمسحها)، وأي طريقة برضو محتاجة "💾 حفظ الأسئلة" فى الآخر</p>
@@ -2826,6 +2831,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-exam-questions')">إغلاق</button>
+      <button class="btn btn-info" onclick="startExamTestMode()">🧪 تجربة بدون نشر — قيد 0</button>
       <button class="btn btn-gold" onclick="saveExamQuestions()">💾 حفظ الأسئلة</button>
     </div>
   </div>
@@ -3983,6 +3989,13 @@ let examSubmitLock = false;
 let examVisibilityHandler = null;
 let examLastCorrectData = [];
 let examLastAnswers = {};
+let examTestMode = false;
+let examTestOriginalPortalDisplay = 'none';
+let examCurrentQuestionIndex = 0;
+let examSkippedQuestions = new Set();
+let examPendingStartId = null;
+let examPolicyVersion = '2026-11-v1';
+let examTestViolationCount = 0;
 
 function showExamScreen(id) {
   ['exam-login-screen', 'exam-select-screen', 'exam-active-screen', 'exam-result-screen'].forEach(s => {
@@ -4696,7 +4709,7 @@ async function loadAvailableExamsForStudent() {
     let actionHtml;
     if (status === 'submitted') actionHtml = '<span class="badge badge-success">✓ تم التسليم مسبقًا</span>';
     else if (status === 'in_progress') actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="resumeExam('${e.id}')">▶ استكمال الامتحان</button>`;
-    else actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="startExam('${e.id}')">▶ بدء الامتحان</button>`;
+    else actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="requestExamStart('${e.id}')">▶ بدء الامتحان</button>`;
     return `<div class="exam-avail-item"><h4>${escapeHtml(e.title)}</h4><p>${escapeHtml(subj)} · المدة: ${Number(e.duration_minutes)||0} دقيقة — متاح حتى ${escapeHtml(until)}</p>${actionHtml}</div>`;
   }).join('');
 }
@@ -11936,6 +11949,18 @@ async function loadExams() {
     return { ...e, question_count, duration_seconds, duration_minutes: Math.ceil(duration_seconds / 60) };
   });
   renderExamsTable();
+  renderExamAdminStats();
+}
+
+function renderExamAdminStats() {
+  const box = document.getElementById('exam-admin-overview');
+  if (!box) return;
+  const total = allExams.length;
+  const published = allExams.filter(e => e.available_from && e.available_until && new Date(e.available_until).getTime() > Date.now()).length;
+  const questionTotal = allExams.reduce((n,e) => n + (e.question_count || 0), 0);
+  const noQuestions = allExams.filter(e => !e.question_count).length;
+  const stat = (value,label,color) => '<div class="card" style="padding:14px;text-align:center"><div style="font-size:25px;font-weight:900;color:'+color+'">'+value+'</div><div style="font-size:12px;color:var(--muted)">'+label+'</div></div>';
+  box.innerHTML = stat(total,'إجمالي الامتحانات','var(--navy)') + stat(published,'امتحانات في نافذة الإتاحة','#15803d') + stat(questionTotal,'إجمالي الأسئلة','#2563eb') + stat(noQuestions,'امتحانات بلا أسئلة','#d97706');
 }
 
 function renderExamsTable() {
