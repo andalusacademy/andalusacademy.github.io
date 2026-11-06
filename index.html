@@ -12006,7 +12006,7 @@ function renderExamAdminStats() {
   const box = document.getElementById('exam-admin-overview');
   if (!box) return;
   const total = allExams.length;
-  const published = allExams.filter(e => e.available_from && e.available_until && new Date(e.available_until).getTime() > Date.now()).length;
+  const published = allExams.filter(e => e.is_published === true).length;
   const questionTotal = allExams.reduce((n,e) => n + (e.question_count || 0), 0);
   const noQuestions = allExams.filter(e => !e.question_count).length;
   const stat = (value,label,color) => '<div class="card" style="padding:14px;text-align:center"><div style="font-size:25px;font-weight:900;color:'+color+'">'+value+'</div><div style="font-size:12px;color:var(--muted)">'+label+'</div></div>';
@@ -12032,7 +12032,7 @@ function renderExamsTable() {
     const until = e.available_until ? new Date(e.available_until).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
     return `<tr>
       <td class="no-print" onclick="event.stopPropagation()"><input type="checkbox" class="exam-row-cb" value="${e.id}"></td>
-      <td><strong>${escapeHtml(e.title)}</strong> <span class="badge badge-navy" style="font-size:10px">💻 إلكتروني</span>${e.is_easy_retake ? ' <span class="badge badge-warning" style="font-size:10px">دور ثاني سهل</span>' : ''}${e.show_answers_after_submit ? ' <span class="badge badge-gold" style="font-size:10px">👁 عرض الإجابات</span>' : ''}${e.is_placement_test ? ' <span class="badge badge-success" style="font-size:10px">🎯 تحديد مستوى</span>' : ''}</td>
+      <td><strong>${escapeHtml(e.title)}</strong> <span class="badge badge-navy" style="font-size:10px">💻 إلكتروني</span> <span class="badge ${e.is_published ? 'badge-success' : 'badge-warning'}" style="font-size:10px">${e.is_published ? 'منشور للطلاب' : 'مسودة غير منشورة'}</span>${e.is_easy_retake ? ' <span class="badge badge-warning" style="font-size:10px">دور ثاني سهل</span>' : ''}${e.show_answers_after_submit ? ' <span class="badge badge-gold" style="font-size:10px">👁 عرض الإجابات</span>' : ''}${e.is_placement_test ? ' <span class="badge badge-success" style="font-size:10px">🎯 تحديد مستوى</span>' : ''}</td>
       <td>${escapeHtml(subj?.name || '—')}</td>
       <td>${escapeHtml(progLabel)} — ${escapeHtml(e.branch)}</td>
       <td><span class="badge ${e.round === 1 ? 'badge-navy' : 'badge-warning'}">${e.round === 1 ? 'الأول' : 'الثاني'}</span></td>
@@ -12044,6 +12044,7 @@ function renderExamsTable() {
       </td>
       <td>
         <button class="btn btn-outline btn-sm" onclick="openExamQuestions('${e.id}')">📝 الأسئلة</button>
+        <button class="btn ${e.is_published ? 'btn-warning' : 'btn-success'} btn-sm" onclick="toggleExamPublication('${e.id}')">${e.is_published ? '⏸ إلغاء النشر' : '🚀 نشر للطلاب'}</button>
         <button class="btn btn-outline btn-sm" onclick="openEasyRetake('${e.id}')">🔁 دور ثاني</button>
         <button class="btn btn-danger btn-sm del-action" onclick="deleteExam('${e.id}')">🗑</button>
       </td>
@@ -12051,6 +12052,22 @@ function renderExamsTable() {
   }).join('');
 }
 
+
+
+async function toggleExamPublication(examId){
+  const exam=allExams.find(e=>e.id===examId);if(!exam)return;
+  const publish=exam.is_published!==true;
+  if(publish){
+    if(!(exam.question_count>0)){showToast('لا يمكن نشر امتحان بلا أسئلة. أضف الأسئلة أولًا.','error');return;}
+    if(!exam.available_from||!exam.available_until||new Date(exam.available_until)<=new Date()){showToast('راجع موعد بداية ونهاية الامتحان قبل النشر.','error');return;}
+    if(!confirm('تأكيد نشر «'+exam.title+'» للطلاب المطابقين للفرع والبرنامج خلال موعد الإتاحة؟'))return;
+  }else if(!confirm('إلغاء نشر الامتحان؟ لن يتمكن الطلاب من بدء محاولة جديدة، والمحاولات الجارية تظل قابلة للاستكمال.'))return;
+  const {error}=await sb.from('exams').update({is_published:publish}).eq('id',examId);
+  if(error){showToast('تعذر تحديث حالة النشر: '+error.message,'error');return;}
+  await logActivity('edit',(publish?'نشر':'ألغى نشر')+' الامتحان الإلكتروني: '+exam.title);
+  showToast(publish?'تم نشر الامتحان للطلاب.':'تم إلغاء نشر الامتحان.');
+  await loadExams();
+}
 
 // مكتبة ملفات المناهج لكل مادة — الملفات تحفظ في Supabase Storage داخل مجلد المادة.
 let activeExamMaterialName = '';
@@ -12281,7 +12298,7 @@ function openGeneratedExamSettings() {
   const pointsTotal = exam.questions.reduce((sum, q) => sum + (Number(q.points) > 0 ? Number(q.points) : 1), 0);
   document.getElementById('exam-total-score').value = pointsTotal || exam.questions.length;
   const publishButton = document.querySelector('#modal-exam button[onclick="saveExam()"]');
-  if (publishButton) publishButton.textContent = '🚀 نشر الامتحان وحفظ الأسئلة';
+  if (publishButton) publishButton.textContent = '💾 حفظ المسودة والأسئلة';
   showToast('حدد الفرع والبرنامج والمدة وموعد الامتحان، ثم اضغط نشر الامتحان.');
 }
 
@@ -12364,7 +12381,7 @@ async function saveExam() {
     show_answers_after_submit, is_placement_test,
     available_from: new Date(from).toISOString(),
     available_until: new Date(until).toISOString(),
-    round: 1, created_by: currentAuth?.id || null
+    round: 1, is_published: false, created_by: currentAuth?.id || null
   };
 
   const { data, error } = await sb.from('exams').insert(examData).select().single();
@@ -12420,17 +12437,17 @@ async function saveExam() {
       return;
     }
     generatedExamPending = false;
-    await logActivity('add', 'أنشأ ونشر امتحانًا مولّدًا بالذكاء الاصطناعي: ' + title);
+    await logActivity('add', 'أنشأ مسودة امتحان مولّد بالذكاء الاصطناعي: ' + title);
     closeModal('modal-exam');
     closeModal('modal-ai-exam-review');
-    showToast('✅ تم نشر الامتحان وحفظ ' + generatedRows.length + ' سؤالًا. ستجده الآن في قائمة الامتحانات الإلكترونية.');
+    showToast('تم حفظ مسودة الامتحان و' + generatedRows.length + ' سؤالًا. لن يظهر للطلاب حتى تضغط «نشر للطلاب».');
     await loadExams();
     return;
   }
 
   await logActivity('add', 'أنشأ امتحان إلكتروني: ' + title);
   closeModal('modal-exam');
-  showToast('✅ تم إنشاء الامتحان — أضف الأسئلة الآن');
+  showToast('✅ تم حفظ مسودة الامتحان — أضف الأسئلة ثم جرّبها قبل النشر.');
   await loadExams();
   openExamQuestions(data.id);
 }
