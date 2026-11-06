@@ -4823,7 +4823,8 @@ function sampleExamQuestionsForTest(pool,limit,difficultyMix,typeMix){
 
 function finishExamTestMode(){
  deactivateExamCopyProtection();
- if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
+ if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler,true);
+ if(window.__andalusExamPageHideHandler)window.removeEventListener('pagehide',window.__andalusExamPageHideHandler,true);
  const answers=examCurrentAttempt?.answers||{};let earned=0,rawMax=0;examQuestionsForStudent.forEach(q=>{const p=Number(q.points)||1;rawMax+=p;if(answers[q.id]===q.correct_answer)earned+=p;});
  const max=Number(examCurrentExam.total_score)||rawMax;const score=rawMax?Math.round((earned/rawMax*max)*100)/100:0;
  examCurrentAttempt.status='submitted';document.getElementById('exam-result-emoji').textContent='🧪';document.getElementById('exam-result-title').textContent='انتهت التجربة — هذه ليست نتيجة رسمية';
@@ -4832,7 +4833,8 @@ function finishExamTestMode(){
 }
 function exitExamTestMode(){
  deactivateExamCopyProtection();
- if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
+ if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler,true);
+ if(window.__andalusExamPageHideHandler)window.removeEventListener('pagehide',window.__andalusExamPageHideHandler,true);
  examTestMode=false;examSubmitLock=false;document.getElementById('exam-test-banner').style.display='none';document.getElementById('exam-portal-screen').style.display=examTestOriginalPortalDisplay;
  examStudent=null;examCurrentExam=null;examCurrentAttempt=null;examQuestionsForStudent=[];examStudentPhone='';examFaceVerificationToken=null;examSkippedQuestions=new Set();renderExamQuestionsList();
  showToast('تم الخروج من وضع التجربة. لم يتم تسجيل أي نتيجة رسمية.');
@@ -5087,7 +5089,7 @@ async function logExamViolation(eventName,details){
   if(examTestMode){examTestViolationCount++;showToast('🧪 تم تسجيل مغادرة تجريبية رقم '+examTestViolationCount+' — دون أي أثر على السجلات.','info');return;}
   const {data,error}=await sb.rpc('student_exam_log_violation',{p_attempt_id:examCurrentAttempt.id,p_student_id:examStudent?.id,p_phone:examStudentPhone,p_face_token:examFaceVerificationToken,p_event:eventName,p_details:details||''});
   if(error||!data?.ok){console.warn('تعذر تسجيل مخالفة الامتحان:',error||data?.reason);return;}
-  examCurrentAttempt.violation_count=data.violation_count;showToast('⚠️ تم تسجيل مغادرة الصفحة للمراجعة الإدارية. لم يتم إلغاء إجاباتك تلقائيًا.','warning');
+  examCurrentAttempt.violation_count=data.violation_count;showToast('⚠️ تم تسجيل المخالفة في سجل الامتحان.','warning');
 }
 async function finalizeExamOnExit(source) {
   if (!examCurrentAttempt || examCurrentAttempt.status !== 'in_progress' || examSubmitLock || window.__andalusExamExitStarted) return;
@@ -5118,7 +5120,7 @@ function confirmSubmitExam() {
     ? `لقد أجبت على ${answeredCount} من ${totalCount} سؤال فقط. هل تريد التسليم الآن؟`
     : 'هل أنت متأكد من تسليم الامتحان؟ لا يمكن التراجع بعد التسليم.';
   // تعطيل مؤقت لكشف الغش وقت ظهور نافذة التأكيد، تجنبًا لأي تعارض فى بعض المتصفحات
-  if (examVisibilityHandler) document.removeEventListener('visibilitychange', examVisibilityHandler);
+  if (examVisibilityHandler) document.removeEventListener('visibilitychange', examVisibilityHandler, true);
   const confirmed = confirm(msg);
   if (confirmed) {
     submitExam(false);
