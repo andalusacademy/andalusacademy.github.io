@@ -73,7 +73,7 @@
   function preview(id){
     const d = drafts.find(x => x.id === id); if (!d) return;
     const n = counts(d.questions || []);
-    $('#aed-preview').innerHTML = '<div class="card" style="padding:14px"><h4>' + esc(d.title) + '</h4><p>' + esc(d.subject_name || '') + ' — ' + (d.questions || []).length + ' سؤال</p><p>اختيار من متعدد: ' + n.mcq + ' | صح/خطأ: ' + n.true_false + ' | مقالي: ' + n.essay + '</p><div style="max-height:340px;overflow:auto">' + (d.questions || []).map((q,i) => '<article style="padding:10px;border:1px solid var(--border);border-radius:9px;margin:7px 0"><strong>سؤال ' + (i+1) + ' — ' + esc(q.type || q.question_type || 'اختيار') + '</strong><div>' + esc(q.question || q.question_text || '') + '</div><small>الإجابة: ' + esc(q.answer || q.correct_answer || '—') + '</small></article>').join('') + '</div></div>';
+    $('#aed-preview').innerHTML = '<div class="card" style="padding:14px"><h4>' + esc(d.title) + '</h4><p>' + esc(d.subject_name || '') + ' — ' + (d.questions || []).length + ' سؤال</p><p>اختيار من متعدد: ' + n.mcq + ' | صح/خطأ: ' + n.true_false + ' | مقالي: ' + n.essay + '</p><div style="max-height:340px;overflow:auto">' + (d.questions || []).map((q,i) => { const opts=Array.isArray(q.options)?q.options:(q.options&&typeof q.options==='object'?['a','b','c','d'].map(k=>q.options[k]||q.options[k.toUpperCase()]).filter(Boolean):['a','b','c','d'].map(k=>q['option_'+k]).filter(Boolean)); const typ=String(q.type||q.question_type||'mcq').toLowerCase(); const label=typ.includes('true')||typ.includes('صح')?'صح / غلط':typ.includes('essay')||typ.includes('مقالي')?'مقالي':'اختيار من متعدد'; return '<article style="padding:10px;border:1px solid var(--border);border-radius:9px;margin:7px 0"><strong>سؤال ' + (i+1) + ' — ' + label + '</strong><div style="white-space:pre-wrap;margin:7px 0">' + esc(q.question || q.question_text || q.text || '') + '</div>' + (opts.length?'<div style="margin:6px 0">'+opts.map((o,j)=>'<div style="padding:4px 8px">('+String.fromCharCode(65+j)+') '+esc(o)+'</div>').join('')+'</div>':'') + '<small>الإجابة الصحيحة: ' + esc(q.answer || q.correct_answer || '—') + '</small></article>'; }).join('') + '</div></div>';
   }
   async function saveCurrentDraft(){
     const exam = window._andalusGeneratedExam;
@@ -180,10 +180,9 @@
     const essay=questions.some(q=>String(q.type||q.question_type||'').toLowerCase().includes('essay')||String(q.type||'').includes('مقالي'));
     if(essay) return toast('المسودات تحتوي أسئلة مقالية. لا يمكن تحويلها حاليًا إلى بنك الامتحان الموضوعي دون دعم المقالي في جدول الأسئلة.', 'error');
     const subjectName=chosen[0].subject_name || '';
-    window._andalusGeneratedExam={title:'امتحان '+subjectName,subject:subjectName,questions};
-    pendingApprovalIds=chosen.map(d=>d.id);
-    if(typeof window.openGeneratedExamSettings!=='function') return toast('تعذر فتح إعدادات إنشاء الامتحان.', 'error');
-    window.openGeneratedExamSettings();
+    const exam={title:'امتحان '+subjectName,subject:subjectName,questions};
+    if(typeof window.showGeneratedExamReview!=='function') return toast('واجهة مراجعة الأسئلة غير جاهزة. حدّث الصفحة ثم حاول مرة أخرى.', 'error');
+    window.showGeneratedExamReview(exam);
     const modal=$('#andalus-exam-drafts-modal'); if(modal) modal.classList.remove('open');
   }
   function addButton(parent,label,handler,id){
