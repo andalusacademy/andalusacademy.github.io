@@ -12435,7 +12435,7 @@ async function saveExam() {
     show_answers_after_submit, is_placement_test,
     available_from: new Date(from).toISOString(),
     available_until: new Date(until).toISOString(),
-    round: 1, is_published: false, created_by: currentAuth?.id || null
+    round: 1, is_published: false, targeting_mode: !!(window.getAndalusExamTargetSelection?.().enabled), created_by: currentAuth?.id || null
   };
 
   const { data, error } = await sb.from('exams').insert(examData).select().single();
@@ -12446,6 +12446,22 @@ async function saveExam() {
       showToast('❌ خطأ في إنشاء الامتحان: ' + error.message, 'error');
     }
     return;
+  }
+
+  const targetSelection = window.getAndalusExamTargetSelection?.() || {enabled:false,studentIds:[]};
+  if (targetSelection.enabled) {
+    const ids = [...new Set((targetSelection.studentIds || []).map(String).filter(Boolean))];
+    if (!ids.length) {
+      await sb.from('exams').delete().eq('id', data.id);
+      showToast('فعّلت قصر الامتحان على طلاب محددين، لكن لم تختر أي طالب.', 'error');
+      return;
+    }
+    const { error: targetsError } = await sb.from('exam_student_targets').insert(ids.map(student_id => ({exam_id:data.id,student_id})));
+    if (targetsError) {
+      await sb.from('exams').delete().eq('id', data.id);
+      showToast('تعذر حفظ قائمة الطلاب المستهدفين، وتم إلغاء إنشاء الامتحان: ' + targetsError.message, 'error');
+      return;
+    }
   }
 
   if (generatedExamPending) {
@@ -17159,5 +17175,6 @@ async function changeStudySummaryQuestion(delta){
 <script src="./student-portal-admin-gateway-v5.js?v=1"></script>
 <script src="./icon-depth-3d.js?v=2"></script>
 <script src="./exam-drafts-manager.js?v=1"></script>
+<script src="./exam-targeting-manager.js?v=1"></script>
 </body>
 </html>
