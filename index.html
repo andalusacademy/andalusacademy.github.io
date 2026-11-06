@@ -1080,8 +1080,8 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div style="padding:18px;display:grid;gap:14px;">
               <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;line-height:1.9;color:#1e3a8a;">
                 <b>نسخة بيانات وملفات مشفّرة في ملف واحد</b><br>
-                تحفظ سجلات جداول قاعدة البيانات وملفات التخزين وبيانات تعريف حسابات الدخول في ملف <b>.andbackup</b>.
-                هذه النسخة لا تتضمن كلمات المرور أو الشيفرة البرمجية أو بنية قاعدة البيانات أو إعدادات الأسرار ومفاتيح الخدمات؛ لذلك لا تُعد وحدها نسخة استعادة كاملة للنظام.
+                تحفظ سجلات الجداول وملفات التخزين وبيانات تعريف الحسابات، مع وصف بنية قاعدة البيانات (الأعمدة والعلاقات والفهارس والسياسات والمشغلات والدوال والعروض والإضافات) في ملف <b>.andbackup</b>.
+                لا تتضمن كلمات المرور أو مفاتيح الخدمات والأسرار أو جلسات الدخول. كما أن وصف البنية ليس ملف SQL مستقلًا لإعادة إنشاء المشروع، لذلك لا تُعد النسخة وحدها استعادة كاملة بضغطة واحدة.
               </div>
               <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
                 <button class="btn btn-primary" id="and-backup-create" onclick="createAndalusBackup()">🔐 إنشاء نسخة احتياطية الآن</button>
@@ -8424,8 +8424,20 @@ async function createAndalusBackup() {
   try {
     andalusBackupProgress('جاري قراءة فهرس النسخة...', 2);
     const manifest = await andalusBackupRequest({ action: 'manifest' });
+    andalusBackupProgress('جاري حفظ مخطط قاعدة البيانات وسياسات الحماية...', 4);
+    const schemaResult = await andalusBackupRequest({ action: 'schema-manifest' });
+    if (!schemaResult?.schema || !Array.isArray(schemaResult.schema.tables)) throw new Error('تعذر الحصول على مخطط قاعدة البيانات؛ أوقفت النسخ حتى لا تكون ناقصة.');
+    manifest.schema_summary = {
+      tables: schemaResult.schema.tables.length,
+      views: (schemaResult.schema.views || []).length,
+      policies: (schemaResult.schema.policies || []).length,
+      triggers: (schemaResult.schema.triggers || []).length,
+      routines: (schemaResult.schema.routines || []).length,
+      extensions: (schemaResult.schema.extensions || []).length
+    };
     const zip = new JSZip();
-    zip.file('manifest.json', JSON.stringify({ ...manifest, product: 'أكاديمية الأندلس', app_backup_scope: 'public database tables, storage objects, auth user metadata', restore_status: 'inspection_only_until_restore_validation' }, null, 2));
+    zip.file('manifest.json', JSON.stringify({ ...manifest, product: 'أكاديمية الأندلس', app_backup_scope: 'public database records, schema metadata (columns, constraints, indexes, views, policies, triggers, routines and extensions), storage objects, auth user metadata', restore_status: 'inspection_only_until_restore_validation' }, null, 2));
+    zip.file('schema/structure.json', JSON.stringify(schemaResult.schema));
 
     for (let i = 0; i < manifest.tables.length; i++) {
       const table = manifest.tables[i];
@@ -8504,8 +8516,12 @@ async function inspectAndalusBackup(file) {
     if (manifest.format !== 'ANDALUS_BACKUP' || manifest.format_version !== 1) throw new Error('إصدار النسخة غير مدعوم.');
     const tableFiles = Object.keys(zip.files).filter(x => x.startsWith('database/') && x.endsWith('.json')).length;
     const storageFiles = Object.keys(zip.files).filter(x => x.startsWith('storage/') && !x.endsWith('/')).length;
+    const schemaFile = zip.file('schema/structure.json');
+    if (!schemaFile) throw new Error('ملف بنية قاعدة البيانات غير موجود؛ هذه نسخة قديمة أو غير مكتملة.');
+    const schema = JSON.parse(await schemaFile.async('text'));
+    if (!Array.isArray(schema.tables) || schema.tables.length !== tableFiles) throw new Error('عدد جداول البنية لا يطابق ملفات بيانات الجداول.');
     const box = document.getElementById('and-backup-result');
-    if (box) box.innerHTML = '<b style="color:#15803d">الملف سليم ويمكن قراءة محتوياته.</b><br>تاريخ النسخة: ' + new Date(manifest.created_at).toLocaleString('ar-EG') + '<br>جداول البيانات: ' + tableFiles + '<br>ملفات التخزين: ' + storageFiles + '<br><b>هذا فحص سلامة فقط؛ لم يتم تعديل أي بيانات.</b>';
+    if (box) box.innerHTML = '<b style="color:#15803d">الملف سليم واجتاز فحص البنية الأساسي.</b><br>تاريخ النسخة: ' + new Date(manifest.created_at).toLocaleString('ar-EG') + '<br>جداول البيانات: ' + tableFiles + '<br>ملفات التخزين: ' + storageFiles + '<br>سياسات الحماية: ' + (schema.policies || []).length + ' — المشغلات: ' + (schema.triggers || []).length + ' — الدوال: ' + (schema.routines || []).length + '<br><b>هذا فحص سلامة ومحتويات فقط؛ لم يتم تعديل أي بيانات، والاستعادة لم تُفعّل بعد.</b>';
     showToast('تم فحص ملف النسخة بنجاح دون تغيير بيانات النظام.', 'success');
   } catch (error) {
     const box = document.getElementById('and-backup-result');
