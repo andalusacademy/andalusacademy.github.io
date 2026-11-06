@@ -12014,6 +12014,7 @@ async function deleteSelectedSessions() {
 let allExams = [];
 let editingExamId = null;
 let examQuestionsDraft = [];
+let examOriginalQuestionIds = [];
 
 async function loadExams() {
   const { data, error } = await sb.from('exams').select('*').order('created_at', { ascending: false });
@@ -12724,6 +12725,7 @@ async function openExamQuestions(examId) {
   document.getElementById('modal-exam-q-title').textContent = '📝 أسئلة: ' + (exam?.title || '');
   const { data } = await sb.from('exam_questions').select('*').eq('exam_id', examId).order('order_num');
   examQuestionsDraft = (data || []).map(q => ({ ...q, _localId: q.id }));
+  examOriginalQuestionIds = (data || []).map(q => q.id);
   renderExamQuestionsList();
   document.getElementById('modal-exam-questions').classList.add('open');
 }
@@ -12793,39 +12795,38 @@ function removeQuestionRow(idx) {
 }
 
 async function saveExamQuestions() {
-  // تحقق أساسي
-  for (let i = 0; i < examQuestionsDraft.length; i++) {
-    const q = examQuestionsDraft[i];
-    if (!q.question_text.trim()) { showToast(`⚠️ سؤال ${i + 1} بدون نص`, 'error'); return; }
-    if (!q.correct_answer) { showToast(`⚠️ سؤال ${i + 1} بدون تحديد الإجابة الصحيحة`, 'error'); return; }
-    if (q.question_type === 'mcq' && (!q.option_a || !q.option_b)) { showToast(`⚠️ سؤال ${i + 1} يحتاج اختيارين على الأقل`, 'error'); return; }
+  for (let i=0;i<examQuestionsDraft.length;i++) {
+    const q=examQuestionsDraft[i];
+    if(!String(q.question_text||'').trim()){showToast('⚠️ سؤال '+(i+1)+' بدون نص','error');return;}
+    if(!q.correct_answer){showToast('⚠️ سؤال '+(i+1)+' بدون تحديد الإجابة الصحيحة','error');return;}
+    if(q.question_type==='mcq'&&(!q.option_a||!q.option_b)){showToast('⚠️ سؤال '+(i+1)+' يحتاج اختيارين على الأقل','error');return;}
   }
-
-  // حذف الأسئلة القديمة وإعادة إدراجها (أبسط من تتبع التعديلات الجزئية)
-  await sb.from('exam_questions').delete().eq('exam_id', editingExamId);
-  if (examQuestionsDraft.length) {
-    const toInsert = examQuestionsDraft.map((q, i) => ({
-      exam_id: editingExamId,
-      question_text: q.question_text.trim(),
-      question_type: q.question_type || 'mcq',
-      option_a: q.option_a || null, option_b: q.option_b || null,
-      option_c: q.option_c || null, option_d: q.option_d || null,
-      correct_answer: q.correct_answer,
-      points: q.points || 1,
-      difficulty: q.difficulty || 'medium',
-      source_group: q.source_group || null,
-      source_exam_id: q.source_exam_id || null,
-      order_num: i
-    }));
-    const { error } = await sb.from('exam_questions').insert(toInsert);
-    if (error) { showToast('❌ خطأ في الحفظ: ' + error.message, 'error'); return; }
+  const toInsert=examQuestionsDraft.map((q,i)=>({
+    exam_id:editingExamId,question_text:String(q.question_text||'').trim(),question_type:q.question_type||'mcq',
+    option_a:q.option_a||null,option_b:q.option_b||null,option_c:q.option_c||null,option_d:q.option_d||null,
+    correct_answer:q.correct_answer,points:q.points||1,difficulty:q.difficulty||'medium',
+    source_group:q.source_group||null,source_exam_id:q.source_exam_id||null,order_num:i
+  }));
+  let insertedIds=[];
+  if(toInsert.length){
+    const {data:inserted,error:insertError}=await sb.from('exam_questions').insert(toInsert).select('id');
+    if(insertError){showToast('❌ لم يتم تغيير الأسئلة القديمة لأن إضافة النسخة الجديدة فشلت: '+insertError.message,'error');return;}
+    insertedIds=(inserted||[]).map(row=>row.id);
   }
-  const calculatedSeconds = Math.min(examQuestionsDraft.length, 100) * 15;
-  const { error: durationUpdateError } = await sb.from('exams').update({ duration_minutes: Math.ceil(calculatedSeconds / 60) }).eq('id', editingExamId);
-  if (durationUpdateError) { showToast('تم حفظ الأسئلة لكن تعذر تحديث المدة المحسوبة: ' + durationUpdateError.message, 'error'); return; }
-  await logActivity('edit', 'حدّث أسئلة امتحان إلكتروني (' + examQuestionsDraft.length + ' سؤال)');
+  if(examOriginalQuestionIds.length){
+    const {error:deleteError}=await sb.from('exam_questions').delete().eq('exam_id',editingExamId).in('id',examOriginalQuestionIds);
+    if(deleteError){
+      showToast('تم حفظ النسخة الجديدة، لكن تعذر تنظيف النسخة القديمة. لم نفقد الأسئلة السابقة؛ أعد فتح مدير الأسئلة وراجع التكرار: '+deleteError.message,'error');
+      await loadExams();return;
+    }
+  }
+  examOriginalQuestionIds=insertedIds;
+  const calculatedSeconds=Math.min(examQuestionsDraft.length,100)*15;
+  const {error:durationUpdateError}=await sb.from('exams').update({duration_minutes:Math.ceil(calculatedSeconds/60)}).eq('id',editingExamId);
+  if(durationUpdateError){showToast('تم حفظ الأسئلة لكن تعذر تحديث المدة المحسوبة: '+durationUpdateError.message,'error');return;}
+  await logActivity('edit','حدّث أسئلة امتحان إلكتروني ('+examQuestionsDraft.length+' سؤال)');
   closeModal('modal-exam-questions');
-  showToast('✅ تم حفظ الأسئلة');
+  showToast('✅ تم حفظ الأسئلة وتحديث وقت الامتحان.');
   await loadExams();
 }
 
