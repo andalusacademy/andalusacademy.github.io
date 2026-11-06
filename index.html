@@ -478,7 +478,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 @media(max-width:380px){#student-portal-card{padding:20px 15px}.student-portal-grid{gap:8px!important}.student-portal-tile{min-height:118px;padding:12px 7px!important}.student-portal-tile .tile-icon{width:44px;height:44px;font-size:23px}.student-portal-tile .tile-label{font-size:12px}}
 @media(min-width:540px){.student-portal-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}.student-portal-tile{min-height:140px}}
 </style>
-<style id="exam-portal-enhancements">#exam-portal-screen{z-index:9998;position:relative}#exam-portal-screen .exam-questions-wrap{padding:10px 12px 30px}#exam-portal-screen .exam-q-card{background:#fff;border:1px solid #e4e8f2;border-radius:16px;box-shadow:0 8px 24px rgba(21,34,56,.08)}#exam-portal-screen .exam-option-label{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid #dbe2ee;border-radius:11px;margin:8px 0;cursor:pointer}#exam-portal-screen .exam-option-label.selected{border-color:#1d4ed8;background:#eff6ff}#exam-portal-screen .exam-timer{position:sticky;top:0;z-index:4;margin:0 auto;max-width:900px;text-align:center}#modal-exam-questions .modal{max-width:980px!important}@media(max-width:640px){#exam-portal-screen .exam-option-label{font-size:13px}#exam-portal-screen .exam-timer{font-size:25px}}</style></head>
+<style id="exam-portal-enhancements">#exam-portal-screen{z-index:9998;position:relative}#exam-portal-screen .exam-questions-wrap{padding:10px 12px 30px}#exam-portal-screen .exam-q-card{background:#fff;border:1px solid #e4e8f2;border-radius:16px;box-shadow:0 8px 24px rgba(21,34,56,.08)}#exam-portal-screen .exam-option-label{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid #dbe2ee;border-radius:11px;margin:8px 0;cursor:pointer}#exam-portal-screen .exam-option-label.selected{border-color:#1d4ed8;background:#eff6ff}#exam-portal-screen .exam-timer{position:sticky;top:0;z-index:4;margin:0 auto;max-width:900px;text-align:center}#modal-exam-questions .modal{max-width:980px!important}@media(max-width:640px){#exam-portal-screen .exam-option-label{font-size:13px}#exam-portal-screen .exam-timer{font-size:25px}}</style><style id="exam-copy-protection-css">#exam-portal-screen #exam-questions-wrap,#exam-portal-screen #exam-questions-wrap *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}</style></head>
 <body>
 
 <!-- STUDENT EXAM PORTAL (مستقلة تمامًا عن نظام الموظفين) -->
@@ -3996,6 +3996,7 @@ let examSkippedQuestions = new Set();
 let examPendingStartId = null;
 let examPolicyVersion = '2026-11-v1';
 let examTestViolationCount = 0;
+let examCopyProtectionHandlers = null;
 
 function showExamScreen(id) {
   ['exam-login-screen', 'exam-select-screen', 'exam-active-screen', 'exam-result-screen'].forEach(s => {
@@ -4773,6 +4774,7 @@ function startExamTestMode(){
  document.getElementById('exam-portal-screen').style.display='block';document.getElementById('exam-test-banner').textContent='🧪 وضع تجربة — رقم القيد: '+testStudentId+' — لا يتم حفظ نتيجة رسمية';document.getElementById('exam-test-banner').style.display='block';renderExamQuestionsForStudent({});showExamScreen('exam-active-screen');startExamTimer();
 }
 function finishExamTestMode(){
+ deactivateExamCopyProtection();
  if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
  const answers=examCurrentAttempt?.answers||{};let score=0,max=0;examQuestionsForStudent.forEach(q=>{const p=Number(q.points)||1;max+=p;if(answers[q.id]===q.correct_answer)score+=p;});
  examCurrentAttempt.status='submitted';document.getElementById('exam-result-emoji').textContent='🧪';document.getElementById('exam-result-title').textContent='انتهت التجربة — هذه ليست نتيجة رسمية';
@@ -4780,6 +4782,7 @@ function finishExamTestMode(){
  document.getElementById('exam-answers-review').style.display='none';document.getElementById('exam-test-banner').style.display='none';examSubmitLock=false;showExamScreen('exam-result-screen');
 }
 function exitExamTestMode(){
+ deactivateExamCopyProtection();
  if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
  examTestMode=false;examSubmitLock=false;document.getElementById('exam-test-banner').style.display='none';document.getElementById('exam-portal-screen').style.display=examTestOriginalPortalDisplay;
  examStudent=null;examCurrentExam=null;examCurrentAttempt=null;examQuestionsForStudent=[];examStudentPhone='';examFaceVerificationToken=null;examSkippedQuestions=new Set();renderExamQuestionsList();
@@ -4887,8 +4890,32 @@ async function saveExamAnswer(questionId,value){
   else renderExamQuestionsForStudent(answers);
 }
 
+
+function deactivateExamCopyProtection(){
+  if(!examCopyProtectionHandlers)return;
+  document.removeEventListener('contextmenu',examCopyProtectionHandlers.context,true);
+  document.removeEventListener('copy',examCopyProtectionHandlers.copy,true);
+  document.removeEventListener('cut',examCopyProtectionHandlers.copy,true);
+  document.removeEventListener('selectstart',examCopyProtectionHandlers.copy,true);
+  document.removeEventListener('keydown',examCopyProtectionHandlers.key,true);
+  examCopyProtectionHandlers=null;
+}
+function activateExamCopyProtection(){
+  deactivateExamCopyProtection();
+  const active=()=>!!examCurrentAttempt&&examCurrentAttempt.status==='in_progress'&&document.getElementById('exam-active-screen')?.style.display!=='none';
+  const block=e=>{if(active()){e.preventDefault();e.stopPropagation();}};
+  const key=e=>{if(active()&&(e.ctrlKey||e.metaKey)&&['c','x','a','p','s'].includes(String(e.key||'').toLowerCase())){e.preventDefault();e.stopPropagation();}};
+  examCopyProtectionHandlers={context:block,copy:block,key};
+  document.addEventListener('contextmenu',block,true);
+  document.addEventListener('copy',block,true);
+  document.addEventListener('cut',block,true);
+  document.addEventListener('selectstart',block,true);
+  document.addEventListener('keydown',key,true);
+}
+
 function startExamTimer() {
   if (examTimerInterval) clearInterval(examTimerInterval);
+  activateExamCopyProtection();
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
   const durationMs = Math.max(15000, Number(examCurrentExam.duration_seconds) > 0 ? Number(examCurrentExam.duration_seconds) * 1000 : (Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000);
   const durationEnd = startedAt + durationMs;
@@ -4951,6 +4978,7 @@ function confirmSubmitExam() {
 
 async function submitExam(autoSubmitted, cheatingDetected) {
   if (examTestMode) { finishExamTestMode(); return; }
+  deactivateExamCopyProtection();
   document.getElementById('exam-result-note').textContent = 'شكرًا لأدائك الامتحان. النتيجة مسجَّلة في النظام.';
   if (examSubmitLock) return;
   examSubmitLock = true;
