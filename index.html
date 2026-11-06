@@ -4783,8 +4783,8 @@ function sampleExamQuestionsByDifficulty(pool,limit,mix){
  const picked=[...examShuffleArray(pool.filter(q=>(q.difficulty||'medium')==='easy')).slice(0,easy),
    ...examShuffleArray(pool.filter(q=>(q.difficulty||'medium')==='medium')).slice(0,medium),
    ...examShuffleArray(pool.filter(q=>(q.difficulty||'medium')==='hard')).slice(0,hard)];
- const pickedIds=new Set(picked.map(q=>q.id||q._localId||q.question_text));
- const remaining=pool.filter(q=>!pickedIds.has(q.id||q._localId||q.question_text));
+ const pickedIds=new Set(picked);
+ const remaining=pool.filter(q=>!pickedIds.has(q));
  return examShuffleArray([...picked,...examShuffleArray(remaining).slice(0,Math.max(total-picked.length,0))]);
 }
 function finishExamTestMode(){
