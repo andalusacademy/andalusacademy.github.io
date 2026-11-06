@@ -12342,6 +12342,9 @@ function openGeneratedExamSettings() {
   document.getElementById('exam-title').value = exam.title || ('امتحان ' + (exam.subject || activeExamMaterialName || match.name));
   const pointsTotal = exam.questions.reduce((sum, q) => sum + (Number(q.points) > 0 ? Number(q.points) : 1), 0);
   document.getElementById('exam-total-score').value = pointsTotal || exam.questions.length;
+  document.getElementById('exam-mix-easy').value = 20;
+  document.getElementById('exam-mix-medium').value = 60;
+  document.getElementById('exam-mix-hard').value = 20;
   const publishButton = document.querySelector('#modal-exam button[onclick="saveExam()"]');
   if (publishButton) publishButton.textContent = '💾 حفظ المسودة والأسئلة';
   showToast('حدد الفرع والبرنامج والموعد، ثم احفظ المسودة وأضف الأسئلة وجرّبها قبل النشر.');
