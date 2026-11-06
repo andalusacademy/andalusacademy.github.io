@@ -28,12 +28,12 @@ async function publish(){
  const until=document.getElementById('exam-until')?.value;
  if(!title||!subject_id||!from||!until)return toast('أكمل عنوان الامتحان والمادة وموعد البداية والنهاية','error');
  if(individual&&!studentIds.length)return toast('حدد طالبًا واحدًا على الأقل أو غيّر طريقة الاستهداف إلى الدفعات والأنظمة','error');
- if(!individual&&!branches.length&&!legacyBranch)return toast('حدد فرعًا واحدًا على الأقل','error');
+ if(!individual&&!branches.length)return toast('حدد فرعًا واحدًا على الأقل','error');
  if(new Date(until)<=new Date(from))return toast('وقت النهاية لازم يكون بعد البداية','error');
  const firstCombo=combos.length?String(combos[0]).split('|'):[null,null];
  const {data:x,error}=await sb.from('exams').insert({
   title,subject_id,program_id:individual?null:(firstCombo[0]||null),system_name:individual?null:(firstCombo[1]||null),
-  program_combos:combos,branch,duration_minutes,total_score,show_answers_after_submit,is_placement_test,
+  program_combos:combos,branch,duration_minutes,total_score,show_answers_after_submit,is_placement_test,is_published:true,
   targeting_mode:individual,available_from:new Date(from).toISOString(),available_until:new Date(until).toISOString(),
   round:1,created_by:window.currentAuth?.id||null
  }).select().single();
