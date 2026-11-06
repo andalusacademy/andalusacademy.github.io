@@ -154,10 +154,11 @@
    savedAnswers=savedAnswers||{};
    const wrap=document.getElementById('exam-questions-wrap');
    if(!wrap)return;
-   const qs=Array.isArray(window.examQuestionsForStudent)?window.examQuestionsForStudent:[];
+   const bridge=window.__andalusExamBridge;
+   const qs=bridge && Array.isArray(bridge.questions)?bridge.questions:[];
    if(!qs.length){wrap.innerHTML='<div class="exam-q-card"><h3>لا توجد أسئلة محملة في هذه المحاولة.</h3><p>يرجى الرجوع للإدارة لمراجعة بنك الأسئلة.</p></div>';return;}
-   const index=Math.max(0,Math.min(Number(window.examCurrentQuestionIndex)||0,qs.length-1));
-   window.examCurrentQuestionIndex=index;
+   const index=Math.max(0,Math.min(Number(bridge?.questionIndex)||0,qs.length-1));
+   if(bridge)bridge.questionIndex=index;
    const q=qs[index]||{};
    const qid=String(q.id??'');
    const answer=savedAnswers[qid];
@@ -179,7 +180,7 @@
      if(!opts.length)optionsHtml='<div style="padding:12px;background:#fff7ed;color:#9a3412;border-radius:10px">لا توجد اختيارات محفوظة لهذا السؤال. يرجى مراجعة السؤال مع الإدارة.</div>';
    }
    const answered=qs.filter(item=>Object.prototype.hasOwnProperty.call(savedAnswers,String(item.id))).length;
-   const title=window.examCurrentExam?.title||'الامتحان الإلكتروني';
+   const title=bridge?.currentExam?.title||'الامتحان الإلكتروني';
    wrap.innerHTML='<div class="exam-q-card">'+
      '<div style="text-align:center;margin-bottom:18px"><div style="font-size:12px;color:#64748b;font-weight:800">أكاديمية الأندلس · الامتحان الإلكتروني</div><h2 style="font-size:clamp(18px,2.4vw,25px);color:#172b4d;margin-top:5px">'+esc(title)+'</h2></div>'+
      '<div class="exam-question-progress"><span>السؤال '+(index+1)+' من '+qs.length+'</span><span>تمت الإجابة: '+answered+' · متبقي: '+(qs.length-answered)+'</span></div>'+
