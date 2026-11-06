@@ -7708,7 +7708,7 @@ async function createDismissalDecisionTest() {
   const date = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
   const dateText = new Intl.DateTimeFormat('ar-EG',{day:'numeric',month:'long',year:'numeric'}).format(now);
   const no = enteredNo;
-  const details = 'قرار فصل للمتدرب: ' + (student.name || '') + '\\n' + reasons.map((x,i)=>(i+1)+'. '+x).join('\\n');
+  const details = 'قرار فصل للمتدرب: ' + (student.name || '') + '\\n' + reasons.map((x,i)=>(i+1)+'. '+x).join('\n');
   const esc = x => String(x ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const reasonHtml = reasons.map((x,i) => '<div class="reason"><span class="arrow">➢</span><span>' + esc(x) + '</span></div>').join('');
   const w = window.open('', '_blank');
@@ -12834,8 +12834,8 @@ async function saveExamQuestions() {
    ============================================================ */
 function downloadExamQuestionsTemplate() {
   const sample = [
-    { 'السؤال': 'مثال: عاصمة مصر؟', 'النوع (اختيار من متعدد / صح وغلط)': 'اختيار من متعدد', 'اختيار أ': 'الإسكندرية', 'اختيار ب': 'القاهرة', 'اختيار ج': 'الجيزة', 'اختيار د': 'أسوان', 'رقم الإجابة الصحيحة (1=أ, 2=ب, 3=ج, 4=د) — أو (1=صح, 2=غلط)': 2, 'الدرجة': 1 },
-    { 'السؤال': 'مثال: القاهرة عاصمة مصر (صح/غلط)؟', 'النوع (اختيار من متعدد / صح وغلط)': 'صح وغلط', 'اختيار أ': '', 'اختيار ب': '', 'اختيار ج': '', 'اختيار د': '', 'رقم الإجابة الصحيحة (1=أ, 2=ب, 3=ج, 4=د) — أو (1=صح, 2=غلط)': 1, 'الدرجة': 1 }
+    { 'السؤال': 'مثال: عاصمة مصر؟', 'النوع (اختيار من متعدد / صح وغلط)': 'اختيار من متعدد', 'اختيار أ': 'الإسكندرية', 'اختيار ب': 'القاهرة', 'اختيار ج': 'الجيزة', 'اختيار د': 'أسوان', 'رقم الإجابة الصحيحة (1=أ, 2=ب, 3=ج, 4=د) — أو (1=صح, 2=غلط)': 2, 'الدرجة': 1, 'الصعوبة': 'متوسط' },
+    { 'السؤال': 'مثال: القاهرة عاصمة مصر (صح/غلط)؟', 'النوع (اختيار من متعدد / صح وغلط)': 'صح وغلط', 'اختيار أ': '', 'اختيار ب': '', 'اختيار ج': '', 'اختيار د': '', 'رقم الإجابة الصحيحة (1=أ, 2=ب, 3=ج, 4=د) — أو (1=صح, 2=غلط)': 1, 'الدرجة': 1, 'الصعوبة': 'سهل' }
   ];
   const ws = XLSX.utils.json_to_sheet(sample);
   const wb = XLSX.utils.book_new();
@@ -12859,6 +12859,8 @@ async function importExamQuestionsExcel(input) {
       const questionText = String(row['السؤال'] || '').trim();
       const typeRaw = String(row['النوع (اختيار من متعدد / صح وغلط)'] || '').trim();
       const isTrueFalse = typeRaw.includes('صح');
+      const difficultyRaw = String(row['الصعوبة'] || 'متوسط').trim().toLowerCase();
+      const difficulty = difficultyRaw.includes('سهل') || difficultyRaw === 'easy' ? 'easy' : (difficultyRaw.includes('صعب') || difficultyRaw === 'hard' ? 'hard' : 'medium');
       const correctNum = parseInt(row['رقم الإجابة الصحيحة (1=أ, 2=ب, 3=ج, 4=د) — أو (1=صح, 2=غلط)'], 10);
       if (!questionText || !correctNum) { skipped++; return; }
 
@@ -12868,7 +12870,8 @@ async function importExamQuestionsExcel(input) {
           question_text: questionText, question_type: 'truefalse',
           option_a: null, option_b: null, option_c: null, option_d: null,
           correct_answer: correctNum === 1 ? 'true' : 'false',
-          points: parseFloat(row['الدرجة']) || 1
+          points: parseFloat(row['الدرجة']) || 1,
+          difficulty
         });
       } else {
         const optionMap = { 1: 'a', 2: 'b', 3: 'c', 4: 'd' };
@@ -12881,7 +12884,8 @@ async function importExamQuestionsExcel(input) {
           option_c: String(row['اختيار ج'] || '').trim() || null,
           option_d: String(row['اختيار د'] || '').trim() || null,
           correct_answer: correctLetter,
-          points: parseFloat(row['الدرجة']) || 1
+          points: parseFloat(row['الدرجة']) || 1,
+          difficulty
         });
       }
       added++;
@@ -12972,7 +12976,7 @@ async function importExamQuestionsDocument(input){
       for(let p=1;p<=pdf.numPages;p++){
         const page=await pdf.getPage(p);const content=await page.getTextContent();const rows=new Map();
         for(const item of content.items){const y=Math.round(item.transform?.[5]||0);rows.set(y,(rows.get(y)||'')+' '+item.str);}
-        pages.push([...rows.entries()].sort((a,b)=>b[0]-a[0]).map(row=>row[1].trim()).join('\\n'));
+        pages.push([...rows.entries()].sort((a,b)=>b[0]-a[0]).map(row=>row[1].trim()).join('\n'));
       }
       extracted=pages.join('\n');
     }else throw new Error('الامتداد المدعوم هو DOCX أو PDF.');
@@ -12995,7 +12999,7 @@ function exportExamQuestionsExcel() {
     return {
       'السؤال': q.question_text || '', 'النوع (اختيار من متعدد / صح وغلط)': isTrueFalse ? 'صح وغلط' : 'اختيار من متعدد',
       'اختيار أ': q.option_a || '', 'اختيار ب': q.option_b || '', 'اختيار ج': q.option_c || '', 'اختيار د': q.option_d || '',
-      'رقم الإجابة الصحيحة (1=أ, 2=ب, 3=ج, 4=د) — أو (1=صح, 2=غلط)': correctNum, 'الدرجة': q.points || 1
+      'رقم الإجابة الصحيحة (1=أ, 2=ب, 3=ج, 4=د) — أو (1=صح, 2=غلط)': correctNum, 'الدرجة': q.points || 1, 'الصعوبة': q.difficulty === 'easy' ? 'سهل' : (q.difficulty === 'hard' ? 'صعب' : 'متوسط')
     };
   });
   const ws = XLSX.utils.json_to_sheet(rows);
