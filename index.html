@@ -3999,6 +3999,14 @@ let examPendingStartId = null;
 let examPolicyVersion = '2026-11-v1';
 let examTestViolationCount = 0;
 let examCopyProtectionHandlers = null;
+// Bridge to lexical exam state for the separately loaded student renderer.
+window.__andalusExamBridge = {
+  get questions(){ return examQuestionsForStudent; },
+  set questions(value){ examQuestionsForStudent = Array.isArray(value) ? value : []; },
+  get questionIndex(){ return examCurrentQuestionIndex; },
+  set questionIndex(value){ examCurrentQuestionIndex = Number(value) || 0; },
+  get currentExam(){ return examCurrentExam; }
+};
 
 function showExamScreen(id) {
   ['exam-login-screen', 'exam-select-screen', 'exam-active-screen', 'exam-result-screen'].forEach(s => {
@@ -4836,6 +4844,11 @@ async function startExam(examId) {
     showToast(messages[result?.reason] || error?.message || 'تعذر بدء الامتحان.', 'error');
     return;
   }
+  if (!Array.isArray(result.questions) || !result.questions.length) {
+    showToast('لم يتم تحميل أي سؤال لهذه المحاولة. أوقفنا الدخول حتى لا يُستهلك وقتك، ويرجى مراجعة بنك الأسئلة.', 'error');
+    showExamScreen('exam-select-screen');
+    return;
+  }
   examCurrentExam = result.exam;
   examCurrentAttempt = result.attempt;
   if (!await recordExamPolicyAcceptance(examCurrentAttempt.id)) { showToast('تعذر تسجيل موافقتك على سياسة الامتحان. أعد المحاولة.', 'error'); return; }
@@ -4863,6 +4876,11 @@ async function resumeExam(examId) {
       no_questions: 'لم يتم العثور على أسئلة مرتبطة بمحاولتك. تواصل مع الإدارة.'
     };
     showToast(resumeMessages[result?.reason] || error?.message || 'تعذر استكمال الامتحان.', 'error');
+    return;
+  }
+  if (!Array.isArray(result.questions) || !result.questions.length) {
+    showToast('لا توجد أسئلة محملة في هذه المحاولة. لم نبدأ المؤقت ولم نستهلك وقتًا.', 'error');
+    showExamScreen('exam-select-screen');
     return;
   }
   const exam = result.exam, attempt = result.attempt;
@@ -13090,6 +13108,32 @@ function viewExamAttemptAudit(attemptId){
   modal.classList.add('open');
 }
 
+async function adminAdjustExamTime(attemptId, resetFull) {
+  const examId = currentExamResultsData?.exam?.id;
+  if (!attemptId || !examId) return;
+  let minutes = 0;
+  if (resetFull) {
+    if (!confirm('إعادة الوقت كاملًا من البداية؟ ستظل إجابات الطالب المحفوظة كما هي.')) return;
+  } else {
+    const raw = prompt('كم دقيقة إضافية تريد منحها للطالب؟ (من 1 إلى 180 دقيقة)', '5');
+    if (raw === null) return;
+    minutes = Number(String(raw).trim());
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) {
+      showToast('أدخل عدد دقائق صحيحًا من 1 إلى 180.', 'error');
+      return;
+    }
+  }
+  const { data, error } = await sb.rpc('admin_adjust_exam_attempt_time', {
+    p_attempt_id: attemptId, p_minutes: minutes, p_reset_full: !!resetFull
+  });
+  if (error || !data?.ok) {
+    showToast(error?.message || (data?.reason === 'attempt_not_in_progress' ? 'المحاولة لم تعد جارية.' : 'تعذر تعديل وقت المحاولة.'), 'error');
+    return;
+  }
+  showToast(data.message || 'تم تعديل وقت الامتحان.');
+  await viewExamResults(examId);
+}
+
 async function viewExamResults(examId) {
   const exam = allExams.find(e => e.id === examId);
   if (!exam) { showToast('تعذر العثور على الامتحان.', 'error'); return; }
@@ -13098,7 +13142,7 @@ async function viewExamResults(examId) {
   tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--muted)">جاري التحميل...</td></tr>';
   document.getElementById('modal-exam-results').classList.add('open');
 
-  let matchingStudents = allStudents.filter(s => s.branch === exam.branch && examMatchesStudent(exam, s));
+  let matchingStudents = [];
   if (exam.targeting_mode) {
     const { data: targets, error: targetError } = await sb.from('exam_student_targets').select('student_id').eq('exam_id', examId);
     if (targetError) {
@@ -13106,7 +13150,9 @@ async function viewExamResults(examId) {
       return;
     }
     const targetIds = new Set((targets || []).map(t => String(t.student_id)));
-    matchingStudents = matchingStudents.filter(s => targetIds.has(String(s.id)));
+    matchingStudents = allStudents.filter(s => targetIds.has(String(s.id)));
+  } else {
+    matchingStudents = allStudents.filter(s => s.branch === exam.branch && examMatchesStudent(exam, s));
   }
 
   const { data: attempts, error: attemptsError } = await sb.from('exam_attempts').select('*').eq('exam_id', examId);
@@ -13114,7 +13160,7 @@ async function viewExamResults(examId) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#b91c1c;padding:18px">تعذر تحميل نتائج المحاولات: '+escapeHtml(attemptsError.message)+'</td></tr>';
     return;
   }
-  const attemptMap = {}; (attempts || []).forEach(a => attemptMap[a.student_id] = a);
+  const attemptMap = {}; (attempts || []).slice().sort((a,b) => new Date(a.started_at||0)-new Date(b.started_at||0)).forEach(a => attemptMap[a.student_id] = a);
 
   if (!matchingStudents.length) {
     tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="emoji">📊</div><h4>لا يوجد طلاب مستهدفون لهذا الامتحان</h4></div></td></tr>';
@@ -13135,7 +13181,7 @@ async function viewExamResults(examId) {
       return '<tr style="background:#fef2f2;"><td><strong>'+escapeHtml(s.enrollment_number || s.id)+'</strong></td><td>'+escapeHtml(s.name)+'</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-danger">❌ لم يبدأ الامتحان</span></td><td>—</td><td>—</td></tr>';
     }
     if (a.status !== 'submitted') {
-      return '<tr style="background:#fffbeb;"><td><strong>'+escapeHtml(s.enrollment_number || s.id)+'</strong></td><td>'+escapeHtml(s.name)+'</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-warning">⏳ محاولة جارية</span></td><td>—</td><td>'+ (Number(a.violation_count)||0) +' <button class="btn btn-outline btn-sm" onclick="viewExamAttemptAudit(\''+a.id+'\')">تفاصيل</button></td></tr>';
+      return '<tr style="background:#fffbeb;"><td><strong>'+escapeHtml(s.enrollment_number || s.id)+'</strong></td><td>'+escapeHtml(s.name)+'</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="badge badge-warning">⏳ محاولة جارية</span><br><button class="btn btn-success btn-sm" onclick="adminAdjustExamTime(\''+a.id+'\',false)">＋ إضافة وقت</button> <button class="btn btn-outline btn-sm" onclick="adminAdjustExamTime(\''+a.id+'\',true)">↻ إعادة الوقت كاملًا</button></td><td>—</td><td>'+ (Number(a.violation_count)||0) +' <button class="btn btn-outline btn-sm" onclick="viewExamAttemptAudit(\''+a.id+'\')">تفاصيل</button></td></tr>';
     }
     const pct = a.max_score > 0 ? Math.round(a.score / a.max_score * 100) : 0;
     const timeTaken = a.time_taken_seconds != null ? Math.floor(a.time_taken_seconds / 60) + ' د ' + (a.time_taken_seconds % 60) + ' ث' : '—';
