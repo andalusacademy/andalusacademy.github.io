@@ -8,7 +8,52 @@ function review(exam){const qs=(exam.questions||[]).map(q=>{const rawType=String
 const box=m.querySelector('#ai-exam-review-content');box.innerHTML='<div style="background:#eff6ff;padding:12px;border-radius:10px;margin-bottom:12px"><b>'+esc(exam.subject||'المادة')+'</b> — <span>يمكنك تعديل أو حذف أي سؤال قبل النشر.</span></div>'+qs.map((q,i)=>'<article class="st-q" data-i="'+i+'" style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:7px;align-items:center;margin-bottom:7px"><b>سؤال '+(i+1)+'</b><select class="st-type"><option value="mcq" '+(q.type==='mcq'?'selected':'')+'>اختيار من متعدد</option><option value="true_false" '+(q.type==='true_false'?'selected':'')+'>صح / خطأ</option><option value="essay" '+(q.type==='essay'?'selected':'')+'>مقالي</option></select><input class="st-points" type="number" min="0.25" step="0.25" value="'+q.points+'" style="width:80px"><button class="btn btn-danger btn-sm st-del">🗑</button></div><textarea class="st-question" rows="2" style="width:100%">'+esc(q.question)+'</textarea><div class="st-opts" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px">'+(q.type==='essay'?'':(q.options.length?q.options.map(o=>'<input class="st-opt" value="'+esc(o)+'">').join(''):'<input class="st-opt" placeholder="اختيار أ"><input class="st-opt" placeholder="اختيار ب"><input class="st-opt" placeholder="اختيار ج"><input class="st-opt" placeholder="اختيار د">'))+'</div><textarea class="st-answer" rows="2" style="width:100%;margin-top:7px" placeholder="الإجابة الصحيحة / نموذج الإجابة">'+esc(q.answer)+'</textarea><textarea class="st-expl" rows="2" style="width:100%;margin-top:7px" placeholder="شرح أو معايير التصحيح">'+esc(q.explanation)+'</textarea></article>').join('');
 box.querySelectorAll('.st-del').forEach(b=>b.onclick=()=>{sync();window._andalusGeneratedExam.questions.splice(Number(b.closest('.st-q').dataset.i),1);review(window._andalusGeneratedExam);});box.querySelectorAll('.st-type').forEach(s=>s.onchange=()=>{sync();review(window._andalusGeneratedExam);});m.classList.add('open');}
 function publishSettings(){sync();const e=window._andalusGeneratedExam;if(!e?.questions?.length)return toast('لا توجد أسئلة للنشر','error');for(const [i,q] of e.questions.entries()){if(!q.question.trim())return toast('سؤال '+(i+1)+' بدون نص','error');if(q.type==='mcq'&&(!q.answer||q.options.length<2))return toast('سؤال الاختيار '+(i+1)+' ناقص','error');if(q.type==='true_false'&&!['صح','خطأ','true','false'].includes(q.answer))return toast('سؤال صح/خطأ '+(i+1)+' ناقص','error');if(q.type==='essay'&&!q.answer.trim())return toast('السؤال المقالي '+(i+1)+' يحتاج نموذج إجابة','error');}document.getElementById('modal-ai-exam-review')?.classList.remove('open');if(typeof openCreateExam==='function')openCreateExam();staged=true;const n=v=>String(v||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/\s+/g,' ').trim().toLowerCase();const mat=(window.allSubjects||[]).find(s=>n(s.name)===n(e.subject));if(mat)document.getElementById('exam-subject').value=mat.id;document.getElementById('exam-title').value=e.title||('امتحان '+e.subject);document.getElementById('exam-total-score').value=e.questions.reduce((s,q)=>s+(Number(q.points)||1),0);toast('حدد الفرع والبرامج والمدة والموعد ثم اضغط نشر الامتحان');}
-async function publish(){sync();const e=window._andalusGeneratedExam,title=document.getElementById('exam-title')?.value.trim(),subject_id=document.getElementById('exam-subject')?.value,combos=[...document.querySelectorAll('.exam-prog-cb:checked')].map(x=>x.value),branch=document.getElementById('exam-branch')?.value,duration_minutes=Number(document.getElementById('exam-duration')?.value)||30,total_score=Number(document.getElementById('exam-total-score')?.value)||100,show_answers_after_submit=!!document.getElementById('exam-show-answers')?.checked,is_placement_test=!!document.getElementById('exam-placement-test')?.checked,from=document.getElementById('exam-from')?.value,until=document.getElementById('exam-until')?.value;if(!title||!subject_id||!combos.length||!branch||!from||!until)return toast('أكمل بيانات الامتحان قبل النشر','error');if(new Date(until)<=new Date(from))return toast('وقت النهاية لازم يكون بعد البداية','error');const [program_id,system_name]=String(combos[0]).split('|');const {data:x,error}=await sb.from('exams').insert({title,subject_id,program_id,system_name:system_name||null,program_combos:combos,branch,duration_minutes,total_score,show_answers_after_submit,is_placement_test,available_from:new Date(from).toISOString(),available_until:new Date(until).toISOString(),round:1,created_by:window.currentAuth?.id||null}).select().single();if(error)return toast('❌ '+error.message,'error');const rows=e.questions.map((q,i)=>{const type=q.type==='essay'?'essay':q.type==='true_false'?'truefalse':'mcq';return{exam_id:x.id,question_text:q.question.trim(),question_type:type,option_a:q.options?.[0]||null,option_b:q.options?.[1]||null,option_c:q.options?.[2]||null,option_d:q.options?.[3]||null,correct_answer:type==='truefalse'?((q.answer==='صح'||q.answer==='true')?'true':'false'):q.answer,points:Number(q.points)||1,order_num:i};});const {error:qe}=await sb.from('exam_questions').insert(rows);if(qe){await sb.from('exams').delete().eq('id',x.id);return toast('❌ تعذر حفظ الأسئلة: '+qe.message,'error');}staged=false;localStorage.removeItem(KEY);window._andalusGeneratedExam=null;closeModal('modal-exam');if(typeof loadExams==='function')await loadExams();if(typeof logActivity==='function')await logActivity('add','أنشأ ونشر امتحانًا مولدًا بالذكاء الاصطناعي: '+title);toast('✅ تم نشر الامتحان وحفظ '+rows.length+' سؤالًا');}
+async function publish(){
+ sync();
+ const e=window._andalusGeneratedExam;
+ const title=document.getElementById('exam-title')?.value.trim();
+ const subject_id=document.getElementById('exam-subject')?.value;
+ const targeting=window.getAndalusExamTargetSelection?.()||{mode:'cohorts',studentIds:[],branches:[]};
+ const individual=targeting.mode==='students';
+ const studentIds=[...new Set((targeting.studentIds||[]).map(String).filter(Boolean))];
+ const combos=individual?[]:[...document.querySelectorAll('.exam-prog-cb:checked')].map(x=>x.value);
+ const branches=(targeting.branches||[]).filter(Boolean);
+ const legacyBranch=document.getElementById('exam-branch')?.value||'';
+ const branch=individual?'الفرعين':(branches.length>1?'الفرعين':(branches[0]||legacyBranch||'الفرعين'));
+ const duration_minutes=Number(document.getElementById('exam-duration')?.value)||30;
+ const total_score=Number(document.getElementById('exam-total-score')?.value)||100;
+ const show_answers_after_submit=!!document.getElementById('exam-show-answers')?.checked;
+ const is_placement_test=!!document.getElementById('exam-placement-test')?.checked;
+ const from=document.getElementById('exam-from')?.value;
+ const until=document.getElementById('exam-until')?.value;
+ if(!title||!subject_id||!from||!until)return toast('أكمل عنوان الامتحان والمادة وموعد البداية والنهاية','error');
+ if(individual&&!studentIds.length)return toast('حدد طالبًا واحدًا على الأقل أو غيّر طريقة الاستهداف إلى الدفعات والأنظمة','error');
+ if(!individual&&!branches.length&&!legacyBranch)return toast('حدد فرعًا واحدًا على الأقل','error');
+ if(new Date(until)<=new Date(from))return toast('وقت النهاية لازم يكون بعد البداية','error');
+ const firstCombo=combos.length?String(combos[0]).split('|'):[null,null];
+ const {data:x,error}=await sb.from('exams').insert({
+  title,subject_id,program_id:individual?null:(firstCombo[0]||null),system_name:individual?null:(firstCombo[1]||null),
+  program_combos:combos,branch,duration_minutes,total_score,show_answers_after_submit,is_placement_test,
+  targeting_mode:individual,available_from:new Date(from).toISOString(),available_until:new Date(until).toISOString(),
+  round:1,created_by:window.currentAuth?.id||null
+ }).select().single();
+ if(error)return toast('❌ '+error.message,'error');
+ const rows=e.questions.map((q,i)=>{
+  const type=q.type==='essay'?'essay':q.type==='true_false'?'truefalse':'mcq';
+  return{exam_id:x.id,question_text:q.question.trim(),question_type:type,option_a:q.options?.[0]||null,option_b:q.options?.[1]||null,option_c:q.options?.[2]||null,option_d:q.options?.[3]||null,correct_answer:type==='truefalse'?((q.answer==='صح'||q.answer==='true')?'true':'false'):q.answer,points:Number(q.points)||1,order_num:i};
+ });
+ const {error:qe}=await sb.from('exam_questions').insert(rows);
+ if(qe){await sb.from('exams').delete().eq('id',x.id);return toast('❌ تعذر حفظ الأسئلة: '+qe.message,'error');}
+ if(individual){
+  const targets=studentIds.map(student_id=>({exam_id:x.id,student_id}));
+  const {error:te}=await sb.from('exam_student_targets').insert(targets);
+  if(te){await sb.from('exams').delete().eq('id',x.id);return toast('❌ تعذر حفظ قائمة الطلاب المستهدفين: '+te.message,'error');}
+ }
+ staged=false;localStorage.removeItem(KEY);window._andalusGeneratedExam=null;closeModal('modal-exam');
+ if(typeof loadExams==='function')await loadExams();
+ if(typeof logActivity==='function')await logActivity('add','أنشأ ونشر امتحانًا مولدًا بالذكاء الاصطناعي: '+title);
+ toast('✅ تم نشر الامتحان وحفظ '+rows.length+' سؤالًا'+(individual+' لـ '+studentIds.length+' طالبًا':''));
+}
 document.addEventListener('click',e=>{const b=e.target?.closest?.('#modal-exam button[onclick="saveExam()"]');if(b&&staged){e.preventDefault();e.stopImmediatePropagation();publish();}},true);
 window.showGeneratedExamReview=review;
 function studentEssay(){if(typeof window.renderExamQuestionsForStudent!=='function'||originalRender)return;originalRender=window.renderExamQuestionsForStudent;window.renderExamQuestionsForStudent=function(saved){const qs=window.examQuestionsForStudent||[];if(!qs.some(q=>q.question_type==='essay'))return originalRender(saved);const w=document.getElementById('exam-questions-wrap');w.innerHTML=qs.map((q,i)=>{if(q.question_type==='essay')return '<div class="exam-q-card"><div class="q-title">سؤال '+(i+1)+' · مقالي</div><div style="white-space:pre-wrap;margin:10px 0">'+esc(q.question_text)+'</div><textarea style="width:100%;min-height:150px;padding:12px;border:1px solid var(--border);border-radius:10px;font-family:inherit" placeholder="اكتب إجابتك هنا..." oninput="saveExamAnswer(\''+q.id+'\',this.value)">'+esc(saved?.[q.id]||'')+'</textarea></div>';return originalRender?'<div></div>':'';}).join('');};}
