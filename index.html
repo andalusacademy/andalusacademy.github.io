@@ -12826,6 +12826,7 @@ async function saveExamQuestions() {
   await logActivity('edit', 'حدّث أسئلة امتحان إلكتروني (' + examQuestionsDraft.length + ' سؤال)');
   closeModal('modal-exam-questions');
   showToast('✅ تم حفظ الأسئلة');
+  await loadExams();
 }
 
 /* ============================================================
