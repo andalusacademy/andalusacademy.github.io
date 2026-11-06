@@ -5,6 +5,9 @@ on:
     paths:
       - 'android-secure-wrapper/**'
       - '.github/workflows/build-secure-android.yml'
+concurrency:
+  group: andalus-android-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
