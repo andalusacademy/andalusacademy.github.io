@@ -38,3 +38,38 @@ jobs:
             android-secure-wrapper/app/build/outputs/bundle/debug/app-debug.aab
           if-no-files-found: error
           retention-days: 14
+      - name: Prepare release signing key
+        id: signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "release_ready=false" >> "$GITHUB_OUTPUT"
+            echo "Release signing secrets are not configured; debug artifacts were built."
+            exit 0
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/andalus-upload-key.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          echo "release_ready=true" >> "$GITHUB_OUTPUT"
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
+      - name: Build signed release APK and AAB
+        if: steps.signing.outputs.release_ready == 'true'
+        working-directory: android-secure-wrapper
+        run: gradle --no-daemon assembleRelease bundleRelease
+      - name: Upload signed release artifacts
+        if: steps.signing.outputs.release_ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: andalus-academy-android-release
+          path: |
+            android-secure-wrapper/app/build/outputs/apk/release/app-release.apk
+            android-secure-wrapper/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 14
