@@ -4767,12 +4767,25 @@ function startExamTestMode(){
  if(!examQuestionsDraft.length){showToast('أضف أسئلة أو استوردها أولًا ثم ابدأ التجربة.','error');return;}
  const invalid=examQuestionsDraft.findIndex(q=>!String(q.question_text||'').trim()||!q.correct_answer||(q.question_type!=='truefalse'&&(!q.option_a||!q.option_b)));
  if(invalid>=0){showToast('راجع السؤال رقم '+(invalid+1)+' وحدد النص والإجابة والاختيارات المطلوبة.','error');return;}
- const shuffled=examShuffleArray(examQuestionsDraft).slice(0,100);examQuestionsForStudent=shuffled.map((q,i)=>({...q,id:'test-q-'+i,question_type:q.question_type||'mcq'}));
+ const sourceExam=allExams.find(e=>e.id===editingExamId)||{};
+ const shuffled=sampleExamQuestionsByDifficulty(examQuestionsDraft,100,sourceExam.question_mix||{easy:20,medium:60,hard:20});
+ examQuestionsForStudent=shuffled.map((q,i)=>({...q,id:'test-q-'+i,question_type:q.question_type||'mcq'}));
  examTestOriginalPortalDisplay=document.getElementById('exam-portal-screen').style.display||'none';examTestMode=true;examTestViolationCount=0;
  examStudent={id:testStudentId,name:'وضع التجربة — قيد '+testStudentId};examStudentPhone='';examFaceVerificationToken=null;
- examCurrentExam={id:'test-exam',title:document.getElementById('modal-exam-q-title').textContent.replace('📝 أسئلة: ','')||'امتحان تجريبي',duration_seconds:examQuestionsForStudent.length*15,total_score:examQuestionsForStudent.reduce((n,q)=>n+(Number(q.points)||1),0),available_until:null,show_answers_after_submit:true};
+ const totalPoints=examQuestionsForStudent.reduce((n,q)=>n+(Number(q.points)||1),0);
+ examCurrentExam={id:'test-exam',title:document.getElementById('modal-exam-q-title').textContent.replace('📝 أسئلة: ','')||'امتحان تجريبي',duration_seconds:examQuestionsForStudent.length*15,total_score:Number(sourceExam.total_score)||totalPoints,available_until:null,show_answers_after_submit:true};
  examCurrentAttempt={id:'test-attempt',started_at:new Date().toISOString(),answers:{},status:'in_progress'};examCurrentQuestionIndex=0;examSkippedQuestions=new Set();
  document.getElementById('exam-portal-screen').style.display='block';document.getElementById('exam-test-banner').textContent='🧪 وضع تجربة — رقم القيد: '+testStudentId+' — لا يتم حفظ نتيجة رسمية';document.getElementById('exam-test-banner').style.display='block';renderExamQuestionsForStudent({});showExamScreen('exam-active-screen');startExamTimer();
+}
+function sampleExamQuestionsByDifficulty(pool,limit,mix){
+ const total=Math.min(pool.length,limit);if(!total)return [];
+ const easy=Math.floor(total*(Number(mix.easy)||0)/100),medium=Math.floor(total*(Number(mix.medium)||0)/100),hard=Math.max(total-easy-medium,0);
+ const picked=[...examShuffleArray(pool.filter(q=>(q.difficulty||'medium')==='easy')).slice(0,easy),
+   ...examShuffleArray(pool.filter(q=>(q.difficulty||'medium')==='medium')).slice(0,medium),
+   ...examShuffleArray(pool.filter(q=>(q.difficulty||'medium')==='hard')).slice(0,hard)];
+ const pickedIds=new Set(picked.map(q=>q.id||q._localId||q.question_text));
+ const remaining=pool.filter(q=>!pickedIds.has(q.id||q._localId||q.question_text));
+ return examShuffleArray([...picked,...examShuffleArray(remaining).slice(0,Math.max(total-picked.length,0))]);
 }
 function finishExamTestMode(){
  deactivateExamCopyProtection();
