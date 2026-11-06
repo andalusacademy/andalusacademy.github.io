@@ -1079,9 +1079,9 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div class="card-header"><h3>🛡️ مركز النسخ الاحتياطي</h3><span style="font-size:12px;color:var(--muted)">المدير فقط</span></div>
             <div style="padding:18px;display:grid;gap:14px;">
               <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;line-height:1.9;color:#1e3a8a;">
-                <b>نسخة واحدة شاملة ومشفّرة</b><br>
-                تجمع سجلات قاعدة البيانات وملفات التخزين وبيانات تعريف حسابات الدخول في ملف واحد بامتداد <b>.andbackup</b>.
-                ستحتاج كلمة مرور النسخة عند فحصها أو استعادتها.
+                <b>نسخة بيانات وملفات مشفّرة في ملف واحد</b><br>
+                تحفظ سجلات جداول قاعدة البيانات وملفات التخزين وبيانات تعريف حسابات الدخول في ملف <b>.andbackup</b>.
+                هذه النسخة لا تتضمن كلمات المرور أو الشيفرة البرمجية أو بنية قاعدة البيانات أو إعدادات الأسرار ومفاتيح الخدمات؛ لذلك لا تُعد وحدها نسخة استعادة كاملة للنظام.
               </div>
               <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
                 <button class="btn btn-primary" id="and-backup-create" onclick="createAndalusBackup()">🔐 إنشاء نسخة احتياطية الآن</button>
@@ -1095,7 +1095,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
               <div id="and-backup-result" style="line-height:1.9;color:var(--muted);"></div>
               <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;line-height:1.9;color:#9a3412;">
                 <b>تنبيه مهم بشأن الاستعادة:</b>
-                فحص الملف متاح، لكن الاستعادة الكاملة لم تُفعّل بعد. لن يتم استبدال بيانات الأكاديمية قبل استكمال اختبار استعادة قاعدة البيانات والملفات والحسابات مع نسخة أمان قابلة للرجوع. كلمات مرور Supabase لا يمكن استخراجها أو تضمينها في النسخة.
+                فحص سلامة الملف متاح فقط حاليًا. لم يتم تفعيل الاستعادة؛ لأن استرجاع الجداول والملفات والحسابات معًا يحتاج آلية مرحلية قابلة للتراجع واختبار توافق بنية قاعدة البيانات. لن يتم حذف أو استبدال أي بيانات من هذه الصفحة. كلمات مرور Supabase لا يمكن استخراجها أو تضمينها في النسخة.
               </div>
             </div>
           </div>
