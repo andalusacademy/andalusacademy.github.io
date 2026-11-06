@@ -2843,7 +2843,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
   <div class="modal" style="max-width:680px">
     <div class="modal-header"><h3 id="modal-exam-results-title">نتائج الامتحان</h3><button class="modal-close" onclick="closeModal('modal-exam-results')">×</button></div>
     <div class="modal-body">
-      <table><thead><tr><th>رقم القيد</th><th>الاسم</th><th>الدرجة</th><th>النسبة</th><th>الحالة</th><th>الوقت المستغرق</th></tr></thead>
+      <table><thead><tr><th>رقم القيد</th><th>الاسم</th><th>الدرجة</th><th>النسبة</th><th>الحالة</th><th>الوقت المستغرق</th><th>سجل المحاولة</th></tr></thead>
       <tbody id="exam-results-table"></tbody></table>
     </div>
     <div class="modal-footer">
@@ -13028,11 +13028,23 @@ function exportExamQuestionsExcel() {
 /* ----- نتائج الامتحان ----- */
 let currentExamResultsData = { exam: null, sorted: [], attemptMap: {} };
 
+function viewExamAttemptAudit(attemptId){
+  const attempt=Object.values(currentExamResultsData.attemptMap||{}).find(a=>a.id===attemptId);
+  if(!attempt){showToast('لم يتم العثور على سجل المحاولة.','error');return;}
+  const log=Array.isArray(attempt.violation_log)?attempt.violation_log:[];
+  let modal=document.getElementById('modal-exam-attempt-audit');
+  if(!modal){modal=document.createElement('div');modal.id='modal-exam-attempt-audit';modal.className='modal-overlay';document.body.appendChild(modal);}
+  const accepted=attempt.policy_accepted_at?new Date(attempt.policy_accepted_at).toLocaleString('ar-EG'):'لم تسجل';
+  const items=log.length?log.map((v,i)=>'<div style="padding:10px;border-bottom:1px solid var(--border)"><strong>مخالفة '+(i+1)+': '+escapeHtml(v.event||'مغادرة الصفحة')+'</strong><div style="font-size:12px;color:var(--muted)">'+escapeHtml(v.details||'')+'</div><small>'+escapeHtml(v.occurred_at?new Date(v.occurred_at).toLocaleString('ar-EG'):'')+'</small></div>').join(''):'<div class="empty-state">لا توجد مخالفات مسجلة لهذه المحاولة.</div>';
+  modal.innerHTML='<div class="modal" style="max-width:680px"><div class="modal-header"><h3>🛡 سجل أمان المحاولة</h3><button class="modal-close" onclick="closeModal(\'modal-exam-attempt-audit\')">×</button></div><div class="modal-body"><p><strong>موافقة السياسة:</strong> '+escapeHtml(accepted)+'</p><p><strong>إصدار السياسة:</strong> '+escapeHtml(attempt.policy_version||'—')+'</p><p><strong>عدد المخالفات:</strong> '+(Number(attempt.violation_count)||0)+'</p><hr>'+items+'</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal(\'modal-exam-attempt-audit\')">إغلاق</button></div></div>';
+  modal.classList.add('open');
+}
+
 async function viewExamResults(examId) {
   const exam = allExams.find(e => e.id === examId);
   document.getElementById('modal-exam-results-title').textContent = '📊 نتائج: ' + (exam?.title || '');
   const tbody = document.getElementById('exam-results-table');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">جاري التحميل...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">جاري التحميل...</td></tr>';
   document.getElementById('modal-exam-results').classList.add('open');
 
   // كل الطلاب المطابقين للبرنامج/الفرع/النظام (نفس نطاق ظهور الامتحان للطالب)
@@ -13042,7 +13054,7 @@ async function viewExamResults(examId) {
   const attemptMap = {}; (attempts || []).forEach(a => attemptMap[a.student_id] = a);
 
   if (!matchingStudents.length) {
-    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="emoji">📊</div><h4>لا يوجد طلاب مطابقين لهذا الامتحان</h4></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="emoji">📊</div><h4>لا يوجد طلاب مطابقين لهذا الامتحان</h4></div></td></tr>';
     return;
   }
 
@@ -13057,15 +13069,17 @@ async function viewExamResults(examId) {
 
   tbody.innerHTML = sorted.map(s => {
     const a = attemptMap[s.id];
-    if (!a || a.status !== 'submitted') {
-      // لم يمتحن بعد — يُعتبر راسبًا تلقائيًا (لم يحضر الامتحان)
+    if (!a) {
       return `<tr style="background:#fef2f2;">
-        <td><strong>${escapeHtml(s.id)}</strong></td>
-        <td>${escapeHtml(s.name)}</td>
-        <td>0 / ${exam.total_score || 100}</td>
-        <td><span class="badge badge-danger">0%</span></td>
-        <td><span class="badge badge-danger">❌ راسب — لم يحضر الامتحان</span></td>
-        <td>—</td>
+        <td><strong>${escapeHtml(s.id)}</strong></td><td>${escapeHtml(s.name)}</td><td>0 / ${exam.total_score || 100}</td>
+        <td><span class="badge badge-danger">0%</span></td><td><span class="badge badge-danger">❌ لم يبدأ الامتحان</span></td><td>—</td><td>—</td>
+      </tr>`;
+    }
+    if (a.status !== 'submitted') {
+      return `<tr style="background:#fffbeb;">
+        <td><strong>${escapeHtml(s.id)}</strong></td><td>${escapeHtml(s.name)}</td><td>—</td><td>—</td>
+        <td><span class="badge badge-warning">⏳ محاولة جارية</span></td><td>—</td>
+        <td>${Number(a.violation_count)||0} <button class="btn btn-outline btn-sm" onclick="viewExamAttemptAudit('${a.id}')">تفاصيل</button></td>
       </tr>`;
     }
     const pct = a.max_score > 0 ? Math.round(a.score / a.max_score * 100) : 0;
@@ -13081,6 +13095,7 @@ async function viewExamResults(examId) {
       <td><span class="badge ${pct >= 50 ? 'badge-success' : 'badge-danger'}">${pct}%</span></td>
       <td>${statusBadge}</td>
       <td style="font-size:12px;">${timeTaken}</td>
+      <td>${Number(a.violation_count)||0} <button class="btn btn-outline btn-sm" onclick="viewExamAttemptAudit('${a.id}')">تفاصيل</button></td>
     </tr>`;
   }).join('');
 }
