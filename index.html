@@ -1085,7 +1085,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
               </div>
               <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
                 <button class="btn btn-primary" id="and-backup-create" onclick="createAndalusBackup()">🔐 إنشاء نسخة احتياطية الآن</button>
-                <label class="btn" for="and-backup-file" style="cursor:pointer;background:#475569;color:#fff;">📂 فحص ملف نسخة احتياطية</label>
+                <label class="btn" for="and-backup-file" style="cursor:pointer;background:#475569;color:#fff;">📂 فحص النسخة ومعاينة التوافق</label>
                 <input id="and-backup-file" type="file" accept=".andbackup,application/octet-stream" style="display:none" onchange="inspectAndalusBackup(this.files?.[0])">
               </div>
               <div id="and-backup-progress" style="display:none;border:1px solid var(--border);border-radius:10px;padding:12px;line-height:1.8;">
@@ -1095,7 +1095,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
               <div id="and-backup-result" style="line-height:1.9;color:var(--muted);"></div>
               <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;line-height:1.9;color:#9a3412;">
                 <b>تنبيه مهم بشأن الاستعادة:</b>
-                فحص سلامة الملف متاح فقط حاليًا. لم يتم تفعيل الاستعادة؛ لأن استرجاع الجداول والملفات والحسابات معًا يحتاج آلية مرحلية قابلة للتراجع واختبار توافق بنية قاعدة البيانات. لن يتم حذف أو استبدال أي بيانات من هذه الصفحة. كلمات مرور Supabase لا يمكن استخراجها أو تضمينها في النسخة.
+                المتاح الآن: فحص كلمة المرور وسلامة الملف واكتمال بيانات الجداول وملفات التخزين ومقارنة أسماء الجداول مع المشروع الحالي. هذه معاينة توافق للقراءة فقط وليست استعادة. لم يتم تفعيل الاستعادة الفعلية؛ لأنها تحتاج نسخة SQL قابلة لإعادة إنشاء المخطط واختبارًا على مشروع منفصل قبل السماح باستبدال بيانات الإنتاج. لا تُحفظ كلمات المرور أو مفاتيح الخدمات أو الجلسات داخل النسخة.
               </div>
             </div>
           </div>
@@ -8501,7 +8501,7 @@ async function createAndalusBackup() {
 async function inspectAndalusBackup(file) {
   if (!file) return;
   try {
-    const password = prompt('اكتب كلمة مرور النسخة لفحص سلامتها:');
+    const password = prompt('اكتب كلمة مرور النسخة لفحص سلامتها وتجهيز معاينة الاستعادة:');
     if (!password) return;
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (bytes.length < 52 || new TextDecoder().decode(bytes.slice(0, 8)) !== 'ANDALUS1') throw new Error('صيغة الملف غير صحيحة أو الملف تالف.');
@@ -8510,22 +8510,61 @@ async function inspectAndalusBackup(file) {
     const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
     const clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
     const zip = await JSZip.loadAsync(clear);
-    const manifestFile = zip.file('manifest.json');
-    if (!manifestFile) throw new Error('ملف الفهرس غير موجود داخل النسخة.');
-    const manifest = JSON.parse(await manifestFile.async('text'));
+    const readJson = async (path) => {
+      const entry = zip.file(path);
+      if (!entry) throw new Error('ملف مفقود داخل النسخة: ' + path);
+      return JSON.parse(await entry.async('text'));
+    };
+    const manifest = await readJson('manifest.json');
     if (manifest.format !== 'ANDALUS_BACKUP' || manifest.format_version !== 1) throw new Error('إصدار النسخة غير مدعوم.');
-    const tableFiles = Object.keys(zip.files).filter(x => x.startsWith('database/') && x.endsWith('.json')).length;
-    const storageFiles = Object.keys(zip.files).filter(x => x.startsWith('storage/') && !x.endsWith('/')).length;
-    const schemaFile = zip.file('schema/structure.json');
-    if (!schemaFile) throw new Error('ملف بنية قاعدة البيانات غير موجود؛ هذه نسخة قديمة أو غير مكتملة.');
-    const schema = JSON.parse(await schemaFile.async('text'));
-    if (!Array.isArray(schema.tables) || schema.tables.length !== tableFiles) throw new Error('عدد جداول البنية لا يطابق ملفات بيانات الجداول.');
+    if (!Array.isArray(manifest.tables) || !manifest.tables.length) throw new Error('قائمة الجداول غير موجودة في فهرس النسخة.');
+    const schema = await readJson('schema/structure.json');
+    if (!Array.isArray(schema.tables) || schema.tables.length !== manifest.tables.length) throw new Error('عدد جداول وصف البنية لا يطابق فهرس النسخة.');
+    const tableNames = new Set();
+    let totalRows = 0;
+    for (const table of manifest.tables) {
+      if (typeof table !== 'string' || !/^[a-zA-Z0-9_]+$/.test(table) || tableNames.has(table)) throw new Error('اسم جدول غير صالح أو مكرر في الفهرس.');
+      tableNames.add(table);
+      const rows = await readJson('database/' + table + '.json');
+      if (!Array.isArray(rows)) throw new Error('بيانات الجدول ليست قائمة سجلات: ' + table);
+      totalRows += rows.length;
+    }
+    const storageIndex = await readJson('storage/index.json');
+    if (!Array.isArray(storageIndex)) throw new Error('فهرس ملفات التخزين غير صالح.');
+    let storageBytes = 0;
+    for (const item of storageIndex) {
+      if (!item || typeof item.bucket !== 'string' || typeof item.path !== 'string' || !item.bucket || !item.path || item.path.includes('..')) throw new Error('يوجد مسار تخزين غير صالح.');
+      const entry = zip.file('storage/' + item.bucket + '/' + item.path);
+      if (!entry) throw new Error('ملف تخزين مفقود: ' + item.bucket + '/' + item.path);
+      const data = await entry.async('uint8array');
+      if (Number.isFinite(Number(item.size)) && Number(item.size) > 0 && data.byteLength !== Number(item.size)) throw new Error('حجم ملف التخزين لا يطابق الفهرس: ' + item.path);
+      storageBytes += data.byteLength;
+    }
+    const auth = await readJson('auth/users-metadata.json');
+    if (!Array.isArray(auth.users)) throw new Error('بيانات تعريف حسابات الدخول غير صالحة.');
+
+    // Live compatibility check only: this call reads current metadata and never writes data.
+    const liveManifest = await andalusBackupRequest({ action: 'manifest' });
+    const liveTables = new Set(liveManifest.tables || []);
+    const missingLive = manifest.tables.filter(t => !liveTables.has(t));
+    const extraLive = (liveManifest.tables || []).filter(t => !tableNames.has(t));
+    const exactTableMatch = missingLive.length === 0 && extraLive.length === 0;
     const box = document.getElementById('and-backup-result');
-    if (box) box.innerHTML = '<b style="color:#15803d">الملف سليم واجتاز فحص البنية الأساسي.</b><br>تاريخ النسخة: ' + new Date(manifest.created_at).toLocaleString('ar-EG') + '<br>جداول البيانات: ' + tableFiles + '<br>ملفات التخزين: ' + storageFiles + '<br>سياسات الحماية: ' + (schema.policies || []).length + ' — المشغلات: ' + (schema.triggers || []).length + ' — الدوال: ' + (schema.routines || []).length + '<br><b>هذا فحص سلامة ومحتويات فقط؛ لم يتم تعديل أي بيانات، والاستعادة لم تُفعّل بعد.</b>';
-    showToast('تم فحص ملف النسخة بنجاح دون تغيير بيانات النظام.', 'success');
+    const fmt = n => Number(n || 0).toLocaleString('en-US');
+    if (box) box.innerHTML =
+      '<b style="color:#15803d">اجتاز الملف فحص التشفير واكتمال الملفات.</b><br>' +
+      'تاريخ النسخة: ' + new Date(manifest.created_at).toLocaleString('ar-EG') + '<br>' +
+      'الجداول: ' + fmt(manifest.tables.length) + ' — إجمالي السجلات: ' + fmt(totalRows) + '<br>' +
+      'ملفات التخزين: ' + fmt(storageIndex.length) + ' — حجم الملفات قبل الضغط: ' + fmt(storageBytes) + ' بايت<br>' +
+      'حسابات الدخول (بيانات تعريف فقط): ' + fmt(auth.users.length) + '<br>' +
+      'مطابقة أسماء الجداول مع المشروع الحالي: ' + (exactTableMatch ? '<b style="color:#15803d">مطابقة</b>' : '<b style="color:#b91c1c">غير مطابقة</b>') +
+      (exactTableMatch ? '' : '<br>جداول غير موجودة حاليًا: ' + missingLive.join('، ') + '<br>جداول إضافية حاليًا: ' + extraLive.join('، ')) +
+      '<br>السياسات: ' + fmt((schema.policies || []).length) + ' — المشغلات: ' + fmt((schema.triggers || []).length) + ' — الدوال: ' + fmt((schema.routines || []).length) +
+      '<br><b style="color:#9a3412">معاينة تحقق فقط: لم تُستعد البيانات ولم يتم تعديل أي شيء.</b>';
+    showToast('اكتمل فحص محتويات النسخة دون تغيير بيانات النظام.', 'success');
   } catch (error) {
     const box = document.getElementById('and-backup-result');
-    if (box) box.textContent = 'فشل فحص النسخة: كلمة المرور غير صحيحة أو الملف تالف. ' + (error?.message || '');
+    if (box) box.textContent = 'فشل فحص النسخة: ' + (error?.message || error);
     showToast('تعذر فحص ملف النسخة.', 'error');
   } finally {
     const input = document.getElementById('and-backup-file');
