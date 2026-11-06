@@ -1,5 +1,12 @@
 <resources>
-    <style name="AppTheme" parent="AppTheme">
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/andalus_sky</item>
+        <item name="android:statusBarColor">@color/andalus_navy</item>
+        <item name="android:navigationBarColor">@color/andalus_navy</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowSplashScreenBackground">@color/andalus_navy</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@color/andalus_navy</item>
