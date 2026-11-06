@@ -82,7 +82,7 @@
   };
   const originalOpen=window.openCreateExam;
   if(typeof originalOpen==='function'&&!originalOpen.__targetingWrapped){
-    const wrapped=function(){selected.clear();const result=originalOpen.apply(this,arguments);installPanel();return result;};
+    const wrapped=function(){selected.clear();const result=originalOpen.apply(this,arguments);installPanel();if(!students().length&&typeof window.loadStudents==='function'){Promise.resolve(window.loadStudents()).then(render).catch(()=>render());}return result;};
     wrapped.__targetingWrapped=true;window.openCreateExam=wrapped;
   }
   document.addEventListener('change',e=>{if(e.target?.id==='exam-branch'&&installed)render();});
