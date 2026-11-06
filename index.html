@@ -4728,7 +4728,8 @@ async function loadAvailableExamsForStudent() {
     const until = new Date(e.available_until).toLocaleString('ar-EG', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
     let actionHtml;
     if (status === 'submitted') actionHtml = '<div class="badge badge-success">✓ تم التسليم نهائيًا</div><div style="margin-top:7px;font-weight:800;color:var(--navy)">درجتك: '+(Number(e.attempt_score)||0)+' / '+(Number(e.attempt_max_score)||100)+'</div>';
-    else if (status === 'in_progress') actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="resumeExam('${e.id}')">▶ استكمال الامتحان</button>`;
+    else if (status === 'in_progress' && e.attempt_admin_reopened) actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="resumeExam('${e.id}')">▶ دخول بعد إعادة فتح الإدارة</button>`;
+    else if (status === 'in_progress') actionHtml = '<span class="badge badge-warning">تم إغلاق المحاولة — راجع الإدارة لإعادة فتحها</span>';
     else actionHtml = `<button class="btn btn-gold" style="width:100%" onclick="requestExamStart('${e.id}')">▶ بدء الامتحان</button>`;
     return `<div class="exam-avail-item"><h4>${escapeHtml(e.title)}</h4><p>${escapeHtml(subj)} · المدة: ${Number(e.duration_minutes)||0} دقيقة — متاح حتى ${escapeHtml(until)}</p>${actionHtml}</div>`;
   }).join('');
@@ -4891,6 +4892,12 @@ async function resumeExam(examId) {
   if (attempt.status === 'submitted') {
     if (attempt.flagged_cheating) showToast('🚫 تم تسليم الامتحان وإلغاء نتيجته بسبب مخالفة مسجلة.', 'error');
     else showToast('انتهى الامتحان بالتسليم. درجتك: '+(Number(attempt.score)||0)+' / '+(Number(attempt.max_score)||100), 'success');
+    await loadAvailableExamsForStudent();
+    showExamScreen('exam-select-screen');
+    return;
+  }
+  if (attempt.status === 'in_progress' && attempt.policy_accepted_at) {
+    showToast('تم إغلاق المحاولة عند مغادرة صفحة الامتحان. لا يمكن استكمالها؛ اطلب من الإدارة إعادة فتحها.', 'warning');
     await loadAvailableExamsForStudent();
     showExamScreen('exam-select-screen');
     return;
