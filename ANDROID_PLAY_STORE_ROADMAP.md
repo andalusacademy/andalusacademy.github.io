@@ -98,6 +98,7 @@
 - تغيير الاسم الظاهر إلى «أكاديمية الأندلس»، وإضافة ألوان الهوية وأيقونة launcher عادية وAdaptive Icon وشاشة بدء Android 12+.
 - نقل تشغيل الصفحة الرئيسية إلى ملفات محلية داخل التطبيق عبر AndroidX WebKit WebViewAssetLoader بدل الاعتماد على GitHub Pages عند بدء التشغيل.
 - إعداد GitHub Actions لنسخ index.html وملفات JavaScript وmanifest وservice worker ومجلدي vendor وassets إلى حزمة التطبيق، ثم بناء APK وAAB للاختبار.
+- نجاح بناء APK وAAB بنمط Debug على GitHub Actions بعد اكتمال الأيقونة وشاشة البداية ودعم WebView؛ آخر تشغيل ناجح: https://github.com/andalusacademy/andalusacademy.github.io/actions/runs/42310475947. هذه مخرجات اختبار وليست Release موقعة.
 - إضافة دعم Service Worker المحلي واختيار الملفات/رفعها من WebView.
 
 ### ما زال مطلوبًا قبل اعتبار التطبيق جاهزًا للنشر
