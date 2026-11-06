@@ -12682,7 +12682,7 @@ function renderExamQuestionsList() {
   container.innerHTML = examQuestionsDraft.map((q, i) => `
     <div class="exam-q-row" data-idx="${i}">
       <div class="q-num">
-        <span>سؤال ${i + 1}</span>
+        <span>سؤال ${i + 1}${q.source_group ? ' · <small style="color:#2563eb">من: '+escapeHtml(q.source_group)+'</small>' : ''}</span>
         <button class="btn btn-danger btn-sm" onclick="removeQuestionRow(${i})">🗑 حذف السؤال</button>
       </div>
       <textarea rows="2" placeholder="نص السؤال..." onchange="updateQuestionField(${i},'question_text',this.value)">${escapeHtml(q.question_text || '')}</textarea>
@@ -12752,6 +12752,8 @@ async function saveExamQuestions() {
       option_c: q.option_c || null, option_d: q.option_d || null,
       correct_answer: q.correct_answer,
       points: q.points || 1,
+      source_group: q.source_group || null,
+      source_exam_id: q.source_exam_id || null,
       order_num: i
     }));
     const { error } = await sb.from('exam_questions').insert(toInsert);
@@ -12828,6 +12830,90 @@ async function importExamQuestionsExcel(input) {
     showToast('خطأ في قراءة الملف: ' + e.message, 'error');
   }
   input.value = '';
+}
+
+
+function openMergeExamQuestions(){
+  const sources=allExams.filter(e=>e.id!==editingExamId&&(e.question_count||0)>0);
+  if(!sources.length){showToast('لا توجد امتحانات أخرى تحتوي على أسئلة لدمجها.','error');return;}
+  let modal=document.getElementById('modal-merge-exam-questions');
+  if(!modal){
+    modal=document.createElement('div');modal.id='modal-merge-exam-questions';modal.className='modal-overlay';
+    modal.innerHTML='<div class="modal" style="max-width:680px"><div class="modal-header"><h3>🧩 دمج بنوك الأسئلة</h3><button class="modal-close" onclick="closeModal(\'modal-merge-exam-questions\')">×</button></div><div class="modal-body"><p style="font-size:12px;color:var(--muted);margin-bottom:12px">اختر مجموعة أو أكثر وحدد عدد الأسئلة المطلوب سحبها من كل مجموعة. اكتب 0 لاستخدام كل الأسئلة المتاحة.</p><div id="merge-exam-source-list"></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal(\'modal-merge-exam-questions\')">إلغاء</button><button class="btn btn-gold" onclick="mergeSelectedExamQuestions()">إضافة المجموعات المحددة</button></div></div>';
+    document.body.appendChild(modal);
+  }
+  document.getElementById('merge-exam-source-list').innerHTML=sources.map(e=>'<div style="display:grid;grid-template-columns:1fr 100px;gap:10px;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><label><input type="checkbox" class="merge-exam-source-cb" value="'+e.id+'"> <strong>'+escapeHtml(e.title)+'</strong><small style="display:block;color:var(--muted)">'+e.question_count+' سؤال متاح</small></label><input type="number" min="0" max="'+e.question_count+'" value="0" class="merge-exam-count" data-exam-id="'+e.id+'" title="0 = كل الأسئلة" style="width:100%"></div>').join('');
+  modal.classList.add('open');
+}
+async function mergeSelectedExamQuestions(){
+  const selected=[...document.querySelectorAll('.merge-exam-source-cb:checked')];
+  if(!selected.length){showToast('حدد مجموعة واحدة على الأقل.','error');return;}
+  let added=0;
+  for(const checkbox of selected){
+    const source=allExams.find(e=>e.id===checkbox.value);
+    const input=document.querySelector('.merge-exam-count[data-exam-id="'+checkbox.value+'"]');
+    const count=Math.max(0,Number(input?.value)||0);
+    const {data,error}=await sb.from('exam_questions').select('*').eq('exam_id',checkbox.value).order('order_num');
+    if(error){showToast('تعذر تحميل مجموعة '+(source?.title||'')+': '+error.message,'error');continue;}
+    const rows=examShuffleArray(data||[]).slice(0,count>0?count:(data||[]).length);
+    rows.forEach(q=>examQuestionsDraft.push({...q,id:undefined,exam_id:undefined,source_exam_id:checkbox.value,source_group:source?.title||'مجموعة أسئلة'}));
+    added+=rows.length;
+  }
+  renderExamQuestionsList();closeModal('modal-merge-exam-questions');
+  showToast('تمت إضافة '+added+' سؤال إلى المسودة. اضغط حفظ الأسئلة لاعتماد الدمج.');
+}
+function parseExamQuestionsText(rawText,sourceName){
+  const text=String(rawText||'').replace(/\r/g,'').replace(/[\u00a0\t]+/g,' ').trim();
+  if(!text)return [];
+  const lines=text.split('\n');const blocks=[];let current=[];
+  const starts=/^(?:سؤال\s*)?\d+\s*[.)、:\-]\s*/i;
+  for(const raw of lines){const line=raw.trim();if(!line){if(current.length)current.push('');continue;}if(starts.test(line)&&current.length){blocks.push(current);current=[];}current.push(line);}
+  if(current.length)blocks.push(current);
+  const parsed=[];
+  for(const block of blocks){
+    const options={};let questionLines=[],answerRaw='',isTF=false;
+    for(let line of block){
+      line=line.replace(starts,'').trim();
+      const am=line.match(/^(?:الإجابة(?:\s+الصحيحة)?|الاجابة(?:\s+الصحيحة)?|answer)\s*[:：\-]\s*(.+)$/i);
+      if(am){answerRaw=am[1].trim();continue;}
+      const om=line.match(/^(?:\(?([أاأبجدد]|[a-dA-D]|[1-4])\)?\s*[).:\-])\s*(.+)$/);
+      if(om){const k=({'أ':'a','ا':'a','ب':'b','ج':'c','د':'d','1':'a','2':'b','3':'c','4':'d','a':'a','b':'b','c':'c','d':'d'})[om[1].toLowerCase()];if(k)options[k]=om[2].trim();continue;}
+      if(/صح\s*[/\\-]\s*خطأ|صح أو خطأ|true\s*[/\\-]\s*false/i.test(line))isTF=true;
+      questionLines.push(line);
+    }
+    const question=questionLines.join(' ').replace(/^\d+\s*[.)\-]\s*/,'').trim();
+    const a=String(answerRaw||'').trim().toLowerCase();
+    let correct='';const map={'أ':'a','ا':'a','ب':'b','ج':'c','د':'d','1':'a','2':'b','3':'c','4':'d','a':'a','b':'b','c':'c','d':'d'};
+    if(isTF||(!Object.keys(options).length&&/^(صح|صحيح|true|خطأ|خاطئ|false)$/i.test(a))){isTF=true;if(/^(صح|صحيح|true|1)$/i.test(a))correct='true';else if(/^(خطأ|خاطئ|false|2)$/i.test(a))correct='false';}
+    else correct=map[a]||'';
+    if(question)parsed.push({question_text:question,question_type:isTF?'truefalse':'mcq',option_a:options.a||null,option_b:options.b||null,option_c:options.c||null,option_d:options.d||null,correct_answer:correct,points:1,source_exam_id:null,source_group:sourceName||'استيراد مستند'});
+  }
+  return parsed;
+}
+async function importExamQuestionsDocument(input){
+  const file=input.files?.[0];if(!file)return;
+  try{
+    if(file.size>25*1024*1024)throw new Error('الحد الأقصى لحجم المستند 25 ميجابايت.');
+    const buffer=await file.arrayBuffer();let extracted='';
+    if(/\.docx$/i.test(file.name)){
+      if(!window.mammoth)throw new Error('قارئ Word غير متاح الآن.');
+      const result=await mammoth.extractRawText({arrayBuffer:buffer});extracted=result.value||'';
+    }else if(/\.pdf$/i.test(file.name)){
+      if(!window.pdfjsLib){
+        await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';script.onload=resolve;script.onerror=()=>reject(new Error('تعذر تحميل قارئ PDF.'));document.head.appendChild(script);});
+      }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const pdf=await window.pdfjsLib.getDocument({data:new Uint8Array(buffer)}).promise;const pages=[];
+      for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p);const content=await page.getTextContent();pages.push(content.items.map(x=>x.str).join(' '));}
+      extracted=pages.join('\n');
+    }else throw new Error('الامتداد المدعوم هو DOCX أو PDF.');
+    const parsed=parseExamQuestionsText(extracted,file.name);
+    if(!parsed.length)throw new Error('لم أتعرف على أسئلة. استخدم ترقيم 1. للسؤال، والاختيارات أ) ب) ج) د)، وسطر الإجابة: ب.');
+    examQuestionsDraft.push(...parsed);renderExamQuestionsList();
+    const incomplete=parsed.filter(q=>!q.correct_answer||(q.question_type==='mcq'&&(!q.option_a||!q.option_b))).length;
+    showToast('تم استخراج '+parsed.length+' سؤال. '+(incomplete?'راجع '+incomplete+' سؤالًا غير مكتمل. ':'')+'لم يتم الحفظ بعد؛ راجع وعدّل ثم اضغط حفظ الأسئلة.');
+  }catch(error){showToast(error.message||'تعذر قراءة المستند.','error');}
+  finally{input.value='';}
 }
 
 function exportExamQuestionsExcel() {
