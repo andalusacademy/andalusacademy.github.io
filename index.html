@@ -823,6 +823,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div class="nav-card c4" onclick="showPage('students')"><span class="nav-card-icon">👨‍🎓</span><span>الطلاب</span></div>
             <div class="nav-card c5 admin-only" id="andalus-student-gateway-card" style="background:linear-gradient(135deg,#1e3a8a,#0f766e);cursor:pointer;"><span class="nav-card-icon">🎓</span><span>بوابة الطلاب</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('achievements');loadAchievementsAdmin()"><span class="nav-card-icon">🏅</span><span>إنجازات وترتيب المتدربين</span></div>
+            <div class="nav-card c12 admin-only" onclick="showPage('backup-center')" style="background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff;"><span class="nav-card-icon">🛡️</span><span>النسخ الاحتياطي والاستعادة</span><small style="display:block;opacity:.9;margin-top:4px;">حفظ بيانات الأكاديمية في ملف مشفّر واحد</small></div>
             <div class="nav-card c12 admin-only" onclick="showPage('requests');loadStudentRequestsAdmin()"><span class="nav-card-icon">🎫</span><span>الشكاوى والطلبات</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('notifications');loadNotificationsAdmin()"><span class="nav-card-icon">🔔</span><span>مركز التنبيهات</span></div>
             <div class="nav-card c12 admin-only" onclick="showPage('competition-security')"><span class="nav-card-icon">🔐</span><span>أمان المسابقات والتحقق والهوية</span></div>
@@ -1069,6 +1070,34 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           <div class="card">
             <div class="card-header"><h3>📋 الإنجازات المسجلة</h3><span id="ach-count" style="font-size:12px;color:var(--muted)">0 إنجاز</span></div>
             <div style="overflow-x:auto;"><table><thead><tr><th>المتدرب</th><th>نوع الإنجاز</th><th>العنوان</th><th>التاريخ</th><th>النقاط</th><th>نقاط الأنشطة</th><th>الوصف</th><th>إجراء</th></tr></thead><tbody id="ach-records-table"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px;">جاري التحميل...</td></tr></tbody></table></div>
+          </div>
+        </div>
+
+        <!-- ANDALUS_BACKUP_CENTER_V1 -->
+        <div id="page-backup-center" class="page">
+          <div class="card">
+            <div class="card-header"><h3>🛡️ مركز النسخ الاحتياطي</h3><span style="font-size:12px;color:var(--muted)">المدير فقط</span></div>
+            <div style="padding:18px;display:grid;gap:14px;">
+              <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;line-height:1.9;color:#1e3a8a;">
+                <b>نسخة واحدة شاملة ومشفّرة</b><br>
+                تجمع سجلات قاعدة البيانات وملفات التخزين وبيانات تعريف حسابات الدخول في ملف واحد بامتداد <b>.andbackup</b>.
+                ستحتاج كلمة مرور النسخة عند فحصها أو استعادتها.
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                <button class="btn btn-primary" id="and-backup-create" onclick="createAndalusBackup()">🔐 إنشاء نسخة احتياطية الآن</button>
+                <label class="btn" for="and-backup-file" style="cursor:pointer;background:#475569;color:#fff;">📂 فحص ملف نسخة احتياطية</label>
+                <input id="and-backup-file" type="file" accept=".andbackup,application/octet-stream" style="display:none" onchange="inspectAndalusBackup(this.files?.[0])">
+              </div>
+              <div id="and-backup-progress" style="display:none;border:1px solid var(--border);border-radius:10px;padding:12px;line-height:1.8;">
+                <div id="and-backup-progress-text">جاري التجهيز...</div>
+                <div style="height:8px;background:#e2e8f0;border-radius:20px;overflow:hidden;margin-top:8px;"><div id="and-backup-progress-bar" style="height:100%;width:0%;background:#2563eb;transition:width .2s"></div></div>
+              </div>
+              <div id="and-backup-result" style="line-height:1.9;color:var(--muted);"></div>
+              <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;line-height:1.9;color:#9a3412;">
+                <b>تنبيه مهم بشأن الاستعادة:</b>
+                فحص الملف متاح، لكن الاستعادة الكاملة لم تُفعّل بعد. لن يتم استبدال بيانات الأكاديمية قبل استكمال اختبار استعادة قاعدة البيانات والملفات والحسابات مع نسخة أمان قابلة للرجوع. كلمات مرور Supabase لا يمكن استخراجها أو تضمينها في النسخة.
+              </div>
+            </div>
           </div>
         </div>
 
@@ -5027,7 +5056,7 @@ function updateTime() {
    ============================================================ */
 
 // الصفحات الإدارية المحمية دائمًا للمدير فقط، بصرف النظر عن أي تخصيص
-const ADMIN_ONLY_PAGES = new Set(['subjects', 'breakeven', 'court', 'dream', 'employees', 'logs', 'achievements', 'requests', 'competition-security', 'dismissed-students', 'study-summaries']);
+const ADMIN_ONLY_PAGES = new Set(['subjects', 'breakeven', 'court', 'dream', 'employees', 'logs', 'achievements', 'requests', 'competition-security', 'dismissed-students', 'study-summaries', 'backup-center']);
 
 function showPage(page) {
   // ✅ فحص أمني: منع الموظف من فتح صفحة إدارية أو غير مسموح له بها، حتى لو استُدعيت الدالة مباشرة
@@ -8331,6 +8360,162 @@ async function readWordTableAsRows(file) {
 /* ============================================================
    EXCEL EXPORT
    ============================================================ */
+
+/* ANDALUS_BACKUP_CENTER_V1 */
+const ANDALUS_BACKUP_ENDPOINT = SUPABASE_URL + '/functions/v1/andalus-backup';
+let andalusBackupBusy = false;
+
+async function andalusBackupRequest(payload, binary = false) {
+  const { data: sessionData, error: sessionError } = await sb.auth.getSession();
+  const token = sessionData?.session?.access_token;
+  if (sessionError || !token) throw new Error('انتهت جلسة الدخول؛ سجّل الدخول مرة أخرى.');
+  const response = await fetch(ANDALUS_BACKUP_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    let message = 'تعذر تنفيذ طلب النسخ الاحتياطي.';
+    try { const body = await response.json(); message = body.error || message; } catch (_) {}
+    throw new Error(message);
+  }
+  return binary ? new Uint8Array(await response.arrayBuffer()) : await response.json();
+}
+
+function andalusBackupProgress(message, percent) {
+  const wrap = document.getElementById('and-backup-progress');
+  const label = document.getElementById('and-backup-progress-text');
+  const bar = document.getElementById('and-backup-progress-bar');
+  if (wrap) wrap.style.display = 'block';
+  if (label) label.textContent = message;
+  if (bar && Number.isFinite(percent)) bar.style.width = Math.max(0, Math.min(100, percent)) + '%';
+}
+
+async function andalusBackupListFiles(bucket, prefix, output) {
+  let offset = 0;
+  while (true) {
+    const result = await andalusBackupRequest({ action: 'storage-list', bucket, prefix, offset });
+    for (const item of (result.items || [])) {
+      const path = prefix ? prefix + '/' + item.name : item.name;
+      const isFolder = item.id === null || item.metadata === null;
+      if (isFolder) await andalusBackupListFiles(bucket, path, output);
+      else output.push({ bucket, path, size: Number(item.metadata?.size || 0), contentType: item.metadata?.mimetype || '' });
+    }
+    if (result.done) break;
+    offset += 100;
+  }
+}
+
+async function createAndalusBackup() {
+  if (andalusBackupBusy) return;
+  if (currentUser?.role !== 'admin') { showToast('النسخ الاحتياطي للمدير فقط', 'error'); return; }
+  if (typeof JSZip === 'undefined') { showToast('مكتبة ضغط النسخ الاحتياطي غير متاحة.', 'error'); return; }
+  const password = prompt('اكتب كلمة مرور قوية لتشفير النسخة الاحتياطية:');
+  if (!password) return;
+  if (password.length < 10) { showToast('كلمة المرور يجب ألا تقل عن 10 أحرف.', 'error'); return; }
+  const confirmPassword = prompt('أعد كتابة كلمة المرور للتأكيد:');
+  if (password !== confirmPassword) { showToast('كلمتا المرور غير متطابقتين.', 'error'); return; }
+
+  andalusBackupBusy = true;
+  const button = document.getElementById('and-backup-create');
+  if (button) button.disabled = true;
+  const resultBox = document.getElementById('and-backup-result');
+  if (resultBox) resultBox.textContent = '';
+  try {
+    andalusBackupProgress('جاري قراءة فهرس النسخة...', 2);
+    const manifest = await andalusBackupRequest({ action: 'manifest' });
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify({ ...manifest, product: 'أكاديمية الأندلس', app_backup_scope: 'public database tables, storage objects, auth user metadata', restore_status: 'inspection_only_until_restore_validation' }, null, 2));
+
+    for (let i = 0; i < manifest.tables.length; i++) {
+      const table = manifest.tables[i];
+      let offset = 0, allRows = [], done = false;
+      while (!done) {
+        const chunk = await andalusBackupRequest({ action: 'table', table, offset, limit: 500 });
+        allRows = allRows.concat(chunk.rows || []);
+        done = !!chunk.done;
+        offset += 500;
+      }
+      zip.file('database/' + table + '.json', JSON.stringify(allRows));
+      andalusBackupProgress('تم حفظ جدول ' + table + ' (' + allRows.length + ' سجل)', 5 + Math.round(((i + 1) / manifest.tables.length) * 48));
+    }
+
+    let authUsers = [], authPage = 1, authDone = false;
+    while (!authDone) {
+      const chunk = await andalusBackupRequest({ action: 'auth-users', page: authPage++ });
+      authUsers = authUsers.concat(chunk.users || []);
+      authDone = !!chunk.done;
+    }
+    zip.file('auth/users-metadata.json', JSON.stringify({ users: authUsers, note: 'Passwords, password hashes, refresh tokens and active sessions are not included.' }));
+
+    const files = [];
+    for (const bucket of (manifest.buckets || [])) await andalusBackupListFiles(bucket.name, '', files);
+    zip.file('storage/index.json', JSON.stringify(files, null, 2));
+    for (let i = 0; i < files.length; i++) {
+      const item = files[i];
+      const bytes = await andalusBackupRequest({ action: 'storage-download', bucket: item.bucket, path: item.path }, true);
+      zip.file('storage/' + item.bucket + '/' + item.path, bytes);
+      andalusBackupProgress('حفظ الملفات: ' + (i + 1) + ' من ' + files.length, 55 + Math.round(((i + 1) / Math.max(1, files.length)) * 35));
+    }
+
+    andalusBackupProgress('جاري ضغط وتشفير الملف النهائي...', 92);
+    const zipBytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+    const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, zipBytes));
+    const output = new Uint8Array(36 + encrypted.length);
+    output.set(new TextEncoder().encode('ANDALUS1'), 0);
+    output.set(salt, 8); output.set(iv, 24); output.set(encrypted, 36);
+    const url = URL.createObjectURL(new Blob([output], { type: 'application/octet-stream' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Andalus-Full-Backup-' + new Date().toISOString().replace(/[:.]/g, '-') + '.andbackup';
+    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    andalusBackupProgress('اكتمل إنشاء الملف المشفّر.', 100);
+    if (resultBox) resultBox.innerHTML = '<b style="color:#15803d">تم إنشاء النسخة الاحتياطية بنجاح.</b><br>الجداول: ' + manifest.tables.length + ' — ملفات التخزين: ' + files.length + ' — حسابات الدخول: ' + authUsers.length + '<br>احتفظ بكلمة المرور في مكان آمن؛ لا يمكن فتح الملف بدونها.';
+    showToast('تم إنشاء النسخة الاحتياطية المشفّرة.', 'success');
+  } catch (error) {
+    console.error('Andalus backup error:', error);
+    if (resultBox) resultBox.textContent = 'تعذر إكمال النسخة: ' + (error?.message || error);
+    showToast('فشل إنشاء النسخة الاحتياطية: ' + (error?.message || error), 'error');
+  } finally {
+    andalusBackupBusy = false;
+    if (button) button.disabled = false;
+  }
+}
+
+async function inspectAndalusBackup(file) {
+  if (!file) return;
+  try {
+    const password = prompt('اكتب كلمة مرور النسخة لفحص سلامتها:');
+    if (!password) return;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (bytes.length < 52 || new TextDecoder().decode(bytes.slice(0, 8)) !== 'ANDALUS1') throw new Error('صيغة الملف غير صحيحة أو الملف تالف.');
+    const salt = bytes.slice(8, 24), iv = bytes.slice(24, 36), encrypted = bytes.slice(36);
+    const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    const clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
+    const zip = await JSZip.loadAsync(clear);
+    const manifestFile = zip.file('manifest.json');
+    if (!manifestFile) throw new Error('ملف الفهرس غير موجود داخل النسخة.');
+    const manifest = JSON.parse(await manifestFile.async('text'));
+    if (manifest.format !== 'ANDALUS_BACKUP' || manifest.format_version !== 1) throw new Error('إصدار النسخة غير مدعوم.');
+    const tableFiles = Object.keys(zip.files).filter(x => x.startsWith('database/') && x.endsWith('.json')).length;
+    const storageFiles = Object.keys(zip.files).filter(x => x.startsWith('storage/') && !x.endsWith('/')).length;
+    const box = document.getElementById('and-backup-result');
+    if (box) box.innerHTML = '<b style="color:#15803d">الملف سليم ويمكن قراءة محتوياته.</b><br>تاريخ النسخة: ' + new Date(manifest.created_at).toLocaleString('ar-EG') + '<br>جداول البيانات: ' + tableFiles + '<br>ملفات التخزين: ' + storageFiles + '<br><b>هذا فحص سلامة فقط؛ لم يتم تعديل أي بيانات.</b>';
+    showToast('تم فحص ملف النسخة بنجاح دون تغيير بيانات النظام.', 'success');
+  } catch (error) {
+    const box = document.getElementById('and-backup-result');
+    if (box) box.textContent = 'فشل فحص النسخة: كلمة المرور غير صحيحة أو الملف تالف. ' + (error?.message || '');
+    showToast('تعذر فحص ملف النسخة.', 'error');
+  } finally {
+    const input = document.getElementById('and-backup-file');
+    if (input) input.value = '';
+  }
+}
 
 function showExportMenu() {
   if (currentUser.role !== 'admin') { showToast('هذه الميزة للمدير فقط', 'error'); return; }
