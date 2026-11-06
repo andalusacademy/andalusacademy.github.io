@@ -4951,6 +4951,7 @@ function confirmSubmitExam() {
 
 async function submitExam(autoSubmitted, cheatingDetected) {
   if (examTestMode) { finishExamTestMode(); return; }
+  document.getElementById('exam-result-note').textContent = 'شكرًا لأدائك الامتحان. النتيجة مسجَّلة في النظام.';
   if (examSubmitLock) return;
   examSubmitLock = true;
   if (examTimerInterval) clearInterval(examTimerInterval);
@@ -12904,7 +12905,11 @@ async function importExamQuestionsDocument(input){
       }
       window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       const pdf=await window.pdfjsLib.getDocument({data:new Uint8Array(buffer)}).promise;const pages=[];
-      for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p);const content=await page.getTextContent();pages.push(content.items.map(x=>x.str).join(' '));}
+      for(let p=1;p<=pdf.numPages;p++){
+        const page=await pdf.getPage(p);const content=await page.getTextContent();const rows=new Map();
+        for(const item of content.items){const y=Math.round(item.transform?.[5]||0);rows.set(y,(rows.get(y)||'')+' '+item.str);}
+        pages.push([...rows.entries()].sort((a,b)=>b[0]-a[0]).map(row=>row[1].trim()).join('\\n'));
+      }
       extracted=pages.join('\n');
     }else throw new Error('الامتداد المدعوم هو DOCX أو PDF.');
     const parsed=parseExamQuestionsText(extracted,file.name);
