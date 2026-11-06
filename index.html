@@ -8,7 +8,7 @@
 </script>
 <meta name="theme-color" content="#1a2a4a">
 <meta name="description" content="نظام إدارة مركز الاندلس للتدريب">
-<meta name="andalus-build" content="direct-portal-v30">
+<meta name="andalus-build" content="direct-portal-v31-exam-security">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a2a4a'/><text x='50' y='65' font-size='60' text-anchor='middle' fill='%23c9a84c' font-family='Arial'>A</text></svg>">
 <title>نظام مركز الاندلس للتدريب</title>
@@ -478,7 +478,11 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
 @media(max-width:380px){#student-portal-card{padding:20px 15px}.student-portal-grid{gap:8px!important}.student-portal-tile{min-height:118px;padding:12px 7px!important}.student-portal-tile .tile-icon{width:44px;height:44px;font-size:23px}.student-portal-tile .tile-label{font-size:12px}}
 @media(min-width:540px){.student-portal-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}.student-portal-tile{min-height:140px}}
 </style>
-<style id="exam-portal-enhancements">#exam-portal-screen{z-index:9998;position:relative}#exam-portal-screen .exam-questions-wrap{padding:10px 12px 30px}#exam-portal-screen .exam-q-card{background:#fff;border:1px solid #e4e8f2;border-radius:16px;box-shadow:0 8px 24px rgba(21,34,56,.08)}#exam-portal-screen .exam-option-label{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid #dbe2ee;border-radius:11px;margin:8px 0;cursor:pointer}#exam-portal-screen .exam-option-label.selected{border-color:#1d4ed8;background:#eff6ff}#exam-portal-screen .exam-timer{position:sticky;top:0;z-index:4;margin:0 auto;max-width:900px;text-align:center}#modal-exam-questions .modal{max-width:980px!important}@media(max-width:640px){#exam-portal-screen .exam-option-label{font-size:13px}#exam-portal-screen .exam-timer{font-size:25px}}</style><style id="exam-copy-protection-css">#exam-portal-screen #exam-questions-wrap,#exam-portal-screen #exam-questions-wrap *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}</style></head>
+<style id="exam-portal-enhancements">#exam-portal-screen{z-index:9998;position:relative}#exam-portal-screen .exam-questions-wrap{padding:10px 12px 30px}#exam-portal-screen .exam-q-card{background:#fff;border:1px solid #e4e8f2;border-radius:16px;box-shadow:0 8px 24px rgba(21,34,56,.08)}#exam-portal-screen .exam-option-label{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid #dbe2ee;border-radius:11px;margin:8px 0;cursor:pointer}#exam-portal-screen .exam-option-label.selected{border-color:#1d4ed8;background:#eff6ff}#exam-portal-screen .exam-timer{position:sticky;top:0;z-index:4;margin:0 auto;max-width:900px;text-align:center}#modal-exam-questions .modal{max-width:980px!important}@media(max-width:640px){#exam-portal-screen .exam-option-label{font-size:13px}#exam-portal-screen .exam-timer{font-size:25px}}</style><style id="exam-copy-protection-css">#exam-portal-screen #exam-questions-wrap,#exam-portal-screen #exam-questions-wrap *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}</style><style id="andalus-exam-anti-copy">
+#exam-active-screen,#exam-active-screen *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
+#exam-active-screen input,#exam-active-screen textarea{user-select:text!important;-webkit-user-select:text!important}
+@media print{#exam-active-screen{display:none!important}}
+</style></head>
 <body>
 
 <!-- STUDENT EXAM PORTAL (مستقلة تمامًا عن نظام الموظفين) -->
@@ -4954,7 +4958,7 @@ function renderExamQuestionsForStudent(savedAnswers) {
 function goToExamQuestion(index){if(index<0||index>=examQuestionsForStudent.length)return;examCurrentQuestionIndex=index;renderExamQuestionsForStudent(examCurrentAttempt?.answers||{});}
 function skipCurrentExamQuestion(){const q=examQuestionsForStudent[examCurrentQuestionIndex];if(!q)return;if(!examCurrentAttempt?.answers?.[q.id])examSkippedQuestions.add(q.id);if(examCurrentQuestionIndex<examQuestionsForStudent.length-1)examCurrentQuestionIndex++;renderExamQuestionsForStudent(examCurrentAttempt?.answers||{});}
 async function saveExamAnswer(questionId,value){
-  if(!examCurrentAttempt)return;const answers=examCurrentAttempt.answers||{};answers[questionId]=value;examCurrentAttempt.answers=answers;examSkippedQuestions.delete(questionId);
+  if(!examCurrentAttempt || examCurrentAttempt.status !== 'in_progress' || window.__andalusExamExitStarted)return;const answers=examCurrentAttempt.answers||{};answers[questionId]=value;examCurrentAttempt.answers=answers;examSkippedQuestions.delete(questionId);
   if(examTestMode){renderExamQuestionsForStudent(answers);return;}
   const {data:result,error}=await sb.rpc('student_exam_save_answers',{p_attempt_id:examCurrentAttempt.id,p_student_id:examStudent?.id,p_phone:examStudentPhone,p_face_token:examFaceVerificationToken,p_answers:answers});
   if(error||!result?.ok){console.error('تعذر حفظ إجابة الامتحان:',error||result?.reason);showToast('تعذر حفظ الإجابة على قاعدة البيانات. تحقق من الاتصال قبل المتابعة.','error');}
@@ -4965,28 +4969,62 @@ async function saveExamAnswer(questionId,value){
 function deactivateExamCopyProtection(){
   if(!examCopyProtectionHandlers)return;
   document.removeEventListener('contextmenu',examCopyProtectionHandlers.context,true);
-  document.removeEventListener('copy',examCopyProtectionHandlers.copy,true);
-  document.removeEventListener('cut',examCopyProtectionHandlers.copy,true);
-  document.removeEventListener('selectstart',examCopyProtectionHandlers.copy,true);
+  document.removeEventListener('copy',examCopyProtectionHandlers.clipboard,true);
+  document.removeEventListener('cut',examCopyProtectionHandlers.clipboard,true);
+  document.removeEventListener('paste',examCopyProtectionHandlers.clipboard,true);
+  document.removeEventListener('selectstart',examCopyProtectionHandlers.context,true);
+  document.removeEventListener('dragstart',examCopyProtectionHandlers.context,true);
   document.removeEventListener('keydown',examCopyProtectionHandlers.key,true);
+  window.removeEventListener('beforeprint',examCopyProtectionHandlers.beforeprint,true);
   examCopyProtectionHandlers=null;
 }
 function activateExamCopyProtection(){
   deactivateExamCopyProtection();
   const active=()=>!!examCurrentAttempt&&examCurrentAttempt.status==='in_progress'&&document.getElementById('exam-active-screen')?.style.display!=='none';
-  const block=e=>{if(active()){e.preventDefault();e.stopPropagation();}};
-  const key=e=>{if(active()&&(e.ctrlKey||e.metaKey)&&['c','x','a','p','s'].includes(String(e.key||'').toLowerCase())){e.preventDefault();e.stopPropagation();}};
-  examCopyProtectionHandlers={context:block,copy:block,key};
+  const block=e=>{if(active()){e.preventDefault();e.stopPropagation();if(e.stopImmediatePropagation)e.stopImmediatePropagation();}};
+  const clipboard=e=>{
+    if(!active())return;
+    block(e);
+    if(!window.__andalusClipboardViolationLogged){
+      window.__andalusClipboardViolationLogged=true;
+      void logExamViolation('clipboard_attempt',e.type||'clipboard');
+    }
+  };
+  const key=e=>{
+    if(!active())return;
+    const k=String(e.key||'').toLowerCase(), mod=!!(e.ctrlKey||e.metaKey);
+    const screenshot=e.key==='PrintScreen'||(e.shiftKey&&mod&&k==='s');
+    const blocked=(mod&&['c','x','v','a','p','s','u'].includes(k))||(mod&&e.shiftKey&&['i','j','c'].includes(k))||e.key==='F12';
+    if(screenshot||blocked){
+      e.preventDefault();e.stopPropagation();if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+      if(screenshot)void finalizeExamOnExit('screenshot_shortcut');
+      else if(['c','x','v'].includes(k)&&!window.__andalusClipboardViolationLogged){
+        window.__andalusClipboardViolationLogged=true;
+        void logExamViolation('clipboard_attempt','keyboard_'+k);
+      }
+    }
+  };
+  const beforeprint=e=>{
+    if(!active())return;
+    if(e&&e.preventDefault)e.preventDefault();
+    void finalizeExamOnExit('print_attempt');
+  };
+  examCopyProtectionHandlers={context:block,clipboard,key,beforeprint};
   document.addEventListener('contextmenu',block,true);
-  document.addEventListener('copy',block,true);
-  document.addEventListener('cut',block,true);
+  document.addEventListener('copy',clipboard,true);
+  document.addEventListener('cut',clipboard,true);
+  document.addEventListener('paste',clipboard,true);
   document.addEventListener('selectstart',block,true);
+  document.addEventListener('dragstart',block,true);
   document.addEventListener('keydown',key,true);
+  window.addEventListener('beforeprint',beforeprint,true);
 }
 
 function startExamTimer() {
   if (examTimerInterval) clearInterval(examTimerInterval);
   if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
+  window.__andalusExamExitStarted = false;
+  window.__andalusClipboardViolationLogged = false;
   activateExamCopyProtection();
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
   const durationMs = Math.max(15000, Number(examCurrentExam.duration_seconds) > 0 ? Number(examCurrentExam.duration_seconds) * 1000 : (Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000);
@@ -5051,20 +5089,27 @@ async function logExamViolation(eventName,details){
   if(error||!data?.ok){console.warn('تعذر تسجيل مخالفة الامتحان:',error||data?.reason);return;}
   examCurrentAttempt.violation_count=data.violation_count;showToast('⚠️ تم تسجيل مغادرة الصفحة للمراجعة الإدارية. لم يتم إلغاء إجاباتك تلقائيًا.','warning');
 }
-function finalizeExamOnExit(source) {
-  if (!examCurrentAttempt || examCurrentAttempt.status === 'submitted' || examSubmitLock) return;
+async function finalizeExamOnExit(source) {
+  if (!examCurrentAttempt || examCurrentAttempt.status !== 'in_progress' || examSubmitLock || window.__andalusExamExitStarted) return;
   if (examTestMode) { finishExamTestMode(); return; }
-  console.info('تسليم الامتحان بسبب مغادرة الصفحة:', source);
-  submitExam(false, false, true);
+  window.__andalusExamExitStarted = true;
+  if (examTimerInterval) clearInterval(examTimerInterval);
+  if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
+  console.warn('مخالفة مغادرة الامتحان — تسليم تلقائي:', source);
+  try { await logExamViolation('tab_hidden', String(source || 'page_hidden')); }
+  catch (e) { console.warn('تعذر تسجيل تفاصيل المخالفة:', e); }
+  await submitExam(true, true, true);
 }
 function activateCheatingDetection(){
-  if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
-  // التنقل المؤقت إلى واتساب أو تطبيق آخر على الهاتف لا ينهي الامتحان ولا ينشئ مخالفة.
-  // يستمر احتساب الوقت من ساعة النهاية المحفوظة، وعند العودة يستكمل الطالب من نفس المحاولة.
-  examVisibilityHandler=function(){ return; };
-  document.addEventListener('visibilitychange',examVisibilityHandler);
+  if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler,true);
+  if(window.__andalusExamPageHideHandler)window.removeEventListener('pagehide',window.__andalusExamPageHideHandler,true);
+  examVisibilityHandler=function(){
+    if(document.visibilityState === 'hidden') void finalizeExamOnExit('visibility_hidden');
+  };
+  document.addEventListener('visibilitychange',examVisibilityHandler,true);
+  window.__andalusExamPageHideHandler=function(){ void finalizeExamOnExit('pagehide'); };
+  window.addEventListener('pagehide',window.__andalusExamPageHideHandler,true);
 }
-// لا نسلّم الامتحان بسبب pagehide؛ التسليم يكون بزر الطالب أو عند انتهاء الوقت فقط.
 
 function confirmSubmitExam() {
   const answeredCount = Object.keys(examCurrentAttempt.answers || {}).length;
@@ -5090,7 +5135,8 @@ async function submitExam(autoSubmitted, cheatingDetected, exitTriggered) {
   examSubmitLock = true;
   if (examTimerInterval) clearInterval(examTimerInterval);
   if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
-  if (examVisibilityHandler) document.removeEventListener('visibilitychange', examVisibilityHandler);
+  if (examVisibilityHandler) document.removeEventListener('visibilitychange', examVisibilityHandler, true);
+  if (window.__andalusExamPageHideHandler) window.removeEventListener('pagehide', window.__andalusExamPageHideHandler, true);
 
   const answers = examCurrentAttempt.answers || {};
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
