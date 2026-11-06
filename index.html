@@ -5027,6 +5027,7 @@ function startExamTimer() {
   if (examTimerSyncInterval) clearInterval(examTimerSyncInterval);
   window.__andalusExamExitStarted = false;
   window.__andalusClipboardViolationLogged = false;
+  window.__andalusExamExitRetryCount = 0;
   activateExamCopyProtection();
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
   const durationMs = Math.max(15000, Number(examCurrentExam.duration_seconds) > 0 ? Number(examCurrentExam.duration_seconds) * 1000 : (Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000);
@@ -5156,10 +5157,30 @@ async function submitExam(autoSubmitted, cheatingDetected, exitTriggered) {
   });
   if (submitError || !submitResult?.ok) {
     console.error('تعذر حفظ تسليم الامتحان:', submitError || submitResult?.reason);
-    showToast('تعذر حفظ تسليم الامتحان: تحقق من اتصال الإنترنت وصلاحية التحقق بالوجه.', 'error');
     examSubmitLock = false;
-    if (!exitTriggered) startExamTimer();
-    else console.error('لم يتمكن الخادم من تأكيد التسليم عند مغادرة الصفحة؛ يجب مراجعة المحاولة من الإدارة.');
+    if (!exitTriggered) {
+      showToast('تعذر حفظ تسليم الامتحان: تحقق من اتصال الإنترنت وصلاحية التحقق بالوجه.', 'error');
+      startExamTimer();
+    } else {
+      // لا نعيد فتح الأسئلة عند فشل الشبكة: تبقى المحاولة مقفولة محليًا حتى يتأكد الخادم من التسليم.
+      examCurrentAttempt.status = 'submission_pending';
+      document.getElementById('exam-result-emoji').textContent = '⚠️';
+      document.getElementById('exam-result-title').textContent = 'تم إيقاف الامتحان — جارٍ تأكيد التسليم';
+      document.getElementById('exam-result-score').textContent = '—';
+      document.getElementById('exam-result-note').textContent = 'تم قفل المحاولة بسبب مغادرة صفحة الامتحان، لكن الاتصال لم يسمح بتأكيد التسليم بعد. اترك الاتصال يعمل؛ سيُعاد إرسال التسليم تلقائيًا. لا يمكن استكمال هذه المحاولة.';
+      showExamScreen('exam-result-screen');
+      const retryPendingSubmission = () => {
+        if (!examCurrentAttempt || examCurrentAttempt.status !== 'submission_pending') return;
+        if (!navigator.onLine) { window.addEventListener('online', retryPendingSubmission, { once: true }); return; }
+        examCurrentAttempt.status = 'in_progress';
+        void submitExam(true, true, true);
+      };
+      window.addEventListener('online', retryPendingSubmission, { once: true });
+      if ((window.__andalusExamExitRetryCount || 0) < 3) {
+        window.__andalusExamExitRetryCount = (window.__andalusExamExitRetryCount || 0) + 1;
+        setTimeout(retryPendingSubmission, 2000);
+      }
+    }
     return;
   }
   finalScore = Number(submitResult.score) || 0;
