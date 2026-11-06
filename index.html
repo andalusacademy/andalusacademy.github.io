@@ -2784,7 +2784,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <option value="فرع اسكندرية">فرع اسكندرية</option>
           </select>
         </div>
-        <div class="form-group2"><label>مدة الامتحان (بالدقائق) *</label><input type="number" id="exam-duration" min="1" value="30"></div>
+        <input type="hidden" id="exam-duration" value="25"><div class="form-group2"><label>⏱️ وقت الامتحان</label><div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface,#f8fafc);font-size:13px;line-height:1.8;">يُحسب تلقائيًا حسب عدد الأسئلة الفعلي: <strong>15 ثانية لكل سؤال</strong> — بحد أقصى 100 سؤال للمتدرب.</div></div>
         <div class="form-group2"><label>الدرجة الكلية للامتحان *</label><input type="number" id="exam-total-score" min="1" value="100" placeholder="مثال: 50"></div>
         <div class="form-group2">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -4831,7 +4831,7 @@ async function saveExamAnswer(questionId, value) {
 function startExamTimer() {
   if (examTimerInterval) clearInterval(examTimerInterval);
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
-  const durationMs = Math.max(0, Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000;
+  const durationMs = Math.max(15000, Number(examCurrentExam.duration_seconds) > 0 ? Number(examCurrentExam.duration_seconds) * 1000 : (Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000);
   const durationEnd = startedAt + durationMs;
   const scheduledEnd = examCurrentExam.available_until ? new Date(examCurrentExam.available_until).getTime() : durationEnd;
   const endsAt = Math.min(durationEnd, Number.isFinite(scheduledEnd) ? scheduledEnd : durationEnd);
@@ -4896,7 +4896,7 @@ async function submitExam(autoSubmitted, cheatingDetected) {
 
   const answers = examCurrentAttempt.answers || {};
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
-  const durationEnd = startedAt + Math.max(0, Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000;
+  const durationEnd = startedAt + Math.max(15000, Number(examCurrentExam.duration_seconds) > 0 ? Number(examCurrentExam.duration_seconds) * 1000 : (Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000);
   const scheduledEnd = examCurrentExam.available_until ? new Date(examCurrentExam.available_until).getTime() : durationEnd;
   const hardEnd = Math.min(durationEnd, Number.isFinite(scheduledEnd) ? scheduledEnd : durationEnd);
   const effectiveAutoSubmit = !!autoSubmitted || Date.now() >= hardEnd;
@@ -11926,7 +11926,15 @@ let examQuestionsDraft = [];
 async function loadExams() {
   const { data, error } = await sb.from('exams').select('*').order('created_at', { ascending: false });
   if (error) { showToast('خطأ في تحميل الامتحانات: ' + error.message, 'error'); return; }
-  allExams = data || [];
+  const { data: questionRows, error: questionCountError } = await sb.from('exam_questions').select('exam_id');
+  if (questionCountError) { showToast('تعذر حساب أعداد أسئلة الامتحانات: ' + questionCountError.message, 'error'); return; }
+  const questionCounts = {};
+  (questionRows || []).forEach(q => { questionCounts[q.exam_id] = (questionCounts[q.exam_id] || 0) + 1; });
+  allExams = (data || []).map(e => {
+    const question_count = questionCounts[e.id] || 0;
+    const duration_seconds = Math.min(question_count, 100) * 15;
+    return { ...e, question_count, duration_seconds, duration_minutes: Math.ceil(duration_seconds / 60) };
+  });
   renderExamsTable();
 }
 
@@ -11953,7 +11961,7 @@ function renderExamsTable() {
       <td>${escapeHtml(subj?.name || '—')}</td>
       <td>${escapeHtml(progLabel)} — ${escapeHtml(e.branch)}</td>
       <td><span class="badge ${e.round === 1 ? 'badge-navy' : 'badge-warning'}">${e.round === 1 ? 'الأول' : 'الثاني'}</span></td>
-      <td>${e.duration_minutes} د / ${e.total_score || 100} درجة</td>
+      <td>${e.question_count} سؤال · ${Math.floor(e.duration_seconds / 60)}:${String(e.duration_seconds % 60).padStart(2,'0')} دقيقة / ${e.total_score || 100} درجة</td>
       <td style="font-size:11px;">${from}<br>← ${until}</td>
       <td>
         <button class="btn btn-info btn-sm" onclick="viewExamResults('${e.id}')">📊 عرض</button>
@@ -12675,6 +12683,9 @@ async function saveExamQuestions() {
     const { error } = await sb.from('exam_questions').insert(toInsert);
     if (error) { showToast('❌ خطأ في الحفظ: ' + error.message, 'error'); return; }
   }
+  const calculatedSeconds = Math.min(examQuestionsDraft.length, 100) * 15;
+  const { error: durationUpdateError } = await sb.from('exams').update({ duration_minutes: Math.ceil(calculatedSeconds / 60) }).eq('id', editingExamId);
+  if (durationUpdateError) { showToast('تم حفظ الأسئلة لكن تعذر تحديث المدة المحسوبة: ' + durationUpdateError.message, 'error'); return; }
   await logActivity('edit', 'حدّث أسئلة امتحان إلكتروني (' + examQuestionsDraft.length + ' سؤال)');
   closeModal('modal-exam-questions');
   showToast('✅ تم حفظ الأسئلة');
