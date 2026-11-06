@@ -13203,7 +13203,7 @@ async function adminAdjustExamTime(attemptId, resetFull) {
     showToast(error?.message || (data?.reason === 'attempt_not_in_progress' ? 'المحاولة لم تعد جارية.' : 'تعذر تعديل وقت المحاولة.'), 'error');
     return;
   }
-  showToast((data.message || 'تم تعديل وقت الامتحان.') + ' حدّث صفحة الامتحان لدى الطالب ليظهر الوقت الجديد؛ التعديل محفوظ على الخادم.');
+  showToast((data.message || 'تم تعديل وقت الامتحان.') + ' سيظهر التعديل تلقائيًا لدى الطالب خلال ثوانٍ دون الحاجة إلى تحديث الصفحة أو الخروج من الامتحان.');
   await viewExamResults(examId);
 }
 
