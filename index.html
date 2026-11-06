@@ -2787,6 +2787,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
           </select>
         </div>
         <input type="hidden" id="exam-duration" value="25"><div class="form-group2"><label>⏱️ وقت الامتحان</label><div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface,#f8fafc);font-size:13px;line-height:1.8;">يُحسب تلقائيًا حسب عدد الأسئلة الفعلي: <strong>15 ثانية لكل سؤال</strong> — بحد أقصى 100 سؤال للمتدرب.</div></div>
+        <div class="form-group2"><label>توزيع مستويات صعوبة الأسئلة لكل طالب (المجموع 100%)</label><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><label style="font-size:12px">سهل %<input type="number" id="exam-mix-easy" min="0" max="100" value="20"></label><label style="font-size:12px">متوسط %<input type="number" id="exam-mix-medium" min="0" max="100" value="60"></label><label style="font-size:12px">صعب %<input type="number" id="exam-mix-hard" min="0" max="100" value="20"></label></div><small style="color:var(--muted)">إذا لم يتوفر عدد كافٍ من مستوى معين، يكمل النظام العدد عشوائيًا من بقية المستويات.</small></div>
         <div class="form-group2"><label>الدرجة الكلية للامتحان *</label><input type="number" id="exam-total-score" min="1" value="100" placeholder="مثال: 50"></div>
         <div class="form-group2">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -12340,6 +12341,9 @@ function openCreateExam() {
   document.getElementById('exam-title').value = '';
   document.getElementById('exam-duration').value = 30;
   document.getElementById('exam-total-score').value = 100;
+  document.getElementById('exam-mix-easy').value = 20;
+  document.getElementById('exam-mix-medium').value = 60;
+  document.getElementById('exam-mix-hard').value = 20;
   document.getElementById('exam-show-answers').checked = false;
   document.getElementById('exam-placement-test').checked = false;
   document.getElementById('exam-from').value = '';
@@ -12389,6 +12393,8 @@ async function saveExam() {
   const branch = document.getElementById('exam-branch').value;
   const duration_minutes = parseInt(document.getElementById('exam-duration').value) || 30;
   const total_score = parseFloat(document.getElementById('exam-total-score').value) || 100;
+  const question_mix = { easy:Number(document.getElementById('exam-mix-easy').value), medium:Number(document.getElementById('exam-mix-medium').value), hard:Number(document.getElementById('exam-mix-hard').value) };
+  const mixTotal = question_mix.easy + question_mix.medium + question_mix.hard;
   const show_answers_after_submit = document.getElementById('exam-show-answers').checked;
   const is_placement_test = document.getElementById('exam-placement-test').checked;
   const from = document.getElementById('exam-from').value;
@@ -12398,6 +12404,7 @@ async function saveExam() {
     showToast('⚠️ أدخل كل الحقول المطلوبة (*) — واختر برنامج واحد على الأقل', 'error'); return;
   }
   if (total_score <= 0) { showToast('⚠️ أدخل الدرجة الكلية للامتحان', 'error'); return; }
+  if (Object.values(question_mix).some(v=>!Number.isFinite(v)||v<0||v>100) || mixTotal !== 100) { showToast('⚠️ مجموع نسب السهل والمتوسط والصعب يجب أن يساوي 100%.', 'error'); return; }
   if (new Date(until) <= new Date(from)) {
     showToast('⚠️ وقت النهاية لازم يكون بعد وقت البداية', 'error'); return;
   }
@@ -12406,7 +12413,7 @@ async function saveExam() {
   const [firstPid, firstSys] = combos[0].split('|');
   const examData = {
     title, subject_id, program_id: firstPid, system_name: firstSys || null, program_combos: combos,
-    branch, duration_minutes, total_score,
+    branch, duration_minutes, total_score, question_mix,
     show_answers_after_submit, is_placement_test,
     available_from: new Date(from).toISOString(),
     available_until: new Date(until).toISOString(),
@@ -12450,6 +12457,7 @@ async function saveExam() {
         option_a: optionA, option_b: optionB, option_c: optionC, option_d: optionD,
         correct_answer: correct,
         points: Number(q.points) > 0 ? Number(q.points) : 1,
+        difficulty: ['easy','medium','hard'].includes(q.difficulty) ? q.difficulty : 'medium',
         order_num: index
       };
     });
@@ -12737,6 +12745,11 @@ function renderExamQuestionsList() {
         <option value="mcq" ${q.question_type === 'mcq' || !q.question_type ? 'selected' : ''}>اختيار من متعدد</option>
         <option value="truefalse" ${q.question_type === 'truefalse' ? 'selected' : ''}>صح / غلط</option>
       </select>
+      <select aria-label="مستوى الصعوبة" onchange="updateQuestionField(${i},'difficulty',this.value)" style="margin-top:6px">
+        <option value="easy" ${q.difficulty === 'easy' ? 'selected' : ''}>سهل</option>
+        <option value="medium" ${!q.difficulty || q.difficulty === 'medium' ? 'selected' : ''}>متوسط</option>
+        <option value="hard" ${q.difficulty === 'hard' ? 'selected' : ''}>صعب</option>
+      </select>
       ${(q.question_type === 'truefalse') ? `
         <div style="display:flex;gap:14px;margin:8px 0;">
           <label class="exam-option-label" style="flex:1;${q.correct_answer === 'true' ? 'border-color:var(--navy);background:#eff6ff;' : ''}">
@@ -12770,7 +12783,7 @@ function updateQuestionField(idx, field, value) {
 }
 
 function addQuestionRow() {
-  examQuestionsDraft.push({ question_text: '', question_type: 'mcq', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: '', points: 1 });
+  examQuestionsDraft.push({ question_text: '', question_type: 'mcq', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: '', points: 1, difficulty: 'medium' });
   renderExamQuestionsList();
 }
 
@@ -12799,6 +12812,7 @@ async function saveExamQuestions() {
       option_c: q.option_c || null, option_d: q.option_d || null,
       correct_answer: q.correct_answer,
       points: q.points || 1,
+      difficulty: q.difficulty || 'medium',
       source_group: q.source_group || null,
       source_exam_id: q.source_exam_id || null,
       order_num: i
@@ -12886,29 +12900,32 @@ function openMergeExamQuestions(){
   let modal=document.getElementById('modal-merge-exam-questions');
   if(!modal){
     modal=document.createElement('div');modal.id='modal-merge-exam-questions';modal.className='modal-overlay';
-    modal.innerHTML='<div class="modal" style="max-width:680px"><div class="modal-header"><h3>🧩 دمج بنوك الأسئلة</h3><button class="modal-close" onclick="closeModal(\'modal-merge-exam-questions\')">×</button></div><div class="modal-body"><p style="font-size:12px;color:var(--muted);margin-bottom:12px">اختر مجموعة أو أكثر وحدد عدد الأسئلة المطلوب سحبها من كل مجموعة. اكتب 0 لاستخدام كل الأسئلة المتاحة.</p><div id="merge-exam-source-list"></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal(\'modal-merge-exam-questions\')">إلغاء</button><button class="btn btn-gold" onclick="mergeSelectedExamQuestions()">إضافة المجموعات المحددة</button></div></div>';
+    modal.innerHTML='<div class="modal" style="max-width:760px"><div class="modal-header"><h3>🧩 دمج بنوك الأسئلة</h3><button class="modal-close" onclick="closeModal(\\'modal-merge-exam-questions\\')">×</button></div><div class="modal-body"><p style="font-size:12px;color:var(--muted);margin-bottom:12px">اختر مجموعات الأسئلة، وحدد عدد الأسئلة ومستوى الصعوبة من كل امتحان. اكتب 0 لاستخدام كل الأسئلة المطابقة.</p><div id="merge-exam-source-list"></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal(\\'modal-merge-exam-questions\\')">إلغاء</button><button class="btn btn-gold" onclick="mergeSelectedExamQuestions()">إضافة المجموعات المحددة</button></div></div>';
     document.body.appendChild(modal);
   }
-  document.getElementById('merge-exam-source-list').innerHTML=sources.map(e=>'<div style="display:grid;grid-template-columns:1fr 100px;gap:10px;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><label><input type="checkbox" class="merge-exam-source-cb" value="'+e.id+'"> <strong>'+escapeHtml(e.title)+'</strong><small style="display:block;color:var(--muted)">'+e.question_count+' سؤال متاح</small></label><input type="number" min="0" max="'+e.question_count+'" value="0" class="merge-exam-count" data-exam-id="'+e.id+'" title="0 = كل الأسئلة" style="width:100%"></div>').join('');
+  document.getElementById('merge-exam-source-list').innerHTML=sources.map(e=>'<div style="display:grid;grid-template-columns:minmax(150px,1fr) 90px 125px;gap:8px;align-items:center;padding:10px;border-bottom:1px solid var(--border)"><label><input type="checkbox" class="merge-exam-source-cb" value="'+e.id+'"> <strong>'+escapeHtml(e.title)+'</strong><small style="display:block;color:var(--muted)">'+e.question_count+' سؤال متاح</small></label><input type="number" min="0" max="'+e.question_count+'" value="0" class="merge-exam-count" data-exam-id="'+e.id+'" title="0 = كل الأسئلة" style="width:100%"><select class="merge-exam-difficulty" data-exam-id="'+e.id+'" style="width:100%"><option value="all">كل المستويات</option><option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option></select></div>').join('');
   modal.classList.add('open');
 }
 async function mergeSelectedExamQuestions(){
   const selected=[...document.querySelectorAll('.merge-exam-source-cb:checked')];
   if(!selected.length){showToast('حدد مجموعة واحدة على الأقل.','error');return;}
-  let added=0;
+  let added=0;const summary=[];
   for(const checkbox of selected){
     const source=allExams.find(e=>e.id===checkbox.value);
     const input=document.querySelector('.merge-exam-count[data-exam-id="'+checkbox.value+'"]');
+    const difficulty=document.querySelector('.merge-exam-difficulty[data-exam-id="'+checkbox.value+'"]')?.value||'all';
     const count=Math.max(0,Number(input?.value)||0);
     const {data,error}=await sb.from('exam_questions').select('*').eq('exam_id',checkbox.value).order('order_num');
     if(error){showToast('تعذر تحميل مجموعة '+(source?.title||'')+': '+error.message,'error');continue;}
-    const rows=examShuffleArray(data||[]).slice(0,count>0?count:(data||[]).length);
+    const matching=(data||[]).filter(q=>difficulty==='all'||(q.difficulty||'medium')===difficulty);
+    const rows=examShuffleArray(matching).slice(0,count>0?count:matching.length);
     rows.forEach(q=>examQuestionsDraft.push({...q,id:undefined,exam_id:undefined,source_exam_id:checkbox.value,source_group:source?.title||'مجموعة أسئلة'}));
-    added+=rows.length;
+    added+=rows.length;summary.push((source?.title||'مجموعة')+': '+rows.length);
   }
   renderExamQuestionsList();closeModal('modal-merge-exam-questions');
-  showToast('تمت إضافة '+added+' سؤال إلى المسودة. اضغط حفظ الأسئلة لاعتماد الدمج.');
+  showToast('تم دمج '+added+' سؤال. '+summary.join(' | ')+' — راجع المسودة ثم احفظها.');
 }
+
 function parseExamQuestionsText(rawText,sourceName){
   const text=String(rawText||'').replace(/\r/g,'').replace(/[\u00a0\t]+/g,' ').trim();
   if(!text)return [];
@@ -12933,7 +12950,7 @@ function parseExamQuestionsText(rawText,sourceName){
     let correct='';const map={'أ':'a','ا':'a','ب':'b','ج':'c','د':'d','1':'a','2':'b','3':'c','4':'d','a':'a','b':'b','c':'c','d':'d'};
     if(isTF||(!Object.keys(options).length&&/^(صح|صحيح|true|خطأ|خاطئ|false)$/i.test(a))){isTF=true;if(/^(صح|صحيح|true|1)$/i.test(a))correct='true';else if(/^(خطأ|خاطئ|false|2)$/i.test(a))correct='false';}
     else correct=map[a]||'';
-    if(question)parsed.push({question_text:question,question_type:isTF?'truefalse':'mcq',option_a:options.a||null,option_b:options.b||null,option_c:options.c||null,option_d:options.d||null,correct_answer:correct,points:1,source_exam_id:null,source_group:sourceName||'استيراد مستند'});
+    if(question)parsed.push({question_text:question,question_type:isTF?'truefalse':'mcq',option_a:options.a||null,option_b:options.b||null,option_c:options.c||null,option_d:options.d||null,correct_answer:correct,points:1,source_exam_id:null,source_group:sourceName||'استيراد مستند',difficulty:'medium'});
   }
   return parsed;
 }
