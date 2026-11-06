@@ -5,7 +5,7 @@
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let selected = new Set();
   let installed = false;
-  const norm = v => String(v || '').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[\sـ]+/g,' ').trim().toLowerCase();
+  const norm = v => String(v || '').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[\sـ]+/g,' ').trim().toLowerCase();
   function students(){ return Array.isArray(window.allStudents) ? window.allStudents : (typeof allStudents !== 'undefined' && Array.isArray(allStudents) ? allStudents : []); }
   function active(s){
     const status=String(s.student_status||'active').toLowerCase();
