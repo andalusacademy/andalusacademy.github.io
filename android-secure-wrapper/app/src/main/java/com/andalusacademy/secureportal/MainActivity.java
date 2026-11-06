@@ -95,7 +95,15 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onPause() {
-        if (webView != null) webView.onPause();
+        if (webView != null) {
+            // Leaving the Android app while an exam is active is an exam exit.
+            // The page also listens for visibilitychange; this native hook is a fallback.
+            webView.evaluateJavascript(
+                "(function(){if(typeof window.finalizeExamOnExit==='function'){window.finalizeExamOnExit('android_app_background');}})();",
+                null
+            );
+            webView.onPause();
+        }
         super.onPause();
     }
 
