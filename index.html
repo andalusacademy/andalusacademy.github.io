@@ -1764,9 +1764,9 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
             <div style="padding:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
               <input type="file" id="album-photo-input" accept="image/*" multiple style="display:none" onchange="uploadAlbumPhotos(this)">
               <button class="btn btn-gold" onclick="document.getElementById('album-photo-input').click()">📤 رفع صور</button>
-              <button class="btn btn-outline" onclick="toggleSelectAllAlbumPhotos()">☑️ تحديد الكل / إلغاء التحديد</button>
-              <button class="btn btn-primary" onclick="downloadSelectedAlbumPhotos()">⬇️ تحميل الصور المحددة</button>
-              <button class="btn btn-primary" onclick="downloadAlbumAsZip()">🗂️ تحميل الألبوم كامل ZIP</button>
+              <button class="btn btn-outline" id="album-select-all-btn" onclick="toggleSelectAllAlbumPhotos()">☑️ تحديد الكل</button>
+              <button class="btn btn-primary" onclick="downloadSelectedAlbumPhotos()">⬇️ تحميل الجميع / المحدد ZIP</button>
+              <button class="btn btn-danger" onclick="deleteSelectedAlbumPhotos()">🗑️ مسح الجميع / المحدد</button>
               <span id="album-selection-count" style="font-size:12px;color:var(--muted)">لم يتم تحديد صور</span>
             </div>
           </div>
@@ -14167,13 +14167,19 @@ async function renderAlbumPhotos() {
   updateAlbumSelectionCount();
 }
 function updateAlbumSelectionCount(){
-  const n=document.querySelectorAll('#album-photos-grid .album-photo-select:checked').length;
-  const el=document.getElementById('album-selection-count');if(el)el.textContent=n?('تم تحديد '+n+' صورة'):'لم يتم تحديد صور';
+  const boxes=[...document.querySelectorAll('#album-photos-grid .album-photo-select')];
+  const n=boxes.filter(x=>x.checked).length;
+  const el=document.getElementById('album-selection-count');
+  if(el)el.textContent=n?('تم تحديد '+n+' من '+boxes.length+' صورة'):'لم يتم تحديد صور';
+  const selectBtn=document.getElementById('album-select-all-btn');
+  if(selectBtn)selectBtn.textContent=boxes.length && n===boxes.length?'☑️ إلغاء تحديد الكل':'☑️ تحديد الكل';
 }
 function toggleSelectAllAlbumPhotos(){
   const boxes=[...document.querySelectorAll('#album-photos-grid .album-photo-select')];
   if(!boxes.length)return;
-  const all=boxes.every(x=>x.checked);boxes.forEach(x=>x.checked=!all);updateAlbumSelectionCount();
+  const all=boxes.every(x=>x.checked);
+  boxes.forEach(x=>x.checked=!all);
+  updateAlbumSelectionCount();
 }
 function shareAlbumPhoto(url,platform){
   const text=encodeURIComponent('صورة من ألبوم مركز الأندلس للتدريب');
@@ -14239,10 +14245,51 @@ async function uploadAlbumPhotos(input) {
   showToast(uploaded ? `✅ تم رفع ${uploaded} صورة` : '❌ فشل الرفع — تأكد من عمل bucket باسم gallery-photos فى Supabase Storage (Public)', uploaded ? 'success' : 'error');
 }
 
+function getGalleryStoragePathFromPhotoUrl(photoUrl){
+  const marker='/storage/v1/object/public/gallery-photos/';
+  const raw=String(photoUrl||'');
+  const index=raw.indexOf(marker);
+  if(index<0)return null;
+  try{return decodeURIComponent(raw.slice(index+marker.length).split('?')[0]);}
+  catch(e){return raw.slice(index+marker.length).split('?')[0]||null;}
+}
 async function deleteAlbumPhoto(photoId) {
+  if(currentUser?.role!=='admin'){showToast('الحذف متاح للمدير فقط','error');return;}
   if (!confirm('حذف هذه الصورة؟')) return;
-  await sb.from('gallery_photos').delete().eq('id', photoId);
-  renderAlbumPhotos();
+  const {data:photo,error:readError}=await sb.from('gallery_photos').select('id,photo_url').eq('id',photoId).maybeSingle();
+  if(readError||!photo){showToast('تعذر العثور على الصورة لحذفها','error');return;}
+  const path=getGalleryStoragePathFromPhotoUrl(photo.photo_url);
+  if(path){
+    const {error:storageError}=await sb.storage.from('gallery-photos').remove([path]);
+    if(storageError){showToast('تعذر حذف ملف الصورة من التخزين: '+storageError.message,'error');return;}
+  }
+  const {error}=await sb.from('gallery_photos').delete().eq('id',photoId);
+  if(error){showToast('تعذر حذف سجل الصورة: '+error.message,'error');return;}
+  await renderAlbumPhotos();
+  showToast('تم حذف الصورة بنجاح','success');
+}
+async function deleteSelectedAlbumPhotos(){
+  if(currentUser?.role!=='admin'){showToast('الحذف الجماعي متاح للمدير فقط','error');return;}
+  const items=getSelectedAlbumPhotoItems();
+  if(!items.length){showToast('حدد الصور التي تريد مسحها أولًا','error');return;}
+  if(!confirm('تأكيد مسح '+items.length+' صورة من هذا الألبوم نهائيًا؟ لا يمكن التراجع عن الحذف.'))return;
+  const ids=items.map(item=>item.id);
+  const {data:photos,error:readError}=await sb.from('gallery_photos').select('id,photo_url').eq('album_id',currentAlbumId).in('id',ids);
+  if(readError){showToast('تعذر تجهيز الصور للحذف: '+readError.message,'error');return;}
+  const paths=[...new Set((photos||[]).map(p=>getGalleryStoragePathFromPhotoUrl(p.photo_url)).filter(Boolean))];
+  const btns=[...document.querySelectorAll('#page-album-detail button')];
+  btns.forEach(btn=>btn.disabled=true);
+  try{
+    if(paths.length){
+      const {error:storageError}=await sb.storage.from('gallery-photos').remove(paths);
+      if(storageError)throw new Error('تعذر حذف ملفات الصور من التخزين: '+storageError.message);
+    }
+    const {error:deleteError}=await sb.from('gallery_photos').delete().eq('album_id',currentAlbumId).in('id',ids);
+    if(deleteError)throw new Error('تم حذف ملفات التخزين لكن تعذر حذف سجلات الصور: '+deleteError.message);
+    await renderAlbumPhotos();
+    showToast('تم مسح '+(photos||[]).length+' صورة بنجاح','success');
+  }catch(error){showToast(error.message||'حدث خطأ أثناء الحذف الجماعي','error');}
+  finally{btns.forEach(btn=>btn.disabled=false);}
 }
 
 /* ============================================================
