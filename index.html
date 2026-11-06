@@ -4679,6 +4679,7 @@ async function examStudentLogin() {
 }
 
 function examStudentLogout() {
+  if (examTestMode) { exitExamTestMode(); return; }
   examStudent = null; examCurrentExam = null; examCurrentAttempt = null; examFaceVerifiedStudentId = null; examFaceVerificationToken = null; examStudentPhone = '';
   if (examTimerInterval) clearInterval(examTimerInterval);
   document.getElementById('exam-login-id').value = '';
@@ -4739,6 +4740,53 @@ async function isStudentEligibleForExam(exam, student, options = {}) {
   return true;
 }
 
+
+function ensureExamPolicyModal(){
+ let modal=document.getElementById('modal-exam-policy-consent');if(modal)return modal;
+ modal=document.createElement('div');modal.id='modal-exam-policy-consent';modal.className='modal-overlay';
+ modal.innerHTML=`<div class="modal" style="max-width:680px"><div class="modal-header"><h3>📜 سياسة وضوابط الامتحان الإلكتروني</h3><button class="modal-close" onclick="closeModal('modal-exam-policy-consent')">×</button></div>
+ <div class="modal-body" style="line-height:1.9;font-size:13px"><ol style="padding-right:22px">
+ <li>يتم سحب أسئلة عشوائية مستقلة لكل طالب، وقد يختلف ترتيب الأسئلة والاختيارات بين الطلاب.</li><li>عدد الأسئلة حسب إعداد الامتحان وبحد أقصى 100 سؤال، والوقت 15 ثانية لكل سؤال.</li>
+ <li>يجب البقاء داخل صفحة الامتحان وعدم الانتقال إلى تبويب أو تطبيق آخر أثناء الحل.</li><li>تُحفظ الإجابات تلقائيًا، ويمكن التنقل بين الأسئلة والعودة إلى الأسئلة المتروكة.</li>
+ <li>انتهاء الوقت يؤدي إلى التسليم التلقائي بالإجابات المحفوظة.</li><li>تُسجل مغادرة الصفحة للمراجعة الإدارية، ولا تُلغى النتيجة تلقائيًا بسبب حدث واحد؛ وتُراجع الأعطال التقنية.</li>
+ <li>بعد التسليم لا يمكن تعديل الإجابات، وتُطبق قاعدة المحاولة الواحدة.</li><li>يُمنع نسخ الأسئلة أو تصويرها أو مشاركة محتواها أثناء الامتحان.</li></ol>
+ <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;background:#eff6ff;border-radius:10px;margin-top:12px"><input id="exam-policy-accept-checkbox" type="checkbox" style="margin-top:5px;width:18px;height:18px"><span><strong>أقر بأنني قرأت سياسة الامتحان وأوافق على الالتزام بها.</strong></span></label></div>
+ <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-exam-policy-consent')">رجوع</button><button class="btn btn-gold" onclick="acceptExamPolicyAndStart()">أوافق وابدأ الامتحان</button></div></div>`;
+ document.body.appendChild(modal);return modal;
+}
+function requestExamStart(examId){examPendingStartId=examId;const modal=ensureExamPolicyModal();document.getElementById('exam-policy-accept-checkbox').checked=false;modal.classList.add('open');}
+async function acceptExamPolicyAndStart(){if(!document.getElementById('exam-policy-accept-checkbox')?.checked){showToast('يجب الموافقة على السياسة قبل بدء الامتحان.','error');return;}const id=examPendingStartId;examPendingStartId=null;closeModal('modal-exam-policy-consent');if(id)await startExam(id);}
+async function recordExamPolicyAcceptance(attemptId){
+ const {data,error}=await sb.rpc('student_exam_accept_policy',{p_attempt_id:attemptId,p_student_id:examStudent?.id,p_phone:examStudentPhone,p_face_token:examFaceVerificationToken,p_policy_version:examPolicyVersion});
+ if(error||!data?.ok){console.error('تعذر حفظ الموافقة:',error||data?.reason);return false;}return true;
+}
+function startExamTestMode(){
+ const testStudentId=(prompt('أدخل رقم القيد الذي سيظهر في وضع التجربة. استخدم 0 للتجربة الخاصة بك:','0')||'').trim();if(!testStudentId)return;
+ if(!examQuestionsDraft.length){showToast('أضف أسئلة أو استوردها أولًا ثم ابدأ التجربة.','error');return;}
+ const invalid=examQuestionsDraft.findIndex(q=>!String(q.question_text||'').trim()||!q.correct_answer||(q.question_type!=='truefalse'&&(!q.option_a||!q.option_b)));
+ if(invalid>=0){showToast('راجع السؤال رقم '+(invalid+1)+' وحدد النص والإجابة والاختيارات المطلوبة.','error');return;}
+ const shuffled=examShuffleArray(examQuestionsDraft).slice(0,100);examQuestionsForStudent=shuffled.map((q,i)=>({...q,id:'test-q-'+i,question_type:q.question_type||'mcq'}));
+ examTestOriginalPortalDisplay=document.getElementById('exam-portal-screen').style.display||'none';examTestMode=true;examTestViolationCount=0;
+ examStudent={id:testStudentId,name:'وضع التجربة — قيد '+testStudentId};examStudentPhone='';examFaceVerificationToken=null;
+ examCurrentExam={id:'test-exam',title:document.getElementById('modal-exam-q-title').textContent.replace('📝 أسئلة: ','')||'امتحان تجريبي',duration_seconds:examQuestionsForStudent.length*15,total_score:examQuestionsForStudent.reduce((n,q)=>n+(Number(q.points)||1),0),available_until:null,show_answers_after_submit:true};
+ examCurrentAttempt={id:'test-attempt',started_at:new Date().toISOString(),answers:{},status:'in_progress'};examCurrentQuestionIndex=0;examSkippedQuestions=new Set();
+ document.getElementById('exam-portal-screen').style.display='block';document.getElementById('exam-test-banner').style.display='block';renderExamQuestionsForStudent({});showExamScreen('exam-active-screen');startExamTimer();
+}
+function finishExamTestMode(){
+ if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
+ const answers=examCurrentAttempt?.answers||{};let score=0,max=0;examQuestionsForStudent.forEach(q=>{const p=Number(q.points)||1;max+=p;if(answers[q.id]===q.correct_answer)score+=p;});
+ examCurrentAttempt.status='submitted';document.getElementById('exam-result-emoji').textContent='🧪';document.getElementById('exam-result-title').textContent='انتهت التجربة — هذه ليست نتيجة رسمية';
+ document.getElementById('exam-result-score').textContent=score+' / '+max;document.getElementById('exam-result-note').textContent='وضع تجربة فقط. لم يتم حفظ محاولة أو درجة أو إشعار أو أي سجل رسمي للطالب.';
+ document.getElementById('exam-answers-review').style.display='none';document.getElementById('exam-test-banner').style.display='none';examSubmitLock=false;showExamScreen('exam-result-screen');
+}
+function exitExamTestMode(){
+ if(examTimerInterval)clearInterval(examTimerInterval);if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
+ examTestMode=false;examSubmitLock=false;document.getElementById('exam-test-banner').style.display='none';document.getElementById('exam-portal-screen').style.display=examTestOriginalPortalDisplay;
+ examStudent=null;examCurrentExam=null;examCurrentAttempt=null;examQuestionsForStudent=[];examStudentPhone='';examFaceVerificationToken=null;examSkippedQuestions=new Set();renderExamQuestionsList();
+ showToast('تم الخروج من وضع التجربة. لم يتم تسجيل أي نتيجة رسمية.');
+}
+function examShuffleArray(items){const out=[...items];for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;}
+
 async function startExam(examId) {
   const { data: result, error } = await sb.rpc('student_exam_start_attempt', {
     p_exam_id: examId, p_student_id: examStudent?.id,
@@ -4758,7 +4806,10 @@ async function startExam(examId) {
   }
   examCurrentExam = result.exam;
   examCurrentAttempt = result.attempt;
+  if (!await recordExamPolicyAcceptance(examCurrentAttempt.id)) { showToast('تعذر تسجيل موافقتك على سياسة الامتحان. أعد المحاولة.', 'error'); return; }
   examQuestionsForStudent = result.questions || [];
+  examCurrentQuestionIndex = 0;
+  examSkippedQuestions = new Set();
   renderExamQuestionsForStudent(examCurrentAttempt.answers || {});
   showExamScreen('exam-active-screen');
   startExamTimer();
@@ -4788,7 +4839,10 @@ async function resumeExam(examId) {
   }
   examCurrentExam = exam;
   examCurrentAttempt = attempt;
+  if (!await recordExamPolicyAcceptance(attempt.id)) { showToast('تعذر تسجيل سياسة الامتحان لهذا الاختبار.', 'error'); return; }
   examQuestionsForStudent = result.questions || [];
+  examCurrentQuestionIndex = 0;
+  examSkippedQuestions = new Set();
   renderExamQuestionsForStudent(attempt.answers || {});
   showExamScreen('exam-active-screen');
   startExamTimer();
@@ -4797,48 +4851,40 @@ async function resumeExam(examId) {
 function renderExamQuestionsForStudent(savedAnswers) {
   savedAnswers = savedAnswers || {};
   const wrap = document.getElementById('exam-questions-wrap');
-  wrap.innerHTML = examQuestionsForStudent.map((q, i) => {
-    let optionsHtml = '';
-    if (q.question_type === 'truefalse') {
-      optionsHtml = `
-        <label class="exam-option-label ${savedAnswers[q.id] === 'true' ? 'selected' : ''}">
-          <input type="radio" name="q_${q.id}" value="true" ${savedAnswers[q.id] === 'true' ? 'checked' : ''} onchange="saveExamAnswer('${q.id}','true')"> صحيحة
-        </label>
-        <label class="exam-option-label ${savedAnswers[q.id] === 'false' ? 'selected' : ''}">
-          <input type="radio" name="q_${q.id}" value="false" ${savedAnswers[q.id] === 'false' ? 'checked' : ''} onchange="saveExamAnswer('${q.id}','false')"> خاطئة
-        </label>`;
-    } else {
-      ['a', 'b', 'c', 'd'].forEach(letter => {
-        const text = q['option_' + letter];
-        if (!text) return;
-        optionsHtml += `<label class="exam-option-label ${savedAnswers[q.id] === letter ? 'selected' : ''}">
-          <input type="radio" name="q_${q.id}" value="${letter}" ${savedAnswers[q.id] === letter ? 'checked' : ''} onchange="saveExamAnswer('${q.id}','${letter}')"> ${escapeHtml(text)}
-        </label>`;
-      });
-    }
-    return `<div class="exam-q-card">
-      <div class="q-title">سؤال ${i + 1}: ${escapeHtml(q.question_text)}</div>
-      ${optionsHtml}
-    </div>`;
-  }).join('');
-}
-
-async function saveExamAnswer(questionId, value) {
-  if (!examCurrentAttempt) return;
-  const answers = examCurrentAttempt.answers || {};
-  answers[questionId] = value;
-  examCurrentAttempt.answers = answers;
-  document.querySelectorAll(`input[name="q_${questionId}"]`).forEach(inp => {
-    inp.closest('.exam-option-label').classList.toggle('selected', inp.checked);
-  });
-  const { data: result, error } = await sb.rpc('student_exam_save_answers', {
-    p_attempt_id: examCurrentAttempt.id, p_student_id: examStudent?.id,
-    p_phone: examStudentPhone, p_face_token: examFaceVerificationToken, p_answers: answers
-  });
-  if (error || !result?.ok) {
-    console.error('تعذر حفظ إجابة الامتحان:', error || result?.reason);
-    showToast('تعذر حفظ الإجابة على قاعدة البيانات. تحقق من الاتصال قبل المتابعة.', 'error');
+  if (!examQuestionsForStudent.length) { wrap.innerHTML = '<div class="exam-q-card">لا توجد أسئلة في هذه المحاولة.</div>'; return; }
+  examCurrentQuestionIndex = Math.max(0, Math.min(examCurrentQuestionIndex, examQuestionsForStudent.length - 1));
+  const q = examQuestionsForStudent[examCurrentQuestionIndex];
+  const answer = savedAnswers[q.id];
+  let optionsHtml = '';
+  if (q.question_type === 'truefalse') {
+    optionsHtml = `<label class="exam-option-label ${answer === 'true' ? 'selected' : ''}"><input type="radio" name="q_${q.id}" value="true" ${answer === 'true' ? 'checked' : ''} onchange="saveExamAnswer('${q.id}','true')"> صحيحة</label>
+      <label class="exam-option-label ${answer === 'false' ? 'selected' : ''}"><input type="radio" name="q_${q.id}" value="false" ${answer === 'false' ? 'checked' : ''} onchange="saveExamAnswer('${q.id}','false')"> خاطئة</label>`;
+  } else {
+    ['a','b','c','d'].forEach(letter => { const optionText=q['option_'+letter]; if(!optionText)return;
+      optionsHtml += `<label class="exam-option-label ${answer===letter?'selected':''}"><input type="radio" name="q_${q.id}" value="${letter}" ${answer===letter?'checked':''} onchange="saveExamAnswer('${q.id}','${letter}')"> ${escapeHtml(optionText)}</label>`;
+    });
   }
+  const nav=examQuestionsForStudent.map((item,index)=>{const status=savedAnswers[item.id]?'answered':(examSkippedQuestions.has(item.id)?'skipped':'unanswered');const bg=status==='answered'?'#16a34a':status==='skipped'?'#f59e0b':'#94a3b8';return `<button type="button" title="سؤال ${index+1}" onclick="goToExamQuestion(${index})" style="width:34px;height:34px;border:0;border-radius:9px;background:${bg};color:#fff;font-weight:800;cursor:pointer;outline:${index===examCurrentQuestionIndex?'3px solid #1e3a8a':'none'};outline-offset:2px">${index+1}</button>`;}).join('');
+  const answered=Object.keys(savedAnswers).length;
+  wrap.innerHTML=`<div class="exam-q-card" style="max-width:900px;margin:14px auto;padding:18px">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px"><strong>السؤال ${examCurrentQuestionIndex+1} من ${examQuestionsForStudent.length}</strong><span style="font-size:12px;color:var(--muted)">تمت الإجابة: ${answered} · متبقي: ${examQuestionsForStudent.length-answered}</span></div>
+    <div class="q-title" style="margin-bottom:16px;line-height:1.9">${escapeHtml(q.question_text)}</div>${optionsHtml}
+    <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:18px">
+      <button class="btn btn-outline" onclick="goToExamQuestion(examCurrentQuestionIndex-1)" ${examCurrentQuestionIndex===0?'disabled':''}>السؤال السابق</button>
+      <button class="btn btn-warning" onclick="skipCurrentExamQuestion()">تخطي السؤال</button>
+      <button class="btn btn-gold" onclick="goToExamQuestion(examCurrentQuestionIndex+1)" ${examCurrentQuestionIndex===examQuestionsForStudent.length-1?'disabled':''}>السؤال التالي</button>
+    </div>
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)"><div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;margin-bottom:9px"><span>🟢 تمت الإجابة</span><span>⚪ لم تتم الإجابة</span><span>🟠 تم تخطيه</span></div><div style="display:flex;gap:7px;flex-wrap:wrap">${nav}</div></div>
+  </div>`;
+}
+function goToExamQuestion(index){if(index<0||index>=examQuestionsForStudent.length)return;examCurrentQuestionIndex=index;renderExamQuestionsForStudent(examCurrentAttempt?.answers||{});}
+function skipCurrentExamQuestion(){const q=examQuestionsForStudent[examCurrentQuestionIndex];if(!q)return;if(!examCurrentAttempt?.answers?.[q.id])examSkippedQuestions.add(q.id);if(examCurrentQuestionIndex<examQuestionsForStudent.length-1)examCurrentQuestionIndex++;renderExamQuestionsForStudent(examCurrentAttempt?.answers||{});}
+async function saveExamAnswer(questionId,value){
+  if(!examCurrentAttempt)return;const answers=examCurrentAttempt.answers||{};answers[questionId]=value;examCurrentAttempt.answers=answers;examSkippedQuestions.delete(questionId);
+  if(examTestMode){renderExamQuestionsForStudent(answers);return;}
+  const {data:result,error}=await sb.rpc('student_exam_save_answers',{p_attempt_id:examCurrentAttempt.id,p_student_id:examStudent?.id,p_phone:examStudentPhone,p_face_token:examFaceVerificationToken,p_answers:answers});
+  if(error||!result?.ok){console.error('تعذر حفظ إجابة الامتحان:',error||result?.reason);showToast('تعذر حفظ الإجابة على قاعدة البيانات. تحقق من الاتصال قبل المتابعة.','error');}
+  else renderExamQuestionsForStudent(answers);
 }
 
 function startExamTimer() {
@@ -4874,15 +4920,17 @@ window.addEventListener('beforeunload', () => { examPageUnloading = true; });
 
 // ✅ كشف الغش: أي خروج من الصفحة (تبديل تبويب، تصغير، فتح تطبيق آخر) يُنهي الامتحان فورًا
 // لكن إعادة تحميل الصفحة (ريفرش) لا تُعتبر غشًا — الطالب يستكمل بنفس الوقت المتبقي
-function activateCheatingDetection() {
-  if (examVisibilityHandler) document.removeEventListener('visibilitychange', examVisibilityHandler);
-  examVisibilityHandler = function () {
-    if (examPageUnloading) return; // الصفحة بتُعاد تحميلها (ريفرش) — ليس غشًا
-    if (document.hidden && !examSubmitLock && examCurrentAttempt && examCurrentAttempt.status !== 'submitted') {
-      submitExam(false, true); // تم اكتشاف غش
-    }
-  };
-  document.addEventListener('visibilitychange', examVisibilityHandler);
+async function logExamViolation(eventName,details){
+  if(!examCurrentAttempt||examCurrentAttempt.status==='submitted')return;
+  if(examTestMode){examTestViolationCount++;showToast('🧪 تم تسجيل مغادرة تجريبية رقم '+examTestViolationCount+' — دون أي أثر على السجلات.','info');return;}
+  const {data,error}=await sb.rpc('student_exam_log_violation',{p_attempt_id:examCurrentAttempt.id,p_student_id:examStudent?.id,p_phone:examStudentPhone,p_face_token:examFaceVerificationToken,p_event:eventName,p_details:details||''});
+  if(error||!data?.ok){console.warn('تعذر تسجيل مخالفة الامتحان:',error||data?.reason);return;}
+  examCurrentAttempt.violation_count=data.violation_count;showToast('⚠️ تم تسجيل مغادرة الصفحة للمراجعة الإدارية. لم يتم إلغاء إجاباتك تلقائيًا.','warning');
+}
+function activateCheatingDetection(){
+  if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler);
+  examVisibilityHandler=function(){if(examPageUnloading||!document.hidden||examSubmitLock||!examCurrentAttempt||examCurrentAttempt.status==='submitted')return;logExamViolation('visibility_hidden','انتقل المتصفح إلى تبويب أو تطبيق آخر أثناء الامتحان');};
+  document.addEventListener('visibilitychange',examVisibilityHandler);
 }
 
 function confirmSubmitExam() {
@@ -4902,6 +4950,7 @@ function confirmSubmitExam() {
 }
 
 async function submitExam(autoSubmitted, cheatingDetected) {
+  if (examTestMode) { finishExamTestMode(); return; }
   if (examSubmitLock) return;
   examSubmitLock = true;
   if (examTimerInterval) clearInterval(examTimerInterval);
