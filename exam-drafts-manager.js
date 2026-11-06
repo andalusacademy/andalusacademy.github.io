@@ -32,10 +32,11 @@
     modal.id = 'andalus-exam-drafts-modal';
     modal.className = 'modal-overlay';
     modal.style.zIndex = '1300';
-    modal.innerHTML = '<div class="modal" style="max-width:980px;width:96vw;max-height:92vh;overflow:auto"><div class="modal-header"><div><h3 style="margin:0">📚 المسودات المحفوظة للامتحانات</h3><small style="color:var(--muted)">حفظ دائم في قاعدة البيانات — اختر مسودة أو أكثر لتجميعها</small></div><button class="btn btn-outline" type="button" id="aed-close">إغلاق</button></div><div class="modal-body"><div id="aed-status" style="margin-bottom:12px"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn btn-outline btn-sm" id="aed-refresh">↻ تحديث</button><button class="btn btn-success btn-sm" id="aed-approve">اعتماد المحدد</button><button class="btn btn-gold btn-sm" id="aed-create">🧩 إنشاء امتحان من المحدد</button><button class="btn btn-outline btn-sm" id="aed-clear">إلغاء التحديد</button></div><div id="aed-list"></div><div id="aed-preview" style="margin-top:14px"></div></div></div>';
+    modal.innerHTML = '<div class="modal" style="max-width:980px;width:96vw;max-height:92vh;overflow:auto"><div class="modal-header"><div><h3 style="margin:0">📚 المسودات المحفوظة للامتحانات</h3><small style="color:var(--muted)">حفظ دائم في قاعدة البيانات — اختر مسودة أو أكثر لتجميعها</small></div><button class="btn btn-outline" type="button" id="aed-close">إغلاق</button></div><div class="modal-body"><div id="aed-status" style="margin-bottom:12px"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn btn-outline btn-sm" id="aed-refresh">↻ تحديث</button><button class="btn btn-warning btn-sm" id="aed-restore-local">📥 استعادة المسودة المحلية</button><button class="btn btn-success btn-sm" id="aed-approve">اعتماد المحدد</button><button class="btn btn-gold btn-sm" id="aed-create">🧩 إنشاء امتحان من المحدد</button><button class="btn btn-outline btn-sm" id="aed-clear">إلغاء التحديد</button></div><div id="aed-list"></div><div id="aed-preview" style="margin-top:14px"></div></div></div>';
     document.body.appendChild(modal);
     $('#aed-close',modal).onclick = () => modal.classList.remove('open');
     $('#aed-refresh',modal).onclick = load;
+    $('#aed-restore-local',modal).onclick = restoreLocalDraft;
     $('#aed-clear',modal).onclick = () => { selected.clear(); render(); };
     $('#aed-approve',modal).onclick = approveSelected;
     $('#aed-create',modal).onclick = createFromSelected;
@@ -91,6 +92,76 @@
     if (typeof window.closeModal === 'function') window.closeModal('modal-ai-exam-review');
     if ($('#andalus-exam-drafts-modal')?.classList.contains('open')) await load();
   }
+
+  function findQuestionArrays(root, out, seen, depth){
+    if (!root || depth > 9 || typeof root !== 'object' || seen.has(root)) return;
+    seen.add(root);
+    if (Array.isArray(root)) {
+      const valid = root.filter(q => q && typeof q === 'object' && !Array.isArray(q) &&
+        (typeof q.question === 'string' || typeof q.question_text === 'string' || typeof q.text === 'string'));
+      if (valid.length >= 20 && valid.length / Math.max(root.length,1) >= 0.8) out.push(valid);
+      root.forEach(v => findQuestionArrays(v,out,seen,depth+1));
+      return;
+    }
+    Object.keys(root).forEach(k => findQuestionArrays(root[k],out,seen,depth+1));
+  }
+  async function restoreLocalDraft(){
+    const btn=$('#aed-restore-local');
+    if(btn) { btn.disabled=true; btn.textContent='جاري البحث عن المسودة المحلية...'; }
+    try {
+      const candidates=[];
+      const stores=[window.localStorage,window.sessionStorage];
+      stores.forEach(store=>{
+        try {
+          for(let i=0;i<store.length;i++){
+            const key=store.key(i), raw=store.getItem(key);
+            if(!raw || raw.length<1000) continue;
+            try {
+              const parsed=JSON.parse(raw), arrays=[];
+              findQuestionArrays(parsed,arrays,new WeakSet(),0);
+              arrays.forEach(questions=>candidates.push({key,questions,raw,parsed}));
+            } catch(_){}
+          }
+        } catch(_){}
+      });
+      if(!candidates.length){
+        toast('لم أعثر على قائمة أسئلة محفوظة في التخزين المحلي لهذا المتصفح. لم يتم حذف أو تغيير أي بيانات.','error');
+        return;
+      }
+      candidates.sort((a,b)=>b.questions.length-a.questions.length);
+      const best=candidates[0];
+      if(best.questions.length<20) {
+        toast('تم العثور على بيانات، لكنها لا تبدو مسودة أسئلة مكتملة. لم يتم استيرادها.','error');
+        return;
+      }
+      const rawText=best.raw;
+      const subjectMatch=rawText.match(/تمريض\s*الباطنة\s*والطوارئ|تمريض الباطنه والطوارئ/i);
+      const subject=subjectMatch ? 'تمريض الباطنة والطوارئ' :
+        (typeof activeExamMaterialName!=='undefined' && activeExamMaterialName) || 'تمريض الباطنة والطوارئ';
+      const sid=subjectId(subject);
+      if(!sid){
+        toast('وجدت '+best.questions.length+' سؤالًا، لكن المادة غير موجودة في قائمة المواد. لم يتم النقل.','error');
+        return;
+      }
+      const db=client(); if(!db) { toast('تعذر الاتصال بقاعدة البيانات.','error'); return; }
+      const n=counts(best.questions);
+      const row={title:'مسودة امتحان — '+subject,subject_id:sid,subject_name:subject,
+        questions:best.questions,source_files:[],question_counts:n,status:'draft'};
+      if(typeof currentAuth!=='undefined' && currentAuth && currentAuth.id) row.created_by=currentAuth.id;
+      const {data,error}=await db.from(TABLE).insert(row).select('id,title,subject_name,questions,status').single();
+      if(error){ toast('فشل نقل المسودة: '+error.message+' — النسخة المحلية ما زالت محفوظة.','error'); return; }
+      const verify=await db.from(TABLE).select('id,title,subject_name,questions,status').eq('id',data.id).single();
+      if(verify.error || !verify.data || !Array.isArray(verify.data.questions) || verify.data.questions.length!==best.questions.length){
+        toast('تمت محاولة النقل لكن تعذر تأكيد اكتمال الأسئلة عند إعادة القراءة. احتفظنا بالنسخة المحلية. راجع المسودات قبل أي متابعة.','error');
+        return;
+      }
+      toast('تم نقل '+verify.data.questions.length+' سؤالًا إلى المسودات المحفوظة والتحقق منها. النسخة المحلية لم تُحذف.');
+      await load();
+    } finally {
+      if(btn) { btn.disabled=false; btn.textContent='📥 استعادة المسودة المحلية'; }
+    }
+  }
+
   async function approveSelected(){
     if (!selected.size) return toast('حدد مسودة واحدة على الأقل.', 'error');
     const db=client(); const ids=[...selected];
