@@ -58,3 +58,80 @@
  setTimeout(()=>{mount();if($('#page-exams')?.classList.contains('active'))load();},1200);
  window.refreshAndalusExamAttemptRegister=load;
 })();
+
+/* Unified paper/electronic exam grade register */
+(function(){
+ 'use strict';
+ if(window.__andalusUnifiedExamGradesV1)return;window.__andalusUnifiedExamGradesV1=true;
+ const $=(s,r=document)=>r.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const digits=v=>String(v??'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+ const db=()=>window.sb||(typeof sb!=='undefined'?sb:null);
+ const page=()=>$('#page-grades')||$('#page-exam-grades')||$('#page-grades-management')||$('#page-student-grades');
+ let mode='paper',round=1,students=[],subjects=[],records=[],payments=[],branch='all',program='all',subjectId='',search='';
+ function mount(){
+  const p=page();if(!p||$('#andalus-unified-grades'))return;
+  const box=document.createElement('section');box.id='andalus-unified-grades';box.className='card';box.style.cssText='margin:0 0 18px;padding:16px;border:1px solid var(--border);border-radius:14px';
+  box.innerHTML=String.raw\`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><h3 style="margin:0">📚 سجل درجات الامتحانات</h3><div style="font-size:12px;color:var(--muted);margin-top:4px">سجل مستقل يحفظ كل محاولة وتحسين دون استبدال الدرجات السابقة</div></div><button type="button" class="btn btn-outline btn-sm" id="ug-refresh">↻ تحديث</button></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0"><button type="button" class="btn btn-primary" id="ug-paper">📝 امتحان ورقي</button><button type="button" class="btn btn-outline" id="ug-electronic">💻 امتحان إلكتروني</button></div>
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px;margin-bottom:12px">
+    <label style="font-size:12px">الفرع<select id="ug-branch" style="display:block;width:100%;padding:9px;margin-top:4px;border:1px solid var(--border);border-radius:8px"></select></label>
+    <label style="font-size:12px">المجموعة / الدفعة<select id="ug-program" style="display:block;width:100%;padding:9px;margin-top:4px;border:1px solid var(--border);border-radius:8px"></select></label>
+    <label style="font-size:12px">المادة<select id="ug-subject" style="display:block;width:100%;padding:9px;margin-top:4px;border:1px solid var(--border);border-radius:8px"></select></label>
+    <label style="font-size:12px">الدور<select id="ug-round" style="display:block;width:100%;padding:9px;margin-top:4px;border:1px solid var(--border);border-radius:8px"><option value="1">الدور الأول</option><option value="2">الدور الثاني</option></select></label></div>
+   <input id="ug-search" placeholder="بحث باسم الطالب أو رقم القيد..." style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border);border-radius:9px;margin-bottom:10px">
+   <div id="ug-summary" style="font-size:12px;color:var(--muted);margin:5px 0 10px">اختر المادة لعرض كشف الطلاب.</div>
+   <div style="overflow:auto"><table style="width:100%;min-width:980px;border-collapse:collapse"><thead><tr><th>رقم القيد</th><th>اسم الطالب</th><th>الفرع</th><th>المجموعة</th><th>السداد</th><th>المحاولات السابقة</th><th>درجة جديدة</th><th>إجراء</th></tr></thead><tbody id="ug-body"><tr><td colspan="8" style="text-align:center;padding:18px">اختر المادة لعرض كشف الطلاب.</td></tr></tbody></table></div>
+   <div style="font-size:11px;color:var(--muted);margin-top:9px">كل رصد جديد يُضاف كمحاولة مستقلة. لا يتم حذف أو استبدال المحاولات السابقة. نتائج الامتحان الإلكتروني الرسمي تُسجل تلقائيًا، والامتحانات التجريبية مستبعدة.</div>\`;
+  p.insertBefore(box,p.firstChild);
+  $('#ug-paper').onclick=()=>setMode('paper');$('#ug-electronic').onclick=()=>setMode('electronic');$('#ug-refresh').onclick=loadAll;
+  $('#ug-branch').onchange=e=>{branch=e.target.value;render();};$('#ug-program').onchange=e=>{program=e.target.value;render();};
+  $('#ug-subject').onchange=e=>{subjectId=e.target.value;render();};$('#ug-round').onchange=e=>{round=Number(e.target.value);render();};
+  $('#ug-search').oninput=e=>{search=e.target.value.trim().toLowerCase();render();};
+  $('#ug-body').addEventListener('click',async e=>{
+   const b=e.target.closest('[data-ug-save]');if(!b)return;
+   const sid=b.dataset.ugSave,s=students.find(x=>String(x.id)===sid),score=Number(digits($('[data-ug-score="'+sid+'"]')?.value)),max=Number(digits($('[data-ug-max="'+sid+'"]')?.value));
+   if(!s||!Number.isFinite(score)||!Number.isFinite(max)||score<0||max<=0||score>max){alert('راجع الدرجة والدرجة النهائية.');return;}
+   b.disabled=true;b.textContent='جارٍ الحفظ...';
+   try{const d=db();if(!d)throw new Error('قاعدة البيانات غير متاحة');
+    const prev=records.filter(x=>x.student_id===sid&&x.subject_id===subjectId&&x.exam_type==='paper'&&Number(x.exam_round)===round),next=Math.max(0,...prev.map(x=>Number(x.attempt_number)||0))+1;
+    const {error}=await d.from('exam_grade_attempts').insert({student_id:sid,subject_id:subjectId,exam_type:'paper',exam_round:round,attempt_number:next,score,max_score:max,branch:s.branch||null,program:s.program||null,program_id:s.program_id||null,system_name:s.system_name||null,note:'رصد يدوي لامتحان ورقي'});
+    if(error)throw error;(window.showToast||alert)('تم حفظ المحاولة رقم '+next+' بنجاح');await loadAll();
+   }catch(err){console.error('[Unified exam grades]',err);alert('تعذر حفظ الدرجة: '+(err.message||String(err)));b.disabled=false;b.textContent='حفظ المحاولة';}
+  });
+  loadAll();
+ }
+ function setMode(v){mode=v;$('#ug-paper').className=v==='paper'?'btn btn-primary':'btn btn-outline';$('#ug-electronic').className=v==='electronic'?'btn btn-primary':'btn btn-outline';render();}
+ async function loadAll(){
+  const d=db();if(!d){$('#ug-body').innerHTML='<tr><td colspan="8">جلسة الإدارة غير متاحة. أعد تسجيل الدخول.</td></tr>';return;}
+  $('#ug-body').innerHTML='<tr><td colspan="8" style="text-align:center;padding:18px">جارٍ تحميل السجل...</td></tr>';
+  try{
+   const [sr,subr,gr,pr]=await Promise.all([d.from('students').select('id,name,branch,program,program_id,system_name,enrollment_number,student_status,total_due').is('deleted_at',null).order('name'),d.from('subjects').select('id,name,max_grade_1,max_grade_2,order_num').order('order_num'),d.from('exam_grade_attempts').select('*').order('recorded_at',{ascending:true}),d.from('payments').select('student_id,amount,paid,applicable')]);
+   for(const [n,r] of [['الطلاب',sr],['المواد',subr],['سجل الدرجات',gr],['المدفوعات',pr]])if(r.error)throw new Error(n+': '+r.error.message);
+   students=sr.data||[];subjects=subr.data||[];records=gr.data||[];payments=pr.data||[];fillFilters();render();
+  }catch(e){console.error('[Unified exam grades load]',e);$('#ug-body').innerHTML='<tr><td colspan="8" style="text-align:center;color:#b42318;padding:18px">تعذر تحميل السجل: '+esc(e.message||e)+'</td></tr>';}
+ }
+ function fillFilters(){
+  const opts=(a,l)=>'<option value="all">'+l+'</option>'+a.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
+  const b=$('#ug-branch'),p=$('#ug-program'),sub=$('#ug-subject');if(!b)return;
+  const bs=[...new Set(students.map(s=>s.branch).filter(Boolean))].sort(),ps=[...new Set(students.map(s=>s.program).filter(Boolean))].sort(),old=subjectId;
+  b.innerHTML=opts(bs,'كل الفروع');b.value=bs.includes(branch)?branch:'all';branch=b.value;p.innerHTML=opts(ps,'كل المجموعات');p.value=ps.includes(program)?program:'all';program=p.value;
+  sub.innerHTML='<option value="">اختر المادة</option>'+subjects.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('');sub.value=subjects.some(s=>s.id===old)?old:'';subjectId=sub.value;
+ }
+ function render(){
+  if(!$('#ug-body'))return;const subject=subjects.find(s=>s.id===subjectId),maxDefault=subject?((round===1?subject.max_grade_1:subject.max_grade_2)||100):100;
+  const relevant=records.filter(x=>x.exam_type===mode&&Number(x.exam_round)===round&&(!subjectId||x.subject_id===subjectId)),byStudent=new Map();
+  relevant.forEach(x=>{if(!byStudent.has(x.student_id))byStudent.set(x.student_id,[]);byStudent.get(x.student_id).push(x);});
+  const filtered=students.filter(s=>(branch==='all'||s.branch===branch)&&(program==='all'||s.program===program)&&(!search||(String(s.name||'').toLowerCase().includes(search)||String(s.id).toLowerCase().includes(search)||String(s.enrollment_number||'').toLowerCase().includes(search))));
+  $('#ug-summary').textContent=(mode==='paper'?'امتحانات ورقية':'امتحانات إلكترونية')+' • '+(round===1?'الدور الأول':'الدور الثاني')+' • '+(subject?.name||'اختر المادة')+' • '+filtered.length+' طالب';
+  if(!subjectId){$('#ug-body').innerHTML='<tr><td colspan="8" style="text-align:center;padding:18px">اختر المادة لعرض كشف الدرجات.</td></tr>';return;}
+  $('#ug-body').innerHTML=filtered.map(s=>{
+   const hist=(byStudent.get(String(s.id))||[]).sort((a,b)=>a.attempt_number-b.attempt_number),chips=hist.length?hist.map(x=>'<span title="'+esc(x.note||'')+'" style="display:inline-block;margin:2px;padding:4px 7px;border-radius:7px;background:var(--bg);border:1px solid var(--border);font-size:11px">م'+x.attempt_number+': <b>'+Number(x.score)+'</b> / '+Number(x.max_score)+'</span>').join(''):'<span style="color:var(--muted)">لا توجد درجات</span>';
+   const paid=payments.filter(x=>x.student_id===String(s.id)&&x.paid&&x.applicable!==false).reduce((n,x)=>n+Number(x.amount||0),0),balance=Math.max(0,Number(s.total_due||0)-paid);
+   const entry=mode==='paper'?'<div style="display:flex;gap:4px;align-items:center"><input data-ug-score="'+esc(s.id)+'" inputmode="decimal" placeholder="الدرجة" style="width:76px;padding:7px;border:1px solid var(--border);border-radius:7px">/<input data-ug-max="'+esc(s.id)+'" inputmode="decimal" value="'+esc(maxDefault)+'" style="width:62px;padding:7px;border:1px solid var(--border);border-radius:7px"></div>':'<span style="color:var(--muted)">تلقائي من الامتحان</span>';
+   const action=mode==='paper'?'<button type="button" class="btn btn-success btn-sm" data-ug-save="'+esc(s.id)+'">حفظ المحاولة</button>':'—';
+   return '<tr style="border-top:1px solid var(--border)"><td>'+esc(s.enrollment_number||s.id)+'</td><td><b>'+esc(s.name)+'</b><div style="font-size:10px;color:var(--muted)">'+esc(s.student_status||'')+'</div></td><td>'+esc(s.branch||'—')+'</td><td>'+esc(s.program||s.system_name||'—')+'</td><td><span style="font-size:11px;color:'+(balance>0?'#b42318':'#16803c')+'">مسدد: '+paid.toLocaleString('en-US')+' ج</span><div style="font-size:10px;color:var(--muted)">متبقي: '+balance.toLocaleString('en-US')+' ج</div></td><td style="min-width:190px;white-space:normal">'+chips+'</td><td>'+entry+'</td><td>'+action+'</td></tr>';
+  }).join('')||'<tr><td colspan="8" style="text-align:center;padding:18px">لا يوجد طلاب مطابقون للفلاتر.</td></tr>';
+ }
+ const originalShow=window.showPage;if(typeof originalShow==='function'&&!originalShow.__unifiedGradesWrapped){const wrapped=function(p){const r=originalShow.apply(this,arguments);if(String(p).toLowerCase().includes('grade'))setTimeout(mount,50);return r;};wrapped.__unifiedGradesWrapped=true;window.showPage=wrapped;}
+ document.addEventListener('DOMContentLoaded',()=>setTimeout(mount,300));document.addEventListener('click',e=>{const n=e.target.closest('[data-page], [onclick*="grades"]');if(n)setTimeout(mount,250);});setTimeout(mount,1500);window.refreshAndalusUnifiedExamGrades=loadAll;
+})();
