@@ -20,11 +20,12 @@
     if (modal) return modal;
     modal = document.createElement('div');
     modal.id = 'modal-staged-exam-generation'; modal.className = 'modal-overlay'; modal.style.zIndex = '1200';
-    modal.innerHTML = `<div class="modal" style="max-width:720px;width:94vw;max-height:90vh;overflow:auto"><div class="modal-header"><div><h3 style="margin:0">🧩 توليد الامتحان على مراحل</h3><p style="margin:5px 0 0;color:var(--muted);font-size:12px">كل عملية توليد تُحفظ كمجموعة مستقلة في بنك الأسئلة.</p></div><button class="btn btn-outline" type="button" data-staged-close>إغلاق</button></div><div class="modal-body" style="padding:20px"><div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:12px;line-height:1.8"><strong>ميزة مهمة:</strong> كل مجموعة تُحفظ في قاعدة البيانات مستقلة، ولا تختلط بالمجموعات السابقة.</div><div id="staged-exam-counts" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px"></div><div id="staged-exam-status" style="margin-top:16px"></div><div style="display:flex;gap:8px;justify-content:flex-start;margin-top:18px;flex-wrap:wrap"><button class="btn btn-gold" id="staged-exam-start" type="button">🚀 توليد مجموعات جديدة للبنك</button><button class="btn btn-primary" id="staged-exam-from-bank" type="button">🧩 إنشاء امتحان من بنك الأسئلة</button></div></div></div>`;
+    modal.innerHTML = `<div class="modal" style="max-width:720px;width:94vw;max-height:90vh;overflow:auto"><div class="modal-header"><div><h3 style="margin:0">🧩 توليد الامتحان على مراحل</h3><p style="margin:5px 0 0;color:var(--muted);font-size:12px">كل عملية توليد تُحفظ كمجموعة مستقلة في بنك الأسئلة.</p></div><button class="btn btn-outline" type="button" data-staged-close>إغلاق</button></div><div class="modal-body" style="padding:20px"><div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:12px;line-height:1.8"><strong>ميزة مهمة:</strong> كل مجموعة تُحفظ في قاعدة البيانات مستقلة، ولا تختلط بالمجموعات السابقة.</div><div id="staged-exam-counts" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px"></div><div id="staged-exam-status" style="margin-top:16px"></div><div style="display:flex;gap:8px;justify-content:flex-start;margin-top:18px;flex-wrap:wrap"><button class="btn btn-outline" id="staged-exam-browse-bank" type="button">📚 استعراض بنك الأسئلة</button><button class="btn btn-gold" id="staged-exam-start" type="button">🚀 توليد مجموعات جديدة للبنك</button><button class="btn btn-primary" id="staged-exam-from-bank" type="button">🧩 إنشاء امتحان من بنك الأسئلة</button></div><div id="staged-exam-bank-panel" style="display:none;margin-top:18px;border-top:1px solid var(--border);padding-top:16px"></div></div></div>`;
     document.body.appendChild(modal);
     modal.querySelector('#staged-exam-counts').innerHTML = TYPES.map((t, i) => `<label style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff;display:block"><span style="display:block;font-weight:900;color:var(--navy);font-size:13px">${t.icon} ${t.label}</span><span style="display:block;color:var(--muted);font-size:11px;margin:5px 0 9px">عدد الأسئلة المطلوبة</span><input id="staged-count-${t.key}" type="number" min="0" max="50" value="${i === 0 ? 20 : i === 1 ? 10 : 0}" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:15px;font-weight:900"></label>`).join('');
     modal.querySelector('[data-staged-close]').onclick = () => { modal.style.display = 'none'; };
     modal.querySelector('#staged-exam-start').onclick = () => runStagedGeneration(modal);
+    modal.querySelector('#staged-exam-browse-bank').onclick = () => openQuestionBankBrowser(modal);
     modal.querySelector('#staged-exam-from-bank').onclick = () => createExamFromBank(modal);
     return modal;
   }
@@ -170,6 +171,85 @@
       setStatus(modal, `<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;line-height:1.8"><strong>انتهت عملية التوليد.</strong><br>${summary}${errors ? '<br>' + errors : ''}<br><strong>تم حفظ ${successful.reduce((n,x)=>n+x.saved,0)} سؤال في مجموعات مستقلة داخل بنك الأسئلة.</strong></div>`);
       if (typeof showToast === 'function') showToast('تم حفظ كل مجموعة توليد بصورة مستقلة في بنك الأسئلة.');
     } finally { if (startButton) { startButton.disabled = false; startButton.textContent = '🚀 بدء التوليد على مراحل'; } renderDraftStatus(modal); }
+  }
+  async function openQuestionBankBrowser(modal) {
+    const panel = modal.querySelector('#staged-exam-bank-panel');
+    const db = window.sb;
+    if (!db) return notify('اتصال قاعدة البيانات غير جاهز.', 'error');
+    panel.style.display = 'block';
+    panel.innerHTML = '<div style="padding:14px;text-align:center">⏳ جاري تحميل بنك الأسئلة...</div>';
+    let page = 0, total = 0, batchOptions = [];
+    const pageSize = 40;
+    try {
+      const batches = await db.from('exam_question_generation_batches')
+        .select('id,title,subject_name,question_type,saved_count,status,created_at')
+        .order('created_at', { ascending: false }).limit(500);
+      if (batches.error) throw batches.error;
+      batchOptions = batches.data || [];
+      const batchLabels = batchOptions.map(b => '<option value="' + b.id + '">' + escapeHtml(b.title || b.subject_name || b.id) + '</option>').join('');
+      panel.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <h4 style="margin:0">📚 بنك الأسئلة المركزي</h4>
+          <span id="bank-browser-total" style="font-size:12px;color:var(--muted)">—</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:12px 0">
+          <input id="bank-filter-subject" placeholder="المادة" value="${escapeHtml(getSubject())}" style="padding:9px;border:1px solid var(--border);border-radius:8px">
+          <select id="bank-filter-type" style="padding:9px;border:1px solid var(--border);border-radius:8px"><option value="">كل الأنواع</option><option value="mcq">اختياري</option><option value="true_false">صح / خطأ</option><option value="essay">مقالي</option></select>
+          <select id="bank-filter-batch" style="padding:9px;border:1px solid var(--border);border-radius:8px"><option value="">كل مجموعات التوليد</option>${batchLabels}</select>
+          <select id="bank-filter-difficulty" style="padding:9px;border:1px solid var(--border);border-radius:8px"><option value="">كل مستويات الصعوبة</option><option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option></select>
+          <input id="bank-filter-search" placeholder="بحث داخل نص السؤال" style="padding:9px;border:1px solid var(--border);border-radius:8px">
+        </div>
+        <div id="bank-browser-counts" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12px"></div>
+        <div id="bank-browser-list" style="display:grid;gap:8px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px">
+          <button class="btn btn-outline" id="bank-browser-prev" type="button">السابق</button>
+          <span id="bank-browser-page" style="font-size:12px;color:var(--muted)">—</span>
+          <button class="btn btn-outline" id="bank-browser-next" type="button">التالي</button>
+        </div>`;
+      const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+      function escapeHtml(value){return esc(value);}
+      async function loadPage() {
+        const subjectText = panel.querySelector('#bank-filter-subject').value.trim();
+        const type = panel.querySelector('#bank-filter-type').value;
+        const batch = panel.querySelector('#bank-filter-batch').value;
+        const difficulty = panel.querySelector('#bank-filter-difficulty').value;
+        const search = panel.querySelector('#bank-filter-search').value.trim();
+        let query = db.from('exam_question_bank').select('id,subject_name,question_text,question_type,options,correct_answer,difficulty,is_active,generation_batch_id,created_at', {count:'exact'});
+        if (subjectText) query = query.ilike('subject_name', '%' + subjectText.replace(/[%_]/g,'') + '%');
+        if (type) query = query.eq('question_type', type);
+        if (batch) query = query.eq('generation_batch_id', batch);
+        if (difficulty) query = query.eq('difficulty', difficulty);
+        if (search) query = query.ilike('question_text', '%' + search.replace(/[%_]/g,'') + '%');
+        const result = await query.order('created_at', {ascending:false}).range(page*pageSize, page*pageSize+pageSize-1);
+        if (result.error) throw result.error;
+        total = result.count || 0;
+        const rows = result.data || [];
+        panel.querySelector('#bank-browser-total').textContent = 'إجمالي النتائج: ' + total.toLocaleString('ar-EG');
+        const counts = await db.from('exam_question_bank').select('question_type', {count:'exact',head:true});
+        panel.querySelector('#bank-browser-counts').textContent = 'النتائج المعروضة: ' + rows.length + ' — استخدم الفلاتر لتحديد المادة والنوع والمجموعة والصعوبة.';
+        panel.querySelector('#bank-browser-list').innerHTML = rows.length ? rows.map((q,i)=>`
+          <article style="border:1px solid var(--border);border-radius:10px;padding:11px;background:var(--card-bg,#fff)">
+            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted)">
+              <span>${escapeHtml(q.subject_name)} · ${({mcq:'اختياري',true_false:'صح / خطأ',essay:'مقالي'}[q.question_type]||q.question_type)} · ${({easy:'سهل',medium:'متوسط',hard:'صعب'}[q.difficulty]||'—')}</span>
+              <span>${q.is_active ? '🟢 نشط' : '⚪ غير نشط'}</span>
+            </div>
+            <div style="font-weight:800;margin-top:7px;line-height:1.8">${escapeHtml(q.question_text)}</div>
+            ${q.question_type==='mcq' && Array.isArray(q.options) ? '<div style="font-size:12px;color:var(--muted);margin-top:6px">'+q.options.map((o,j)=>String.fromCharCode(65+j)+') '+escapeHtml(o)).join(' · ')+'</div>' : ''}
+            <div style="font-size:10px;color:var(--muted);margin-top:6px">معرّف السؤال: ${escapeHtml(q.id)}</div>
+          </article>`).join('') : '<div style="padding:18px;text-align:center;color:var(--muted)">لا توجد أسئلة مطابقة للفلاتر.</div>';
+        panel.querySelector('#bank-browser-page').textContent = 'صفحة ' + (page+1) + ' من ' + Math.max(1,Math.ceil(total/pageSize));
+        panel.querySelector('#bank-browser-prev').disabled = page===0;
+        panel.querySelector('#bank-browser-next').disabled = (page+1)*pageSize>=total;
+      }
+      ['#bank-filter-subject','#bank-filter-type','#bank-filter-batch','#bank-filter-difficulty','#bank-filter-search'].forEach(sel=>{
+        const el=panel.querySelector(sel); el.addEventListener(el.tagName==='INPUT'?'input':'change',()=>{page=0;loadPage().catch(e=>notify('تعذر تحميل البنك: '+e.message,'error'));});
+      });
+      panel.querySelector('#bank-browser-prev').onclick=()=>{if(page>0){page--;loadPage().catch(e=>notify(e.message,'error'));}};
+      panel.querySelector('#bank-browser-next').onclick=()=>{if((page+1)*pageSize<total){page++;loadPage().catch(e=>notify(e.message,'error'));}};
+      await loadPage();
+    } catch(error) {
+      panel.innerHTML='<div style="padding:12px;color:#b91c1c">تعذر تحميل بنك الأسئلة: '+String(error?.message||error)+'</div>';
+    }
   }
   async function createExamFromBank(modal) {
     const db = window.sb;
