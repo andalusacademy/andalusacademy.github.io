@@ -181,6 +181,7 @@
     let page = 0, total = 0, batchOptions = [];
     const pageSize = 40;
     try {
+      const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
       const batches = await db.from('exam_question_generation_batches')
         .select('id,title,subject_name,question_type,saved_count,status,created_at')
         .order('created_at', { ascending: false }).limit(500);
@@ -206,7 +207,6 @@
           <span id="bank-browser-page" style="font-size:12px;color:var(--muted)">—</span>
           <button class="btn btn-outline" id="bank-browser-next" type="button">التالي</button>
         </div>`;
-      const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
       function escapeHtml(value){return esc(value);}
       async function loadPage() {
         const subjectText = panel.querySelector('#bank-filter-subject').value.trim();
@@ -225,7 +225,6 @@
         total = result.count || 0;
         const rows = result.data || [];
         panel.querySelector('#bank-browser-total').textContent = 'إجمالي النتائج: ' + total.toLocaleString('ar-EG');
-        const counts = await db.from('exam_question_bank').select('question_type', {count:'exact',head:true});
         panel.querySelector('#bank-browser-counts').textContent = 'النتائج المعروضة: ' + rows.length + ' — استخدم الفلاتر لتحديد المادة والنوع والمجموعة والصعوبة.';
         panel.querySelector('#bank-browser-list').innerHTML = rows.length ? rows.map((q,i)=>`
           <article style="border:1px solid var(--border);border-radius:10px;padding:11px;background:var(--card-bg,#fff)">
