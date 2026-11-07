@@ -86,10 +86,8 @@
     } finally { busy = false; }
   }
   function metrics() {
-    const a=cache.attempts, published=cache.exams.filter(x=>x.is_published&&!x.is_test).length;
-    const active=a.filter(x=>x.status==='in_progress').length;
-    const submitted=a.filter(x=>x.status==='submitted').length;
-    const review=a.filter(x=>x.flagged_cheating || Number(x.violation_count||0)>0).length;
+    const published=cache.exams.filter(x=>x.is_published&&!x.is_test).length;
+    const active=cache.totals.active, submitted=cache.totals.submitted, review=cache.totals.review;
     const cards=[
       ['📚',cache.exams.length,'إجمالي الامتحانات','#1e3a8a'],
       ['🚀',published,'امتحانات منشورة','#15803d'],
