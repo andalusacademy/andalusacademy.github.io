@@ -71,7 +71,7 @@
  function mount(){
   const p=page();if(!p||$('#andalus-unified-grades'))return;
   const box=document.createElement('section');box.id='andalus-unified-grades';box.className='card';box.style.cssText='margin:0 0 18px;padding:16px;border:1px solid var(--border);border-radius:14px';
-  box.innerHTML=String.raw\`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><h3 style="margin:0">📚 سجل درجات الامتحانات</h3><div style="font-size:12px;color:var(--muted);margin-top:4px">سجل مستقل يحفظ كل محاولة وتحسين دون استبدال الدرجات السابقة</div></div><button type="button" class="btn btn-outline btn-sm" id="ug-refresh">↻ تحديث</button></div>
+  box.innerHTML=String.raw`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><h3 style="margin:0">📚 سجل درجات الامتحانات</h3><div style="font-size:12px;color:var(--muted);margin-top:4px">سجل مستقل يحفظ كل محاولة وتحسين دون استبدال الدرجات السابقة</div></div><button type="button" class="btn btn-outline btn-sm" id="ug-refresh">↻ تحديث</button></div>
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0"><button type="button" class="btn btn-primary" id="ug-paper">📝 امتحان ورقي</button><button type="button" class="btn btn-outline" id="ug-electronic">💻 امتحان إلكتروني</button></div>
    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px;margin-bottom:12px">
     <label style="font-size:12px">الفرع<select id="ug-branch" style="display:block;width:100%;padding:9px;margin-top:4px;border:1px solid var(--border);border-radius:8px"></select></label>
@@ -81,7 +81,7 @@
    <input id="ug-search" placeholder="بحث باسم الطالب أو رقم القيد..." style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border);border-radius:9px;margin-bottom:10px">
    <div id="ug-summary" style="font-size:12px;color:var(--muted);margin:5px 0 10px">اختر المادة لعرض كشف الطلاب.</div>
    <div style="overflow:auto"><table style="width:100%;min-width:980px;border-collapse:collapse"><thead><tr><th>رقم القيد</th><th>اسم الطالب</th><th>الفرع</th><th>المجموعة</th><th>السداد</th><th>المحاولات السابقة</th><th>درجة جديدة</th><th>إجراء</th></tr></thead><tbody id="ug-body"><tr><td colspan="8" style="text-align:center;padding:18px">اختر المادة لعرض كشف الطلاب.</td></tr></tbody></table></div>
-   <div style="font-size:11px;color:var(--muted);margin-top:9px">كل رصد جديد يُضاف كمحاولة مستقلة. لا يتم حذف أو استبدال المحاولات السابقة. نتائج الامتحان الإلكتروني الرسمي تُسجل تلقائيًا، والامتحانات التجريبية مستبعدة.</div>\`;
+   <div style="font-size:11px;color:var(--muted);margin-top:9px">كل رصد جديد يُضاف كمحاولة مستقلة. لا يتم حذف أو استبدال المحاولات السابقة. نتائج الامتحان الإلكتروني الرسمي تُسجل تلقائيًا، والامتحانات التجريبية مستبعدة.</div>`;
   p.insertBefore(box,p.firstChild);
   $('#ug-paper').onclick=()=>setMode('paper');$('#ug-electronic').onclick=()=>setMode('electronic');$('#ug-refresh').onclick=loadAll;
   $('#ug-branch').onchange=e=>{branch=e.target.value;render();};$('#ug-program').onchange=e=>{program=e.target.value;render();};
