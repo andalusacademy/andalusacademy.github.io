@@ -187,7 +187,7 @@
         .order('created_at', { ascending: false }).limit(500);
       if (batches.error) throw batches.error;
       batchOptions = batches.data || [];
-      const batchLabels = batchOptions.map(b => '<option value="' + b.id + '">' + escapeHtml(b.title || b.subject_name || b.id) + '</option>').join('');
+      const batchLabels = batchOptions.map(b => '<option value="' + b.id + '">' + escapeHtml(b.title || b.subject_name || b.id) + ' (' + Number(b.saved_count || 0) + ' سؤال)</option>').join('');
       panel.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
           <h4 style="margin:0">📚 بنك الأسئلة المركزي</h4>
