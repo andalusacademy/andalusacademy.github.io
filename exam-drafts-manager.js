@@ -176,8 +176,6 @@
     if(chosen.length!==1) return toast('لا يمكن تجميع مسودات متعددة. اختر مسودة واحدة فقط.', 'error');
     const questions=Array.isArray(chosen[0].questions)?chosen[0].questions:[];
     if(!questions.length) return toast('المسودات المحددة لا تحتوي على أسئلة.', 'error');
-    const essay=questions.some(q=>String(q.type||q.question_type||'').toLowerCase().includes('essay')||String(q.type||'').includes('مقالي'));
-    if(essay) return toast('المسودات تحتوي أسئلة مقالية. لا يمكن تحويلها حاليًا إلى بنك الامتحان الموضوعي دون دعم المقالي في جدول الأسئلة.', 'error');
     const subjectName=chosen[0].subject_name || '';
     const exam={title:chosen[0].title || 'امتحان '+subjectName,subject:subjectName,questions};
     if(typeof window.showGeneratedExamReview!=='function') return toast('واجهة مراجعة الأسئلة غير جاهزة. حدّث الصفحة ثم حاول مرة أخرى.', 'error');
