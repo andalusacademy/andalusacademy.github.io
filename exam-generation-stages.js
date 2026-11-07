@@ -23,7 +23,6 @@
     document.body.appendChild(modal);
     modal.querySelector('#staged-exam-counts').innerHTML = TYPES.map((t, i) => `<label style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff;display:block"><span style="display:block;font-weight:900;color:var(--navy);font-size:13px">${t.icon} ${t.label}</span><span style="display:block;color:var(--muted);font-size:11px;margin:5px 0 9px">عدد الأسئلة المطلوبة</span><input id="staged-count-${t.key}" type="number" min="0" max="50" value="${i === 0 ? 20 : i === 1 ? 10 : 0}" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:15px;font-weight:900"></label>`).join('');
     modal.querySelector('[data-staged-close]').onclick = () => { modal.style.display = 'none'; };
-    modal.querySelector('#staged-exam-clear').onclick = () => { if (typeof showToast === 'function') showToast('المجموعات المحفوظة في بنك الأسئلة لا تُحذف من هذه الشاشة.'); };
     modal.querySelector('#staged-exam-start').onclick = () => runStagedGeneration(modal);\n    modal.querySelector('#staged-exam-from-bank').onclick = () => createExamFromBank(modal);
     return modal;
   }
@@ -63,6 +62,7 @@
   }
   async function persistGenerationBatch({ db, userId, subject, type, requested, files, questions, errorMessage }) {
     const sid = findSubjectId(subject);
+    if (!sid) throw new Error('المادة غير مرتبطة بمعرّف صحيح في قائمة المواد. لم يبدأ الحفظ.');
     const title = `${TYPES.find(x => x.key === type)?.label || type} — ${subject} — ${new Date().toLocaleString('ar-EG')}`;
     const made = await db.from('exam_question_generation_batches').insert({
       subject_id: sid, subject_name: subject, title, question_type: type,
@@ -73,10 +73,28 @@
     const batchId = made.data.id;
     let saved = 0;
     try {
-      const rows = (questions || []).map(q => normalizeQuestion(q, type, subject, batchId, userId)).filter(q =>
+      const rows = (questions || []).map(q => {
+        const row = normalizeQuestion(q, type, subject, batchId, userId);
+        if (type === 'true_false') {
+          const answer = row.correct_answer.trim().toLowerCase();
+          row.correct_answer = ['صح','صحيح','true','1'].includes(answer) ? 'صح' :
+            ['خطأ','غلط','false','0'].includes(answer) ? 'خطأ' : row.correct_answer;
+          row.options = ['صح','خطأ'];
+        }
+        if (type === 'mcq') {
+          const answer = row.correct_answer.trim();
+          const letter = answer.match(/^(?:option[_ -]?)?([a-d])$/i);
+          if (letter) row.correct_answer = letter[1].toLowerCase();
+          else {
+            const index = row.options.findIndex(option => String(option).trim() === answer);
+            if (index >= 0) row.correct_answer = 'abcd'[index];
+          }
+        }
+        return row;
+      }).filter(q =>
         q.question_text && q.correct_answer &&
-        (type !== 'mcq' || (q.options.length === 4 && q.options.includes(q.correct_answer))) &&
-        (type !== 'true_false' || (q.options.length === 2 && ['صح','خطأ'].includes(q.correct_answer))) &&
+        (type !== 'mcq' || (q.options.length === 4 && /^[a-d]$/.test(q.correct_answer))) &&
+        (type !== 'true_false' || ['صح','خطأ'].includes(q.correct_answer)) &&
         (type !== 'essay' || q.correct_answer)
       );
       if (rows.length) {
