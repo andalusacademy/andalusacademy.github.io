@@ -5018,8 +5018,7 @@ function startExamTimer() {
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
   const durationMs = Math.max(15000, Number(examCurrentExam.duration_seconds) > 0 ? Number(examCurrentExam.duration_seconds) * 1000 : (Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000);
   const durationEnd = startedAt + durationMs;
-  const scheduledEnd = examCurrentExam.available_until ? new Date(examCurrentExam.available_until).getTime() : durationEnd;
-  examTimerEndsAt = Math.min(durationEnd, Number.isFinite(scheduledEnd) ? scheduledEnd : durationEnd);
+  examTimerEndsAt = durationEnd; // يعتمد المؤقت على مدة المحاولة فقط، وليس نهاية نافذة النشر.
 
   function tick() {
     const remaining = examTimerEndsAt - Date.now();
@@ -5051,7 +5050,7 @@ function startExamTimer() {
       if (!error && data?.ok && data.attempt?.status === 'in_progress') {
         const serverStart = new Date(data.attempt.started_at).getTime();
         const serverDuration = Math.max(15000, Number(data.exam?.duration_seconds) * 1000);
-        const serverEnd = data.exam?.available_until ? Math.min(serverStart + serverDuration, new Date(data.exam.available_until).getTime()) : serverStart + serverDuration;
+        const serverEnd = serverStart + serverDuration; // لا نوقف محاولة نشطة عند انتهاء نافذة النشر.
         if (Number.isFinite(serverEnd)) {
           examTimerEndsAt = serverEnd;
           examCurrentAttempt.started_at = data.attempt.started_at;
@@ -5092,7 +5091,11 @@ async function finalizeExamOnExit(source) {
     ]);
   } catch (e) { console.warn('تعذر تسجيل تفاصيل المخالفة:', e); }
   // لا ننتظر تسجيل سجل المخالفة إلى ما لا نهاية؛ أولوية المغادرة هي إرسال التسليم فورًا.
-  await submitExam(true, true, true);
+  const startedAt = new Date(examCurrentAttempt.started_at).getTime();
+  const durationMs = Math.max(15000, Number(examCurrentExam?.duration_seconds) > 0 ? Number(examCurrentExam.duration_seconds) * 1000 : (Number(examCurrentExam?.duration_minutes) || 0) * 60 * 1000);
+  const timeExpired = Number.isFinite(startedAt) && Date.now() >= startedAt + durationMs;
+  // انتهاء الوقت ليس غشًا: سلّم آخر الإجابات المحفوظة واحتسب الدرجة الطبيعية.
+  await submitExam(true, !timeExpired, true);
 }
 function activateCheatingDetection(){
   if(examVisibilityHandler)document.removeEventListener('visibilitychange',examVisibilityHandler,true);
@@ -5138,11 +5141,13 @@ async function submitExam(autoSubmitted, cheatingDetected, exitTriggered) {
   if (window.__andalusExamPageHideHandler) window.removeEventListener('pagehide', window.__andalusExamPageHideHandler, true);
   if (window.__andalusExamBlurHandler) window.removeEventListener('blur', window.__andalusExamBlurHandler, true);
 
+  try {
+    if (window.__andalusExamAnswerSavePromise) await Promise.race([window.__andalusExamAnswerSavePromise, new Promise(resolve => setTimeout(resolve, 1200))]);
+  } catch (saveWaitError) { console.warn('تعذر انتظار حفظ آخر إجابة قبل التسليم:', saveWaitError); }
   const answers = examCurrentAttempt.answers || {};
   const startedAt = new Date(examCurrentAttempt.started_at).getTime();
   const durationEnd = startedAt + Math.max(15000, Number(examCurrentExam.duration_seconds) > 0 ? Number(examCurrentExam.duration_seconds) * 1000 : (Number(examCurrentExam.duration_minutes) || 0) * 60 * 1000);
-  const scheduledEnd = examCurrentExam.available_until ? new Date(examCurrentExam.available_until).getTime() : durationEnd;
-  const hardEnd = Math.min(durationEnd, Number.isFinite(scheduledEnd) ? scheduledEnd : durationEnd);
+  const hardEnd = durationEnd; // نافذة النشر لا تقطع محاولة بدأت بالفعل.
   const effectiveAutoSubmit = !!autoSubmitted || Date.now() >= hardEnd;
   const timeTakenSeconds = Math.max(0, Math.round((Math.min(Date.now(), hardEnd) - startedAt) / 1000));
 
@@ -5170,7 +5175,7 @@ async function submitExam(autoSubmitted, cheatingDetected, exitTriggered) {
         if (!examCurrentAttempt || examCurrentAttempt.status !== 'submission_pending') return;
         if (!navigator.onLine) { window.addEventListener('online', retryPendingSubmission, { once: true }); return; }
         examCurrentAttempt.status = 'in_progress';
-        void submitExam(true, true, true);
+        void submitExam(true, !!cheatingDetected, true);
       };
       window.addEventListener('online', retryPendingSubmission, { once: true });
       if ((window.__andalusExamExitRetryCount || 0) < 3) {
