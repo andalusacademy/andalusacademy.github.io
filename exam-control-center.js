@@ -62,7 +62,11 @@
         client.from('exams').select('id,title,is_published,total_score,is_test').order('created_at',{ascending:false}).limit(500),
         client.from('students').select('id,name').limit(3000),
         client.from('exam_question_generation_batches').select('id,title,subject_name,question_type,requested_count,saved_count,status,error_message,created_at').order('created_at',{ascending:false}).limit(300),
-        client.from('exam_question_bank').select('id',{count:'exact',head:true})
+        client.from('exam_question_bank').select('id',{count:'exact',head:true}),
+        client.from('exam_attempts').select('id',{count:'exact',head:true}),
+        client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','in_progress'),
+        client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','submitted'),
+        client.from('exam_attempts').select('id',{count:'exact',head:true}).or('flagged_cheating.eq.true,violation_count.gt.0')
       ]);
       for (const r of [attemptRes,examRes,studentRes,batchRes,bankCountRes,allCountRes,activeCountRes,submittedCountRes,reviewCountRes]) if (r.error) throw r.error;
       cache.attempts = attemptRes.data || [];
@@ -70,6 +74,7 @@
       cache.students = Object.fromEntries((studentRes.data || []).map(s=>[String(s.id),s.name]));
       cache.batches = batchRes.data || [];
       cache.bankTotal = bankCountRes.count || 0;
+      cache.totals = {attempts:allCountRes.count||0,active:activeCountRes.count||0,submitted:submittedCountRes.count||0,review:reviewCountRes.count||0};
       cache.updatedAt = new Date();
       render();
       if (live) { live.textContent = '● متصل'; live.style.background = '#166534'; }
