@@ -107,7 +107,7 @@
   try{
    const [sr,subr,gr,pr]=await Promise.all([d.from('students').select('id,name,branch,program,program_id,system_name,enrollment_number,student_status,total_due').is('deleted_at',null).order('name'),d.from('subjects').select('id,name,max_grade_1,max_grade_2,order_num').order('order_num'),d.from('exam_grade_attempts').select('*').order('recorded_at',{ascending:true}),d.from('payments').select('student_id,amount,paid,applicable')]);
    for(const [n,r] of [['الطلاب',sr],['المواد',subr],['سجل الدرجات',gr],['المدفوعات',pr]])if(r.error)throw new Error(n+': '+r.error.message);
-   students=sr.data||[];subjects=subr.data||[];records=gr.data||[];payments=pr.data||[];fillFilters();render();
+   students=(sr.data||[]).filter(s=>!['0','1','2'].includes(String(s.id)));subjects=subr.data||[];records=gr.data||[];payments=pr.data||[];fillFilters();render();
   }catch(e){console.error('[Unified exam grades load]',e);$('#ug-body').innerHTML='<tr><td colspan="8" style="text-align:center;color:#b42318;padding:18px">تعذر تحميل السجل: '+esc(e.message||e)+'</td></tr>';}
  }
  function fillFilters(){
