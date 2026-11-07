@@ -5120,10 +5120,9 @@ function activateCheatingDetection(){
   document.addEventListener('visibilitychange',examVisibilityHandler,true);
   window.__andalusExamPageHideHandler=function(){ void finalizeExamOnExit('pagehide'); };
   window.addEventListener('pagehide',window.__andalusExamPageHideHandler,true);
-  window.__andalusExamBlurHandler=function(){
-    if(document.visibilityState !== 'hidden') void finalizeExamOnExit('window_blur_or_new_window');
-  };
-  window.addEventListener('blur',window.__andalusExamBlurHandler,true);
+  // لا نستخدم window.blur كدليل غش؛ فقد يحدث فقدان التركيز دون مغادرة الصفحة.
+  // نعتمد على visibilitychange عندما تصبح الصفحة hidden، وpagehide عند مغادرة المستند فعليًا.
+  window.__andalusExamBlurHandler=null;
 }
 
 function confirmSubmitExam() {
