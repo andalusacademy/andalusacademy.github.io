@@ -186,9 +186,32 @@
      '<div class="exam-question-progress"><span>السؤال '+(index+1)+' من '+qs.length+'</span><span>تمت الإجابة: '+answered+' · متبقي: '+(qs.length-answered)+'</span></div>'+
      '<div class="q-title">'+esc(q.question_text??q.question??'')+'</div>'+optionsHtml+
      '<div class="exam-question-actions">'+
-     '<button type="button" class="btn btn-outline" onclick="goToExamQuestion(examCurrentQuestionIndex-1)" '+(index===0?'disabled':'')+'>السابق</button>'+
-     '<button type="button" class="btn btn-gold" onclick="goToExamQuestion(examCurrentQuestionIndex+1)" '+(index===qs.length-1?'disabled':'')+'>التالي</button>'+
+     '<button type="button" class="btn btn-outline" data-exam-nav="-1" '+(index===0?'disabled':'')+'>السابق</button>'+
+     '<button type="button" class="btn btn-gold" data-exam-nav="1" '+(index===qs.length-1?'disabled':'')+'>التالي</button>'+
      '<button type="button" class="exam-submit-inline" onclick="confirmSubmitExam()">📤 تسليم الامتحان</button>'+
      '</div></div>';
  };
+ // Reliable delegated navigation: avoids inline-handler scope issues on student devices.
+ window.andalusExamNavigate=function(delta){
+   const bridge=window.__andalusExamBridge;
+   const questions=bridge&&Array.isArray(bridge.questions)?bridge.questions:[];
+   if(!questions.length)return;
+   const current=Math.max(0,Math.min(Number(bridge.questionIndex)||0,questions.length-1));
+   const next=current+Number(delta||0);
+   if(!Number.isInteger(next)||next<0||next>=questions.length)return;
+   bridge.questionIndex=next;
+   if(typeof window.renderExamQuestionsForStudent==='function')
+     window.renderExamQuestionsForStudent(bridge.answers||{});
+ };
+ if(!window.__andalusExamNavDelegation){
+   window.__andalusExamNavDelegation=true;
+   document.addEventListener('click',function(event){
+     const button=event.target&&event.target.closest?event.target.closest('[data-exam-nav]'):null;
+     if(!button)return;
+     event.preventDefault();
+     event.stopPropagation();
+     window.andalusExamNavigate(Number(button.getAttribute('data-exam-nav')));
+   },true);
+ }
+
 })();
