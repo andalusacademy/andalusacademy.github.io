@@ -18,20 +18,29 @@ function checkSource(name, source, extension = '.js') {
   if (result.status !== 0) failures.push({ name, output: (result.stderr || result.stdout || 'Syntax check failed').trim() });
 }
 
-const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+const scriptPattern = /<script\\b([^>]*)>([\\s\\S]*?)<\\/script\\s*>/gi;
 let match;
 let inlineIndex = 0;
 while ((match = scriptPattern.exec(html)) !== null) {
   const attrs = match[1] || '';
   const source = match[2] || '';
-  if (/\bsrc\s*=/i.test(attrs) || !source.trim()) continue;
-  const typeMatch = attrs.match(/\btype\s*=\s*["']([^"']+)["']/i);
+  if (/\\bsrc\\s*=/i.test(attrs) || !source.trim()) continue;
+  const typeMatch = attrs.match(/\\btype\\s*=\\s*["']([^"']+)["']/i);
   const type = typeMatch ? typeMatch[1].toLowerCase() : '';
   if (type && !['text/javascript', 'application/javascript', 'module'].includes(type)) continue;
   checkSource('index-inline-' + (++inlineIndex), source, type === 'module' ? '.mjs' : '.js');
 }
 
-for (const fileName of ['student-achievements.js', 'student-requests.js', 'competition-security-admin.js']) {
+const externalFiles = [
+  'student-achievements.js',
+  'student-requests.js',
+  'competition-security-admin.js',
+  'exam-generation-stages.js',
+  'exam-drafts-manager.js',
+  'exam-essay-support.js',
+  'study-summary-ai.js'
+];
+for (const fileName of externalFiles) {
   const file = path.join(root, fileName);
   if (fs.existsSync(file)) checkSource(fileName, fs.readFileSync(file, 'utf8'));
 }
