@@ -29,7 +29,7 @@
   const map=new Map(accounts.map(s=>[String(s.id),s]));
   $('#aetp-accounts').innerHTML=['0','1','2'].map(id=>{
    const s=map.get(id);
-   return '<label style="display:flex;gap:10px;align-items:center;padding:11px;border:1px solid var(--border);border-radius:10px;'+(!s?'opacity:.45':'')+'"><input type="checkbox" class="aetp-check" value="'+id+'" '+(s?'checked disabled':'disabled')+'><span style="flex:1"><b>رقم الخدمة '+id+'</b><small style="display:block;color:var(--muted)">'+(s?esc(s.name)+' · '+esc(s.branch||''):'الحساب غير موجود أو غير نشط')+'</small></span></label>';
+   return '<label style="display:flex;gap:10px;align-items:center;padding:11px;border:1px solid var(--border);border-radius:10px;'+(!s?'opacity:.45':'')+'"><input type="checkbox" class="aetp-check" value="'+id+'" '+(s?'checked':'disabled')+'><span style="flex:1"><b>رقم الخدمة '+id+'</b><small style="display:block;color:var(--muted)">'+(s?esc(s.name)+' · '+esc(s.branch||''):'الحساب غير موجود أو غير نشط')+'</small></span></label>';
   }).join('');
   // Existing service accounts are all selected by default; the administrator can uncheck any of them.
   $('#aetp-accounts').querySelectorAll('input.aetp-check').forEach(cb=>{if(cb.closest('label')&&!cb.disabled)cb.checked=true;});
