@@ -31,11 +31,11 @@ function inject(){
   '<div class="form-group"><label><input id="ss-ai-essay-enabled" type="checkbox"> مقالي</label><input id="ss-ai-essay-count" class="search-input" type="number" min="1" max="100" placeholder="عدد الأسئلة المقالية" style="width:100%" disabled></div>'+
   '<div class="form-group" style="grid-column:1/-1"><label>ملف المادة PDF (ارفعه في الجزء الأول فقط)</label><input id="ss-ai-pdf" class="search-input" type="file" accept="application/pdf,.pdf" style="width:100%"><div id="ss-ai-file-info" style="margin-top:6px;color:var(--muted);font-size:12px"></div></div>'+
   '<div class="form-group" style="grid-column:1/-1"><label>وصف الملخص (اختياري)</label><textarea id="ss-ai-description" class="search-input" maxlength="3000" placeholder="وصف مختصر للمادة" style="width:100%;min-height:65px"></textarea></div></div>'+
-  '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" id="ss-ai-generate-btn" type="button">⬆️ حفظ المادة وتوليد الأسئلة</button><button class="btn btn-outline" id="ss-ai-new-btn" type="button">＋ ملخص جديد</button></div>'+
+  '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold" id="ss-ai-generate-btn" type="button">⬆️ حفظ المادة وتوليد الأسئلة</button><button class="btn btn-primary" id="ss-ai-from-bank-btn" type="button">🧩 إنشاء ملخص من بنك الأسئلة</button><button class="btn btn-outline" id="ss-ai-new-btn" type="button">＋ ملخص جديد</button></div>'+
   '<div id="ss-ai-status" style="margin-top:12px"></div><div style="margin-top:8px;font-size:12px;color:var(--muted)">كل ضغطة تولّد جزءًا جديدًا مستقلًا وتحفظه فورًا. اختر نوعًا واحدًا أو أكثر وحدد عدد أسئلة كل نوع. يمكنك رفع المادة مرة واحدة ثم توليد أجزاء أخرى منها.</div></div>';
   const anchor=page.querySelector('.card');if(anchor)anchor.insertAdjacentElement('beforebegin',card);else page.prepend(card);
   document.getElementById('ss-ai-pdf').addEventListener('change',e=>{const f=e.target.files?.[0];document.getElementById('ss-ai-file-info').textContent=f?'📄 '+f.name+' — '+(f.size/1024/1024).toFixed(2)+' MB':'';});
-  document.getElementById('ss-ai-generate-btn').addEventListener('click',generate);
+  document.getElementById('ss-ai-generate-btn').addEventListener('click',generate);\n  document.getElementById('ss-ai-from-bank-btn').addEventListener('click',createSummaryFromQuestionBank);
   document.getElementById('ss-ai-new-btn').addEventListener('click',startNewSummary);
   [['ss-ai-mc-enabled','ss-ai-mc-count'],['ss-ai-tf-enabled','ss-ai-tf-count'],['ss-ai-essay-enabled','ss-ai-essay-count']].forEach(([check,count])=>{const box=document.getElementById(check),input=document.getElementById(count);box.addEventListener('change',()=>{input.disabled=!box.checked;if(!box.checked)input.value='';else input.focus();});});
  }
@@ -79,6 +79,75 @@ function inject(){
   document.getElementById('ss-manage-target-all').addEventListener('change',()=>{const all=document.getElementById('ss-manage-target-all').checked;['branch','system','batch'].forEach(kind=>document.querySelectorAll('#ss-manage-target-'+kind+' input[type=checkbox]').forEach(box=>box.disabled=all));});
  }
  hideLegacy();
+}
+async function createSummaryFromQuestionBank(){
+ const sbc=client();
+ if(!sbc)return status('اتصال قاعدة البيانات غير جاهز.');
+ const title=document.getElementById('ss-ai-title').value.trim();
+ const subject=document.getElementById('ss-ai-subject').value.trim();
+ const description=document.getElementById('ss-ai-description').value.trim();
+ const mc=document.getElementById('ss-ai-mc-enabled').checked?Number(document.getElementById('ss-ai-mc-count').value||0):0;
+ const tf=document.getElementById('ss-ai-tf-enabled').checked?Number(document.getElementById('ss-ai-tf-count').value||0):0;
+ const essay=document.getElementById('ss-ai-essay-enabled').checked?Number(document.getElementById('ss-ai-essay-count').value||0):0;
+ const requested={mcq:mc,true_false:tf,essay};
+ const total=mc+tf+essay;
+ if(title.length<2||!subject)return status('اكتب اسم الملخص واسم المادة أولًا.');
+ if(!Number.isInteger(total)||total<1||total>100)return status('حدد عددًا صحيحًا من سؤال واحد إلى 100 سؤال.');
+ if([mc,tf,essay].some(n=>!Number.isInteger(n)||n<0||n>100))return status('راجع أعداد الأسئلة لكل نوع.');
+ const norm=v=>String(v||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[\\sـ]+/g,' ').trim().toLowerCase();
+ const subjects=typeof allSubjects!=='undefined'?allSubjects:[];
+ const subjectRow=subjects.find(x=>norm(x.name)===norm(subject))||subjects.find(x=>norm(x.name).includes(norm(subject))||norm(subject).includes(norm(x.name)));
+ if(!subjectRow?.id)return status('اسم المادة غير مرتبط بمادة مسجلة. اختر اسم المادة الصحيح.');
+ const btn=document.getElementById('ss-ai-from-bank-btn');if(btn){btn.disabled=true;btn.textContent='⏳ جاري فحص البنك...';}
+ let newSummaryId=null;
+ try{
+  const auth=await sbc.auth.getSession();if(!auth.data?.session)throw new Error('جلسة المدير غير صالحة. سجّل الدخول مرة أخرى.');
+  const {data:bank,error:bankError}=await sbc.from('exam_question_bank')
+   .select('id,question_text,question_type,options,correct_answer,explanation,generation_batch_id')
+   .eq('subject_id',subjectRow.id).eq('is_active',true);
+  if(bankError)throw bankError;
+  const pool=bank||[],picked=[];
+  const batchIds=[...new Set(pool.map(q=>q.generation_batch_id).filter(Boolean))];
+  let batchNames={};
+  if(batchIds.length){const batches=await sbc.from('exam_question_generation_batches').select('id,title').in('id',batchIds);if(batches.error)throw batches.error;batchNames=Object.fromEntries((batches.data||[]).map(x=>[x.id,x.title]));}
+  for(const [type,count] of Object.entries(requested)){
+   if(!count)continue;
+   const candidates=pool.filter(q=>q.question_type===type);
+   if(candidates.length<count)throw new Error('العدد غير كافٍ في البنك لنوع '+typeLabel(type)+': المطلوب '+count+' والمتاح '+candidates.length+'. لم يتم إنشاء الملخص.');
+   for(let i=candidates.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[candidates[i],candidates[j]]=[candidates[j],candidates[i]];}
+   picked.push(...candidates.slice(0,count));
+  }
+  for(let i=picked.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[picked[i],picked[j]]=[picked[j],picked[i]];}
+  const made=await sbc.from('study_summaries').insert({
+   title,subject_name:subject,description,price:0,validity_days:30,is_published:false,is_approved:false,
+   created_by:auth.data.session.user.id,ai_generation_status:'ready',generated_question_count:picked.length
+  }).select('id').single();
+  if(made.error)throw made.error;
+  newSummaryId=made.data.id;
+  const rows=picked.map((q,i)=>({
+   summary_id:newSummaryId,question_text:q.question_text,answer_text:q.correct_answer,
+   explanation:q.explanation||'',order_num:i+1,question_type:q.question_type,
+   options:Array.isArray(q.options)?q.options:[],ai_generated:false,is_approved:false,
+   is_selected:true,batch_no:1,source_reference:batchNames[q.generation_batch_id]||'بنك أسئلة الأندلس'
+  }));
+  const inserted=await sbc.from('study_summary_questions').insert(rows).select('id');
+  if(inserted.error){await sbc.from('study_summaries').delete().eq('id',newSummaryId);newSummaryId=null;throw inserted.error;}
+  const verify=await sbc.from('study_summary_questions').select('id,question_type',{count:'exact'}).eq('summary_id',newSummaryId);
+  if(verify.error||verify.count!==total){await sbc.from('study_summaries').delete().eq('id',newSummaryId);newSummaryId=null;throw new Error('تعذر تأكيد اكتمال عدد أسئلة الملخص من البنك.');}
+  draftId=newSummaryId;startFresh=false;reviewSummaryId=newSummaryId;selectedSummaryId=newSummaryId;
+  allQuestions=await sbc.from('study_summary_questions').select('*').eq('summary_id',newSummaryId).order('order_num');
+  if(allQuestions.error)throw allQuestions.error;
+  allQuestions=allQuestions.data||[];selectedIds=new Set();reviewReadOnly=false;activeBatch='all';
+  const reviewSel=document.getElementById('ss-review-summary');if(reviewSel)reviewSel.value=newSummaryId;
+  document.getElementById('ss-question-counts').textContent='ملخص من بنك الأسئلة: '+allQuestions.length+' سؤالًا محفوظًا في جزء مستقل.';
+  renderQuestionLists();
+  document.getElementById('ss-approve-summary-btn').disabled=false;
+  document.getElementById('ss-export-questions-pdf-btn').disabled=false;
+  document.getElementById('ss-export-questions-word-btn').disabled=false;
+  status('تم إنشاء مسودة الملخص من بنك الأسئلة وحفظ '+allQuestions.length+' سؤالًا. لم يتم نشرها للطلاب.',true);
+  await refreshSummaries();
+ }catch(e){status(e?.message||String(e));}
+ finally{if(btn){btn.disabled=false;btn.textContent='🧩 إنشاء ملخص من بنك الأسئلة';}}
 }
 async function generate(){
  const sbc=client(),file=document.getElementById('ss-ai-pdf').files?.[0],description=document.getElementById('ss-ai-description').value.trim();
