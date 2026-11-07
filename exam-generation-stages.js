@@ -19,12 +19,12 @@
     if (modal) return modal;
     modal = document.createElement('div');
     modal.id = 'modal-staged-exam-generation'; modal.className = 'modal-overlay'; modal.style.zIndex = '1200';
-    modal.innerHTML = `<div class="modal" style="max-width:720px;width:94vw;max-height:90vh;overflow:auto"><div class="modal-header"><div><h3 style="margin:0">🧩 توليد الامتحان على مراحل</h3><p style="margin:5px 0 0;color:var(--muted);font-size:12px">كل عملية توليد تُحفظ كمجموعة مستقلة في بنك الأسئلة.</p></div><button class="btn btn-outline" type="button" data-staged-close>إغلاق</button></div><div class="modal-body" style="padding:20px"><div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:12px;line-height:1.8"><strong>ميزة مهمة:</strong> كل مجموعة تُحفظ في قاعدة البيانات مستقلة، ولا تختلط بالمجموعات السابقة.</div><div id="staged-exam-counts" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px"></div><div id="staged-exam-status" style="margin-top:16px"></div><div style="display:flex;gap:8px;justify-content:flex-start;margin-top:18px;flex-wrap:wrap"><button class="btn btn-gold" id="staged-exam-start" type="button">🚀 بدء التوليد على مراحل</button><button class="btn btn-outline" id="staged-exam-clear" type="button">مسح المسودة</button></div></div></div>`;
+    modal.innerHTML = `<div class="modal" style="max-width:720px;width:94vw;max-height:90vh;overflow:auto"><div class="modal-header"><div><h3 style="margin:0">🧩 توليد الامتحان على مراحل</h3><p style="margin:5px 0 0;color:var(--muted);font-size:12px">كل عملية توليد تُحفظ كمجموعة مستقلة في بنك الأسئلة.</p></div><button class="btn btn-outline" type="button" data-staged-close>إغلاق</button></div><div class="modal-body" style="padding:20px"><div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:12px;line-height:1.8"><strong>ميزة مهمة:</strong> كل مجموعة تُحفظ في قاعدة البيانات مستقلة، ولا تختلط بالمجموعات السابقة.</div><div id="staged-exam-counts" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px"></div><div id="staged-exam-status" style="margin-top:16px"></div><div style="display:flex;gap:8px;justify-content:flex-start;margin-top:18px;flex-wrap:wrap"><button class="btn btn-gold" id="staged-exam-start" type="button">🚀 توليد مجموعات جديدة للبنك</button><button class="btn btn-primary" id="staged-exam-from-bank" type="button">🧩 إنشاء امتحان من بنك الأسئلة</button></div></div></div>`;
     document.body.appendChild(modal);
     modal.querySelector('#staged-exam-counts').innerHTML = TYPES.map((t, i) => `<label style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff;display:block"><span style="display:block;font-weight:900;color:var(--navy);font-size:13px">${t.icon} ${t.label}</span><span style="display:block;color:var(--muted);font-size:11px;margin:5px 0 9px">عدد الأسئلة المطلوبة</span><input id="staged-count-${t.key}" type="number" min="0" max="50" value="${i === 0 ? 20 : i === 1 ? 10 : 0}" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:15px;font-weight:900"></label>`).join('');
     modal.querySelector('[data-staged-close]').onclick = () => { modal.style.display = 'none'; };
     modal.querySelector('#staged-exam-clear').onclick = () => { if (typeof showToast === 'function') showToast('المجموعات المحفوظة في بنك الأسئلة لا تُحذف من هذه الشاشة.'); };
-    modal.querySelector('#staged-exam-start').onclick = () => runStagedGeneration(modal);
+    modal.querySelector('#staged-exam-start').onclick = () => runStagedGeneration(modal);\n    modal.querySelector('#staged-exam-from-bank').onclick = () => createExamFromBank(modal);
     return modal;
   }
   function openStageModal() { const modal = getStageModal(); renderDraftStatus(modal); modal.style.display = 'flex'; }
@@ -150,6 +150,56 @@
       setStatus(modal, `<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;line-height:1.8"><strong>انتهت عملية التوليد.</strong><br>${summary}${errors ? '<br>' + errors : ''}<br><strong>تم حفظ ${successful.reduce((n,x)=>n+x.saved,0)} سؤال في مجموعات مستقلة داخل بنك الأسئلة.</strong></div>`);
       if (typeof showToast === 'function') showToast('تم حفظ كل مجموعة توليد بصورة مستقلة في بنك الأسئلة.');
     } finally { if (startButton) { startButton.disabled = false; startButton.textContent = '🚀 بدء التوليد على مراحل'; } renderDraftStatus(modal); }
+  }
+  async function createExamFromBank(modal) {
+    const db = window.sb;
+    if (!db) return showToast?.('اتصال قاعدة البيانات غير جاهز.', 'error');
+    const subject = getSubject(), subjectId = findSubjectId(subject);
+    if (!subjectId) return showToast?.('تعذر تحديد المادة الحالية. افتح مكتبة المادة الصحيحة أولًا.', 'error');
+    const requested = {};
+    let total = 0;
+    for (const t of TYPES) {
+      const n = Number.parseInt(modal.querySelector('#staged-count-' + t.key)?.value || '0', 10);
+      if (!Number.isInteger(n) || n < 0) return showToast?.('راجع أعداد الأسئلة المطلوبة.', 'error');
+      requested[t.key] = n; total += n;
+    }
+    if (!total) return showToast?.('حدد عدد الأسئلة المطلوب من كل نوع.', 'error');
+    if (total > 100) return showToast?.('الحد الأقصى للنموذج الواحد 100 سؤال.', 'error');
+    const button = modal.querySelector('#staged-exam-from-bank');
+    if (button) { button.disabled = true; button.textContent = '⏳ جاري فحص البنك والسحب العشوائي...'; }
+    try {
+      const { data, error } = await db.from('exam_question_bank')
+        .select('id,question_text,question_type,options,correct_answer,explanation,difficulty')
+        .eq('subject_id', subjectId).eq('is_active', true);
+      if (error) throw error;
+      const available = data || [];
+      const typeMap = { mcq: 'mcq', true_false: 'true_false', essay: 'essay' };
+      const shortages = [];
+      const picked = [];
+      for (const t of TYPES) {
+        const pool = available.filter(q => q.question_type === typeMap[t.key]);
+        const wanted = requested[t.key];
+        if (pool.length < wanted) shortages.push(t.label + ': المطلوب ' + wanted + ' والمتاح ' + pool.length);
+        else {
+          for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+          picked.push(...pool.slice(0, wanted).map(q => ({
+            bankQuestionId: q.id, type: q.question_type, question: q.question_text,
+            options: Array.isArray(q.options) ? q.options : [],
+            answer: q.correct_answer, explanation: q.explanation || '', points: 1
+          })));
+        }
+      }
+      if (shortages.length) throw new Error('عدد الأسئلة في البنك غير كافٍ:\n' + shortages.join('\n') + '\nلم يتم إنشاء الامتحان.');
+      for (let i = picked.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [picked[i], picked[j]] = [picked[j], picked[i]]; }
+      if (typeof window.showGeneratedExamReview !== 'function') throw new Error('واجهة مراجعة الامتحان غير جاهزة. حدّث الصفحة ثم حاول مرة أخرى.');
+      window.showGeneratedExamReview({ title: 'امتحان ' + subject, subject, questions: picked, source: 'question_bank' });
+      modal.style.display = 'none';
+      if (typeof showToast === 'function') showToast('تم سحب ' + picked.length + ' سؤالًا عشوائيًا من البنك دون تكرار.');
+    } catch (error) {
+      if (typeof showToast === 'function') showToast(error?.message || String(error), 'error');
+    } finally {
+      if (button) { button.disabled = false; button.textContent = '🧩 إنشاء امتحان من بنك الأسئلة'; }
+    }
   }
   function install() { window.startAiExamGeneration = openStageModal; window.__andalusStagedExamGeneration = { open: openStageModal, readDraft, persistGenerationBatch }; console.info('Andalus staged exam generation loaded.'); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
