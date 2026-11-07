@@ -18,14 +18,14 @@ function checkSource(name, source, extension = '.js') {
   if (result.status !== 0) failures.push({ name, output: (result.stderr || result.stdout || 'Syntax check failed').trim() });
 }
 
-const scriptPattern = /<script\\b([^>]*)>([\\s\\S]*?)<\\/script\\s*>/gi;
+const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
 let match;
 let inlineIndex = 0;
 while ((match = scriptPattern.exec(html)) !== null) {
   const attrs = match[1] || '';
   const source = match[2] || '';
-  if (/\\bsrc\\s*=/i.test(attrs) || !source.trim()) continue;
-  const typeMatch = attrs.match(/\\btype\\s*=\\s*["']([^"']+)["']/i);
+  if (/\bsrc\s*=/i.test(attrs) || !source.trim()) continue;
+  const typeMatch = attrs.match(/\btype\s*=\s*["']([^"']+)["']/i);
   const type = typeMatch ? typeMatch[1].toLowerCase() : '';
   if (type && !['text/javascript', 'application/javascript', 'module'].includes(type)) continue;
   checkSource('index-inline-' + (++inlineIndex), source, type === 'module' ? '.mjs' : '.js');
