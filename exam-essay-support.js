@@ -52,7 +52,7 @@ async function publish(){
  staged=false;localStorage.removeItem(KEY);window._andalusGeneratedExam=null;closeModal('modal-exam');
  if(typeof loadExams==='function')await loadExams();
  if(typeof logActivity==='function')await logActivity('add','أنشأ ونشر امتحانًا مولدًا بالذكاء الاصطناعي: '+title);
- toast('✅ تم نشر الامتحان وحفظ '+rows.length+' سؤالًا'+(individual+' لـ '+studentIds.length+' طالبًا':''));
+ toast('✅ تم نشر الامتحان وحفظ '+rows.length+' سؤالًا'+(individual ? ' لـ '+studentIds.length+' طالبًا' : ''));
 }
 document.addEventListener('click',e=>{const b=e.target?.closest?.('#modal-exam button[onclick="saveExam()"]');if(b&&staged){e.preventDefault();e.stopImmediatePropagation();publish();}},true);
 window.showGeneratedExamReview=review;
