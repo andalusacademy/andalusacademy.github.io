@@ -66,13 +66,15 @@
         client.from('exam_attempts').select('id',{count:'exact',head:true}),
         client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','in_progress'),
         client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','submitted'),
-        client.from('exam_attempts').select('id',{count:'exact',head:true}).or('flagged_cheating.eq.true,violation_count.gt.0')
+        client.from('exam_attempts').select('id',{count:'exact',head:true}).or('flagged_cheating.eq.true,violation_count.gt.0'),
+        client.from('employee_activity_log').select('id,actor_user_id,action_type,module,entity_table,entity_id,title,details,created_at').order('created_at',{ascending:false}).limit(150)
       ]);
       for (const r of [attemptRes,examRes,studentRes,batchRes,bankCountRes,allCountRes,activeCountRes,submittedCountRes,reviewCountRes,auditRes]) if (r.error) throw r.error;
       cache.attempts = attemptRes.data || [];
       cache.exams = examRes.data || [];
       cache.students = Object.fromEntries((studentRes.data || []).map(s=>[String(s.id),s.name]));
       cache.batches = batchRes.data || [];
+      cache.auditRows = auditRes.data || [];
       cache.bankTotal = bankCountRes.count || 0;
       cache.totals = {attempts:allCountRes.count||0,active:activeCountRes.count||0,submitted:submittedCountRes.count||0,review:reviewCountRes.count||0};
       cache.updatedAt = new Date();
@@ -146,6 +148,8 @@
       const total=cache.batches.length;
       const sum=cache.batches.reduce((n,b)=>n+Number(b.saved_count||0),0);
       panel.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+cache.bankTotal+'</b><div>إجمالي أسئلة البنك</div></div><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+total+'</b><div>مجموعات التوليد</div></div><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+sum+'</b><div>مجموع المحفوظ بالمجموعات</div></div></div><div style="overflow:auto"><table style="width:100%;min-width:700px"><thead><tr><th>المجموعة</th><th>المادة</th><th>النوع</th><th>المطلوب</th><th>المحفوظ</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>'+(cache.batches.length?cache.batches.map(b=>'<tr><td>'+esc(b.title||b.id)+'</td><td>'+esc(b.subject_name)+'</td><td>'+esc(b.question_type)+'</td><td>'+b.requested_count+'</td><td>'+b.saved_count+'</td><td>'+esc(b.status)+(b.error_message?' — '+esc(b.error_message):'')+'</td><td>'+fmt(b.created_at)+'</td></tr>').join(''):'<tr><td colspan="7" style="padding:18px;text-align:center">لا توجد مجموعات توليد بعد.</td></tr>')+'</tbody></table></div><p style="margin-top:10px;font-size:12px;color:#64748b">إدارة الأسئلة والتوليد التفصيلية من استوديو إنشاء الامتحان داخل مكتبة المادة.</p>';
+    } else if(activeTab==='audit'){
+      panel.innerHTML='<div style="margin-bottom:10px;color:#64748b;font-size:12px">آخر 150 عملية مسجلة في سجل نشاط الإدارة والموظفين — عرض فقط دون تعديل السجلات.</div><div style="overflow:auto"><table style="width:100%;min-width:760px"><thead><tr><th>الوقت</th><th>القسم</th><th>نوع العملية</th><th>الوصف</th><th>الكيان</th><th>تفاصيل إضافية</th></tr></thead><tbody>'+(cache.auditRows.length?cache.auditRows.map(x=>'<tr><td>'+fmt(x.created_at)+'</td><td>'+esc(x.module||'—')+'</td><td>'+esc(x.action_type||'—')+'</td><td>'+esc(x.title||'—')+'</td><td>'+esc([x.entity_table,x.entity_id].filter(Boolean).join(' · ')||'—')+'</td><td><details><summary>عرض</summary><pre style="white-space:pre-wrap;max-width:360px">'+esc(JSON.stringify(x.details||{},null,2))+'</pre></details></td></tr>').join(''):'<tr><td colspan="6" style="padding:18px;text-align:center">لا توجد عمليات مسجلة.</td></tr>')+'</tbody></table></div>';
     } else {
       const statuses={};cache.attempts.forEach(a=>statuses[a.status||'unknown']=(statuses[a.status||'unknown']||0)+1);
       const recent=cache.attempts.slice(0,8);
