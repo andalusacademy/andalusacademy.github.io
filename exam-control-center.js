@@ -5,7 +5,7 @@
   const $ = (s, root=document) => root.querySelector(s);
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const db = () => window.sb || null;
-  let cache = { attempts: [], exams: [], students: {}, batches: [], bankTotal: 0, totals: {attempts:0,active:0,submitted:0,review:0}, updatedAt: null };
+  let cache = { attempts: [], exams: [], students: {}, batches: [], auditRows: [], bankTotal: 0, totals: {attempts:0,active:0,submitted:0,review:0}, updatedAt: null };
   let timer = null, channel = null, busy = false, activeTab = 'overview', searchTerm = '';
   const fmt = v => v ? new Date(v).toLocaleString('ar-EG', { dateStyle:'short', timeStyle:'short' }) : '—';
   const statusLabel = s => ({in_progress:'جاري الآن',submitted:'تم التسليم',expired:'انتهى الوقت',abandoned:'منقطع',cancelled:'ملغي'})[s] || s || 'غير محدد';
@@ -33,7 +33,7 @@
           <button class="btn btn-sm btn-outline" data-tab="attempts">سجل المحاولات</button>
           <button class="btn btn-sm btn-outline" data-tab="alerts">الإنذارات للمراجعة</button>
           <button class="btn btn-sm btn-outline" data-tab="results">النتائج والتحليل</button>
-          <button class="btn btn-sm btn-outline" data-tab="bank">بنك الأسئلة</button>
+          <button class="btn btn-sm btn-outline" data-tab="bank">بنك الأسئلة</button>\n          <button class="btn btn-sm btn-outline" data-tab="audit">سجل العمليات</button>
         </div>
         <div id="ecc-panel"><div style="padding:24px;text-align:center;color:#64748b">جاري تحميل بيانات مركز القيادة...</div></div>
         <div style="border-top:1px solid #e2e8f0;margin-top:14px;padding-top:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:#64748b;font-size:11px"><span>المراقبة تعرض إشارات النظام ولا تصدر حكمًا آليًا بالغش.</span><span id="ecc-updated">لم يتم التحديث بعد</span></div>
@@ -57,7 +57,7 @@
     if (live) live.textContent = '● جاري التحديث';
     try {
       const client = db();
-      const [attemptRes, examRes, studentRes, batchRes, bankCountRes, allCountRes, activeCountRes, submittedCountRes, reviewCountRes] = await Promise.all([
+      const [attemptRes, examRes, studentRes, batchRes, bankCountRes, allCountRes, activeCountRes, submittedCountRes, reviewCountRes, auditRes] = await Promise.all([
         client.from('exam_attempts').select('id,exam_id,student_id,status,started_at,submitted_at,score,max_score,flagged_cheating,violation_count,violation_log,time_taken_seconds').order('started_at',{ascending:false}).limit(300),
         client.from('exams').select('id,title,is_published,total_score,is_test').order('created_at',{ascending:false}).limit(500),
         client.from('students').select('id,name').limit(3000),
@@ -68,7 +68,7 @@
         client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','submitted'),
         client.from('exam_attempts').select('id',{count:'exact',head:true}).or('flagged_cheating.eq.true,violation_count.gt.0')
       ]);
-      for (const r of [attemptRes,examRes,studentRes,batchRes,bankCountRes,allCountRes,activeCountRes,submittedCountRes,reviewCountRes]) if (r.error) throw r.error;
+      for (const r of [attemptRes,examRes,studentRes,batchRes,bankCountRes,allCountRes,activeCountRes,submittedCountRes,reviewCountRes,auditRes]) if (r.error) throw r.error;
       cache.attempts = attemptRes.data || [];
       cache.exams = examRes.data || [];
       cache.students = Object.fromEntries((studentRes.data || []).map(s=>[String(s.id),s.name]));
