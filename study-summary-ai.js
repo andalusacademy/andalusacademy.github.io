@@ -126,7 +126,7 @@ async function createSummaryFromQuestionBank(){
   if(made.error)throw made.error;
   newSummaryId=made.data.id;
   const rows=picked.map((q,i)=>({
-   summary_id:newSummaryId,question_text:q.question_text,answer_text:q.correct_answer,
+   summary_id:newSummaryId,source_question_bank_id:q.id,question_text:q.question_text,answer_text:q.correct_answer,
    explanation:q.explanation||'',order_num:i+1,question_type:q.question_type,
    options:Array.isArray(q.options)?q.options:[],ai_generated:false,is_approved:false,
    is_selected:true,batch_no:1,source_reference:batchNames[q.generation_batch_id]||'بنك أسئلة الأندلس'
