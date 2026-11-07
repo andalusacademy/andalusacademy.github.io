@@ -5180,7 +5180,7 @@ async function submitExam(autoSubmitted, cheatingDetected, exitTriggered) {
   if (submitError || !submitResult?.ok) {
     console.error('تعذر حفظ تسليم الامتحان:', submitError || submitResult?.reason);
     examSubmitLock = false;
-    if (!exitTriggered) {
+    if (!exitTriggered && !effectiveAutoSubmit) {
       showToast('تعذر حفظ تسليم الامتحان: تحقق من اتصال الإنترنت وصلاحية التحقق بالوجه.', 'error');
       startExamTimer();
     } else {
@@ -5189,7 +5189,7 @@ async function submitExam(autoSubmitted, cheatingDetected, exitTriggered) {
       document.getElementById('exam-result-emoji').textContent = '⚠️';
       document.getElementById('exam-result-title').textContent = 'تم إيقاف الامتحان — جارٍ تأكيد التسليم';
       document.getElementById('exam-result-score').textContent = '—';
-      document.getElementById('exam-result-note').textContent = 'تم قفل المحاولة بسبب مغادرة صفحة الامتحان، لكن الاتصال لم يسمح بتأكيد التسليم بعد. اترك الاتصال يعمل؛ سيُعاد إرسال التسليم تلقائيًا. لا يمكن استكمال هذه المحاولة.';
+      document.getElementById('exam-result-note').textContent = 'انتهى الامتحان لكن الاتصال لم يسمح بتأكيد التسليم بعد. اترك الاتصال يعمل؛ سيُعاد إرسال الإجابات المحفوظة تلقائيًا. لا يمكن استكمال هذه المحاولة.';
       showExamScreen('exam-result-screen');
       const retryPendingSubmission = () => {
         if (!examCurrentAttempt || examCurrentAttempt.status !== 'submission_pending') return;
