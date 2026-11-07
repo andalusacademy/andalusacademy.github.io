@@ -4765,25 +4765,8 @@ async function isStudentEligibleForExam(exam, student, options = {}) {
 }
 
 
-function ensureExamPolicyModal(){
- let modal=document.getElementById('modal-exam-policy-consent');if(modal)return modal;
- modal=document.createElement('div');modal.id='modal-exam-policy-consent';modal.className='modal-overlay';
- modal.innerHTML=`<div class="modal" style="max-width:680px"><div class="modal-header"><h3>📜 سياسة وضوابط الامتحان الإلكتروني</h3><button class="modal-close" onclick="closeModal('modal-exam-policy-consent')">×</button></div>
- <div class="modal-body" style="line-height:1.9;font-size:13px"><ol style="padding-right:22px">
- <li>يتم سحب أسئلة عشوائية مستقلة لكل طالب، وقد يختلف ترتيب الأسئلة والاختيارات بين الطلاب.</li><li>عدد الأسئلة حسب إعداد الامتحان وبحد أقصى 100 سؤال، والوقت 15 ثانية لكل سؤال.</li>
- <li>يجب البقاء داخل صفحة الامتحان وعدم الانتقال إلى تبويب أو تطبيق آخر أثناء الحل.</li><li>تُحفظ الإجابات تلقائيًا، ويمكن التنقل بين الأسئلة والعودة إلى الأسئلة المتروكة.</li>
- <li>انتهاء الوقت يؤدي إلى التسليم التلقائي بالإجابات المحفوظة.</li><li>تُسجل مغادرة الصفحة للمراجعة الإدارية، ولا تُلغى النتيجة تلقائيًا بسبب حدث واحد؛ وتُراجع الأعطال التقنية.</li>
- <li>بعد التسليم لا يمكن تعديل الإجابات، وتُطبق قاعدة المحاولة الواحدة.</li><li>يُمنع نسخ الأسئلة أو تصويرها أو مشاركة محتواها أثناء الامتحان.</li></ol>
- <label style="display:flex;gap:10px;align-items:flex-start;padding:12px;background:#eff6ff;border-radius:10px;margin-top:12px"><input id="exam-policy-accept-checkbox" type="checkbox" style="margin-top:5px;width:18px;height:18px"><span><strong>أقر بأنني قرأت سياسة الامتحان وأوافق على الالتزام بها.</strong></span></label></div>
- <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-exam-policy-consent')">رجوع</button><button class="btn btn-gold" onclick="acceptExamPolicyAndStart()">أوافق وابدأ الامتحان</button></div></div>`;
- document.body.appendChild(modal);return modal;
-}
-function requestExamStart(examId){examPendingStartId=examId;const modal=ensureExamPolicyModal();document.getElementById('exam-policy-accept-checkbox').checked=false;modal.classList.add('open');}
-async function acceptExamPolicyAndStart(){if(!document.getElementById('exam-policy-accept-checkbox')?.checked){showToast('يجب الموافقة على السياسة قبل بدء الامتحان.','error');return;}const id=examPendingStartId;examPendingStartId=null;closeModal('modal-exam-policy-consent');if(id)await startExam(id);}
-async function recordExamPolicyAcceptance(attemptId){
- const {data,error}=await sb.rpc('student_exam_accept_policy',{p_attempt_id:attemptId,p_student_id:examStudent?.id,p_phone:examStudentPhone,p_face_token:examFaceVerificationToken,p_policy_version:examPolicyVersion});
- if(error||!data?.ok){console.error('تعذر حفظ الموافقة:',error||data?.reason);return false;}return true;
-}
+/* بدء الامتحان مباشرة دون شاشة إقرار أو موافقة مسبقة. */
+function requestExamStart(examId){return startExam(examId);}
 function startExamTestMode(){
  const testStudentId='0';
  if(!examQuestionsDraft.length){showToast('أضف أسئلة أو استوردها أولًا ثم ابدأ التجربة.','error');return;}
@@ -4868,7 +4851,7 @@ async function startExam(examId) {
   }
   examCurrentExam = result.exam;
   examCurrentAttempt = result.attempt;
-  if (!await recordExamPolicyAcceptance(examCurrentAttempt.id)) { showToast('تعذر تسجيل موافقتك على سياسة الامتحان. أعد المحاولة.', 'error'); return; }
+  // تم إلغاء إقرار السياسة من مسار بدء الامتحان بناءً على طلب الإدارة.
   examQuestionsForStudent = result.questions || [];
   examCurrentQuestionIndex = 0;
   examSkippedQuestions = new Set();
