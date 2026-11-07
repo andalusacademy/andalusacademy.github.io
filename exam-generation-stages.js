@@ -7,7 +7,7 @@
     { key: 'true_false', label: 'صح / خطأ', icon: '🟢' },
     { key: 'essay', label: 'مقالي', icon: '🟣' }
   ];
-  function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+  function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }\n  function notify(message, type) { if (typeof window.showToast === 'function') window.showToast(message, type || 'success'); else alert(message); }
   function getSelectedFiles() { return [...document.querySelectorAll('#exam-material-files-list .exam-material-file-cb:checked')].map(el => el.value); }
   function getSubject() {
     const title = document.getElementById('exam-material-workspace-title')?.textContent || '';
@@ -153,18 +153,18 @@
   }
   async function createExamFromBank(modal) {
     const db = window.sb;
-    if (!db) return showToast?.('اتصال قاعدة البيانات غير جاهز.', 'error');
+    if (!db) return notify('اتصال قاعدة البيانات غير جاهز.', 'error');
     const subject = getSubject(), subjectId = findSubjectId(subject);
-    if (!subjectId) return showToast?.('تعذر تحديد المادة الحالية. افتح مكتبة المادة الصحيحة أولًا.', 'error');
+    if (!subjectId) return notify('تعذر تحديد المادة الحالية. افتح مكتبة المادة الصحيحة أولًا.', 'error');
     const requested = {};
     let total = 0;
     for (const t of TYPES) {
       const n = Number.parseInt(modal.querySelector('#staged-count-' + t.key)?.value || '0', 10);
-      if (!Number.isInteger(n) || n < 0) return showToast?.('راجع أعداد الأسئلة المطلوبة.', 'error');
+      if (!Number.isInteger(n) || n < 0) return notify('راجع أعداد الأسئلة المطلوبة.', 'error');
       requested[t.key] = n; total += n;
     }
-    if (!total) return showToast?.('حدد عدد الأسئلة المطلوب من كل نوع.', 'error');
-    if (total > 100) return showToast?.('الحد الأقصى للنموذج الواحد 100 سؤال.', 'error');
+    if (!total) return notify('حدد عدد الأسئلة المطلوب من كل نوع.', 'error');
+    if (total > 100) return notify('الحد الأقصى للنموذج الواحد 100 سؤال.', 'error');
     const button = modal.querySelector('#staged-exam-from-bank');
     if (button) { button.disabled = true; button.textContent = '⏳ جاري فحص البنك والسحب العشوائي...'; }
     try {
