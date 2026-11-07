@@ -4012,7 +4012,8 @@ window.__andalusExamBridge = {
   set questions(value){ examQuestionsForStudent = Array.isArray(value) ? value : []; },
   get questionIndex(){ return examCurrentQuestionIndex; },
   set questionIndex(value){ examCurrentQuestionIndex = Number(value) || 0; },
-  get currentExam(){ return examCurrentExam; }
+  get currentExam(){ return examCurrentExam; },
+  get answers(){ return examCurrentAttempt?.answers || {}; }
 };
 
 function showExamScreen(id) {
@@ -4904,7 +4905,7 @@ async function resumeExam(examId) {
   }
   examCurrentExam = exam;
   examCurrentAttempt = attempt;
-  if (!await recordExamPolicyAcceptance(attempt.id)) { showToast('تعذر تسجيل سياسة الامتحان لهذا الاختبار.', 'error'); return; }
+  // لا يتطلب استكمال المحاولة إقرارًا مسبقًا بعد إلغاء شاشة الإقرار.
   examQuestionsForStudent = result.questions || [];
   examCurrentQuestionIndex = 0;
   examSkippedQuestions = new Set();
