@@ -40,7 +40,7 @@ async function publish(){
  if(error)return toast('❌ '+error.message,'error');
  const rows=e.questions.map((q,i)=>{
   const type=q.type==='essay'?'essay':q.type==='true_false'?'truefalse':'mcq';
-  return{exam_id:x.id,question_text:q.question.trim(),question_type:type,option_a:q.options?.[0]||null,option_b:q.options?.[1]||null,option_c:q.options?.[2]||null,option_d:q.options?.[3]||null,correct_answer:type==='truefalse'?((q.answer==='صح'||q.answer==='true')?'true':'false'):q.answer,points:Number(q.points)||1,order_num:i};
+  return{exam_id:x.id,source_question_bank_id:q.bankQuestionId||null,question_text:q.question.trim(),question_type:type,option_a:q.options?.[0]||null,option_b:q.options?.[1]||null,option_c:q.options?.[2]||null,option_d:q.options?.[3]||null,correct_answer:type==='truefalse'?((q.answer==='صح'||q.answer==='true')?'true':'false'):q.answer,points:Number(q.points)||1,order_num:i};
  });
  const {error:qe}=await sb.from('exam_questions').insert(rows);
  if(qe){await sb.from('exams').delete().eq('id',x.id);return toast('❌ تعذر حفظ الأسئلة: '+qe.message,'error');}
