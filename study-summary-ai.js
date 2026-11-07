@@ -35,7 +35,8 @@ function inject(){
   '<div id="ss-ai-status" style="margin-top:12px"></div><div style="margin-top:8px;font-size:12px;color:var(--muted)">كل ضغطة تولّد جزءًا جديدًا مستقلًا وتحفظه فورًا. اختر نوعًا واحدًا أو أكثر وحدد عدد أسئلة كل نوع. يمكنك رفع المادة مرة واحدة ثم توليد أجزاء أخرى منها.</div></div>';
   const anchor=page.querySelector('.card');if(anchor)anchor.insertAdjacentElement('beforebegin',card);else page.prepend(card);
   document.getElementById('ss-ai-pdf').addEventListener('change',e=>{const f=e.target.files?.[0];document.getElementById('ss-ai-file-info').textContent=f?'📄 '+f.name+' — '+(f.size/1024/1024).toFixed(2)+' MB':'';});
-  document.getElementById('ss-ai-generate-btn').addEventListener('click',generate);\n  document.getElementById('ss-ai-from-bank-btn').addEventListener('click',createSummaryFromQuestionBank);
+  document.getElementById('ss-ai-generate-btn').addEventListener('click',generate);
+  document.getElementById('ss-ai-from-bank-btn').addEventListener('click',createSummaryFromQuestionBank);
   document.getElementById('ss-ai-new-btn').addEventListener('click',startNewSummary);
   [['ss-ai-mc-enabled','ss-ai-mc-count'],['ss-ai-tf-enabled','ss-ai-tf-count'],['ss-ai-essay-enabled','ss-ai-essay-count']].forEach(([check,count])=>{const box=document.getElementById(check),input=document.getElementById(count);box.addEventListener('change',()=>{input.disabled=!box.checked;if(!box.checked)input.value='';else input.focus();});});
  }
