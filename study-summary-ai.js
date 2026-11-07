@@ -94,7 +94,7 @@ async function createSummaryFromQuestionBank(){
  if(title.length<2||!subject)return status('اكتب اسم الملخص واسم المادة أولًا.');
  if(!Number.isInteger(total)||total<1||total>100)return status('حدد عددًا صحيحًا من سؤال واحد إلى 100 سؤال.');
  if([mc,tf,essay].some(n=>!Number.isInteger(n)||n<0||n>100))return status('راجع أعداد الأسئلة لكل نوع.');
- const norm=v=>String(v||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[\\sـ]+/g,' ').trim().toLowerCase();
+ const norm=v=>String(v||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[\sـ]+/g,' ').trim().toLowerCase();
  const subjects=typeof allSubjects!=='undefined'?allSubjects:[];
  const subjectRow=subjects.find(x=>norm(x.name)===norm(subject))||subjects.find(x=>norm(x.name).includes(norm(subject))||norm(subject).includes(norm(x.name)));
  if(!subjectRow?.id)return status('اسم المادة غير مرتبط بمادة مسجلة. اختر اسم المادة الصحيح.');
