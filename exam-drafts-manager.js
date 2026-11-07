@@ -32,7 +32,7 @@
     modal.id = 'andalus-exam-drafts-modal';
     modal.className = 'modal-overlay';
     modal.style.zIndex = '1300';
-    modal.innerHTML = '<div class="modal" style="max-width:980px;width:96vw;max-height:92vh;overflow:auto"><div class="modal-header"><div><h3 style="margin:0">📚 المسودات المحفوظة للامتحانات</h3><small style="color:var(--muted)">حفظ دائم في قاعدة البيانات — اختر مسودة أو أكثر لتجميعها</small></div><button class="btn btn-outline" type="button" id="aed-close">إغلاق</button></div><div class="modal-body"><div id="aed-status" style="margin-bottom:12px"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn btn-outline btn-sm" id="aed-refresh">↻ تحديث</button><button class="btn btn-warning btn-sm" id="aed-restore-local">📥 استعادة المسودة المحلية</button><button class="btn btn-success btn-sm" id="aed-approve">اعتماد المحدد</button><button class="btn btn-gold btn-sm" id="aed-create">🧩 إنشاء امتحان من المحدد</button><button class="btn btn-outline btn-sm" id="aed-clear">إلغاء التحديد</button></div><div id="aed-list"></div><div id="aed-preview" style="margin-top:14px"></div></div></div>';
+    modal.innerHTML = '<div class="modal" style="max-width:980px;width:96vw;max-height:92vh;overflow:auto"><div class="modal-header"><div><h3 style="margin:0">📚 المسودات المحفوظة للامتحانات</h3><small style="color:var(--muted)">كل مسودة مستقلة — اختر مسودة واحدة فقط</small></div><button class="btn btn-outline" type="button" id="aed-close">إغلاق</button></div><div class="modal-body"><div id="aed-status" style="margin-bottom:12px"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn btn-outline btn-sm" id="aed-refresh">↻ تحديث</button><button class="btn btn-warning btn-sm" id="aed-restore-local">📥 استعادة المسودة المحلية</button><button class="btn btn-success btn-sm" id="aed-approve">اعتماد المحدد</button><button class="btn btn-gold btn-sm" id="aed-create">🧩 إنشاء امتحان من المحدد</button><button class="btn btn-outline btn-sm" id="aed-clear">إلغاء التحديد</button></div><div id="aed-list"></div><div id="aed-preview" style="margin-top:14px"></div></div></div>';
     document.body.appendChild(modal);
     $('#aed-close',modal).onclick = () => modal.classList.remove('open');
     $('#aed-refresh',modal).onclick = load;
@@ -43,7 +43,7 @@
     $('#aed-list',modal).addEventListener('change', e => {
       const cb = e.target.closest('[data-draft-id]');
       if (!cb) return;
-      if (cb.checked) selected.add(cb.dataset.draftId); else selected.delete(cb.dataset.draftId);
+      if (cb.checked) { selected.clear(); selected.add(cb.dataset.draftId); } else selected.delete(cb.dataset.draftId);
       render();
     });
     $('#aed-list',modal).addEventListener('click', e => {
@@ -172,15 +172,12 @@
   }
   async function createFromSelected(){
     const chosen=drafts.filter(d=>selected.has(d.id));
-    if(!chosen.length) return toast('حدد مسودة واحدة على الأقل.', 'error');
-    const subjects=[...new Set(chosen.map(d=>d.subject_id))];
-    if(subjects.length!==1) return toast('لا يمكن دمج مسودات من مواد مختلفة في امتحان واحد.', 'error');
-    const questions=chosen.flatMap(d=>Array.isArray(d.questions)?d.questions:[]);
+    if(!chosen.length) return toast('حدد مسودة واحدة فقط.', 'error');
+    if(chosen.length!==1) return toast('لا يمكن تجميع مسودات متعددة. اختر مسودة واحدة فقط.', 'error');
+    const questions=Array.isArray(chosen[0].questions)?chosen[0].questions:[];
     if(!questions.length) return toast('المسودات المحددة لا تحتوي على أسئلة.', 'error');
-    const essay=questions.some(q=>String(q.type||q.question_type||'').toLowerCase().includes('essay')||String(q.type||'').includes('مقالي'));
-    if(essay) return toast('المسودات تحتوي أسئلة مقالية. لا يمكن تحويلها حاليًا إلى بنك الامتحان الموضوعي دون دعم المقالي في جدول الأسئلة.', 'error');
     const subjectName=chosen[0].subject_name || '';
-    const exam={title:'امتحان '+subjectName,subject:subjectName,questions};
+    const exam={title:chosen[0].title || 'امتحان '+subjectName,subject:subjectName,questions};
     if(typeof window.showGeneratedExamReview!=='function') return toast('واجهة مراجعة الأسئلة غير جاهزة. حدّث الصفحة ثم حاول مرة أخرى.', 'error');
     window.showGeneratedExamReview(exam);
     const modal=$('#andalus-exam-drafts-modal'); if(modal) modal.classList.remove('open');
