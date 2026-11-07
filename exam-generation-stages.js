@@ -7,7 +7,8 @@
     { key: 'true_false', label: 'صح / خطأ', icon: '🟢' },
     { key: 'essay', label: 'مقالي', icon: '🟣' }
   ];
-  function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }\n  function notify(message, type) { if (typeof window.showToast === 'function') window.showToast(message, type || 'success'); else alert(message); }
+  function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+  function notify(message, type) { if (typeof window.showToast === 'function') window.showToast(message, type || 'success'); else alert(message); }
   function getSelectedFiles() { return [...document.querySelectorAll('#exam-material-files-list .exam-material-file-cb:checked')].map(el => el.value); }
   function getSubject() {
     const title = document.getElementById('exam-material-workspace-title')?.textContent || '';
@@ -23,7 +24,8 @@
     document.body.appendChild(modal);
     modal.querySelector('#staged-exam-counts').innerHTML = TYPES.map((t, i) => `<label style="border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff;display:block"><span style="display:block;font-weight:900;color:var(--navy);font-size:13px">${t.icon} ${t.label}</span><span style="display:block;color:var(--muted);font-size:11px;margin:5px 0 9px">عدد الأسئلة المطلوبة</span><input id="staged-count-${t.key}" type="number" min="0" max="50" value="${i === 0 ? 20 : i === 1 ? 10 : 0}" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:15px;font-weight:900"></label>`).join('');
     modal.querySelector('[data-staged-close]').onclick = () => { modal.style.display = 'none'; };
-    modal.querySelector('#staged-exam-start').onclick = () => runStagedGeneration(modal);\n    modal.querySelector('#staged-exam-from-bank').onclick = () => createExamFromBank(modal);
+    modal.querySelector('#staged-exam-start').onclick = () => runStagedGeneration(modal);
+    modal.querySelector('#staged-exam-from-bank').onclick = () => createExamFromBank(modal);
     return modal;
   }
   function openStageModal() { const modal = getStageModal(); renderDraftStatus(modal); modal.style.display = 'flex'; }
