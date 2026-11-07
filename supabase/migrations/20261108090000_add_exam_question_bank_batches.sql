@@ -63,3 +63,25 @@ comment on table public.exam_question_generation_batches is
   'One row per independent question-generation operation; batches are never merged.';
 comment on table public.exam_question_bank is
   'Reusable question bank; each generated question is stored as its own row.';
+
+-- Preserve provenance when a bank question is copied into a fixed exam/summary snapshot.
+alter table public.exam_questions
+  add column if not exists source_question_bank_id uuid null
+  references public.exam_question_bank(id) on delete set null;
+create index if not exists exam_questions_source_bank_idx
+  on public.exam_questions(source_question_bank_id);
+
+alter table public.study_summary_questions
+  add column if not exists source_question_bank_id uuid null
+  references public.exam_question_bank(id) on delete set null;
+create index if not exists study_summary_questions_source_bank_idx
+  on public.study_summary_questions(source_question_bank_id);
+
+-- The summaries table has RLS enabled but no admin policy in the current schema.
+-- Add the same admin-only boundary used by study_summary_questions.
+drop policy if exists study_summaries_admin_all on public.study_summaries;
+create policy study_summaries_admin_all
+  on public.study_summaries
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
