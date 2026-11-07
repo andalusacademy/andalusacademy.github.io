@@ -133,6 +133,13 @@
    min-height:46px!important;min-width:128px!important;padding:10px 18px!important;
    font-family:inherit!important;font-size:14px!important;font-weight:800!important;
  }
+ #exam-portal-screen #exam-active-screen #exam-questions-wrap .exam-question-actions{
+   position:relative!important;z-index:20!important;pointer-events:auto!important;
+ }
+ #exam-portal-screen #exam-active-screen #exam-questions-wrap .exam-question-actions button{
+   position:relative!important;z-index:21!important;pointer-events:auto!important;
+   touch-action:manipulation!important;cursor:pointer!important;
+ }
  #exam-portal-screen #exam-active-screen #exam-questions-wrap .exam-question-actions .exam-submit-inline{
    background:#b42318!important;color:#fff!important;border:0!important;border-radius:10px!important;
  }
@@ -188,7 +195,7 @@
      '<div class="exam-question-actions">'+
      '<button type="button" class="btn btn-outline" data-exam-nav="-1" '+(index===0?'disabled':'')+'>السابق</button>'+
      '<button type="button" class="btn btn-gold" data-exam-nav="1" '+(index===qs.length-1?'disabled':'')+'>التالي</button>'+
-     '<button type="button" class="exam-submit-inline" onclick="confirmSubmitExam()">📤 تسليم الامتحان</button>'+
+     '<button type="button" class="exam-submit-inline" data-exam-submit="1">📤 تسليم الامتحان</button>'+
      '</div></div>';
  };
  // Reliable delegated navigation: avoids inline-handler scope issues on student devices.
@@ -211,6 +218,17 @@
      event.preventDefault();
      event.stopPropagation();
      window.andalusExamNavigate(Number(button.getAttribute('data-exam-nav')));
+   },true);
+ }
+ // Submit uses delegated capture handling instead of a fragile inline onclick.
+ if(!window.__andalusExamSubmitDelegation){
+   window.__andalusExamSubmitDelegation=true;
+   document.addEventListener('click',function(event){
+     const button=event.target&&event.target.closest?event.target.closest('[data-exam-submit]'):null;
+     if(!button)return;
+     event.preventDefault();
+     event.stopPropagation();
+     if(typeof window.confirmSubmitExam==='function')window.confirmSubmitExam();
    },true);
  }
 
