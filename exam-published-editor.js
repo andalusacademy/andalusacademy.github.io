@@ -16,10 +16,10 @@
  $('#aep-all').onclick=()=>visible().forEach(s=>selected.add(String(s.id)))||renderStudents();
  $('#aep-none').onclick=()=>{visible().forEach(s=>selected.delete(String(s.id)));renderStudents();};
  $('#aep-students').addEventListener('change',e=>{const id=e.target.dataset.sid;if(!id)return;e.target.checked?selected.add(id):selected.delete(id);updateCount();});
- m.querySelectorAll('[name="aep-mode"]').forEach(x=>x.onchange=()=>{mode=x.value;$('#aep-pick').style.display=mode==='students'?'block':'none';});
+ m.querySelectorAll('[name="aep-mode"]').forEach(x=>x.onchange=()=>{mode=x.value;$('#aep-pick').style.display=mode==='students'?'block':'none';renderStudents();});
  $('#aep-save').onclick=save;
  }
- function visible(){const q=norm(search);return students().filter(s=>active(s)&&baseEligible(s,current)&&(!q||norm([s.name,s.enrollment_number,s.registration_number,s.id].join(' ')).includes(q)));}
+ function visible(){const q=norm(search);return students().filter(s=>active(s)&&(mode==='students'||baseEligible(s,current))&&(!q||norm([s.name,s.enrollment_number,s.registration_number,s.id].join(' ')).includes(q)));}
  function updateCount(){const n=$('#aep-count');if(n)n.textContent='محددون: '+selected.size+' من '+visible().length+' ظاهرين';}
  function renderStudents(){const box=$('#aep-students');if(!box||!current)return;const rows=visible();box.innerHTML=rows.map(s=>{const id=String(s.id);return '<label style="display:flex;gap:10px;align-items:center;padding:8px;border-bottom:1px solid var(--border)"><input type="checkbox" data-sid="'+esc(id)+'" '+(selected.has(id)?'checked':'')+'><span style="flex:1">'+esc(s.name||'')+'</span><small style="color:var(--muted)">قيد '+esc(s.enrollment_number||s.registration_number||id)+' · '+esc(s.branch||'')+'</small></label>';}).join('')||'<div style="padding:14px;color:var(--muted)">لا يوجد طلاب مطابقون لنطاق الامتحان.</div>';updateCount();}
  async function open(id){const e=exams().find(x=>String(x.id)===String(id));if(!e)return;current=e;selected.clear();search='';mode=e.targeting_mode?'students':'scope';ensureModal();$('#aep-title').textContent=e.title||'امتحان';$('#aep-from').value=toLocal(e.available_from);$('#aep-until').value=toLocal(e.available_until);$('#aep-search').value='';document.querySelectorAll('[name="aep-mode"]').forEach(x=>x.checked=x.value===mode);$('#aep-pick').style.display=mode==='students'?'block':'none';
