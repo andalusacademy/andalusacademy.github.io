@@ -38,6 +38,7 @@ const externalFiles = [
   'exam-generation-stages.js',
   'exam-drafts-manager.js',
   'exam-essay-support.js',
+  'exam-control-center.js',
   'study-summary-ai.js'
 ];
 for (const fileName of externalFiles) {
