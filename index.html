@@ -4946,11 +4946,31 @@ function renderExamQuestionsForStudent(savedAnswers) {
 function goToExamQuestion(index){if(index<0||index>=examQuestionsForStudent.length)return;examCurrentQuestionIndex=index;renderExamQuestionsForStudent(examCurrentAttempt?.answers||{});}
 function skipCurrentExamQuestion(){const q=examQuestionsForStudent[examCurrentQuestionIndex];if(!q)return;if(!examCurrentAttempt?.answers?.[q.id])examSkippedQuestions.add(q.id);if(examCurrentQuestionIndex<examQuestionsForStudent.length-1)examCurrentQuestionIndex++;renderExamQuestionsForStudent(examCurrentAttempt?.answers||{});}
 async function saveExamAnswer(questionId,value){
-  if(!examCurrentAttempt || examCurrentAttempt.status !== 'in_progress' || window.__andalusExamExitStarted)return;const answers=examCurrentAttempt.answers||{};answers[questionId]=value;examCurrentAttempt.answers=answers;examSkippedQuestions.delete(questionId);
+  if(!examCurrentAttempt || examCurrentAttempt.status !== 'in_progress' || window.__andalusExamExitStarted)return;
+  const answers=examCurrentAttempt.answers||{};
+  answers[questionId]=value;
+  examCurrentAttempt.answers=answers;
+  examSkippedQuestions.delete(questionId);
   if(examTestMode){renderExamQuestionsForStudent(answers);return;}
-  const {data:result,error}=await sb.rpc('student_exam_save_answers',{p_attempt_id:examCurrentAttempt.id,p_student_id:examStudent?.id,p_phone:examStudentPhone,p_face_token:examFaceVerificationToken,p_answers:answers});
-  if(error||!result?.ok){console.error('تعذر حفظ إجابة الامتحان:',error||result?.reason);showToast('تعذر حفظ الإجابة على قاعدة البيانات. تحقق من الاتصال قبل المتابعة.','error');}
-  else renderExamQuestionsForStudent(answers);
+  // تسلسل عمليات الحفظ يمنع طلبًا قديمًا من الكتابة فوق إجابة أحدث.
+  const saveTask=async()=>{
+    if(!examCurrentAttempt || examCurrentAttempt.status!=='in_progress')return {ok:false,reason:'attempt_closed'};
+    const {data:result,error}=await sb.rpc('student_exam_save_answers',{
+      p_attempt_id:examCurrentAttempt.id,p_student_id:examStudent?.id,
+      p_phone:examStudentPhone,p_face_token:examFaceVerificationToken,
+      p_answers:{...(examCurrentAttempt.answers||{})}
+    });
+    if(error||!result?.ok){
+      console.error('تعذر حفظ إجابة الامتحان:',error||result?.reason);
+      showToast(result?.reason==='time_expired'?'انتهى الوقت؛ جاري تسليم آخر الإجابات المحفوظة.':'تعذر حفظ إجابة الامتحان. تحقق من الاتصال.','error');
+      return {ok:false,reason:result?.reason||error?.message||'save_failed'};
+    }
+    renderExamQuestionsForStudent(examCurrentAttempt.answers||{});
+    return {ok:true};
+  };
+  window.__andalusExamAnswerSavePromise=(window.__andalusExamAnswerSavePromise||Promise.resolve())
+    .catch(()=>({ok:false})).then(saveTask);
+  return window.__andalusExamAnswerSavePromise;
 }
 
 
