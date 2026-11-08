@@ -6,7 +6,7 @@
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const db = () => window.sb || null;
   let cache = { attempts: [], exams: [], students: {}, batches: [], auditRows: [], auditError: null, bankTotal: 0, totals: {attempts:0,active:0,submitted:0,review:0}, updatedAt: null };
-  let timer = null, channel = null, busy = false, activeTab = 'overview', searchTerm = '';
+  let timer = null, channel = null, busy = false, activeTab = 'overview', searchTerm = '', attemptFilter = 'all', examFilter = 'all';
   const fmt = v => v ? new Date(v).toLocaleString('ar-EG', { dateStyle:'short', timeStyle:'short' }) : '—';
   const statusLabel = s => ({in_progress:'جاري الآن',submitted:'تم التسليم',expired:'انتهى الوقت',abandoned:'منقطع',cancelled:'ملغي'})[s] || s || 'غير محدد';
   const statusColor = s => s === 'in_progress' ? '#2563eb' : s === 'submitted' ? '#15803d' : '#64748b';
@@ -95,22 +95,34 @@
   function metrics() {
     const published=cache.totals.published;
     const active=cache.totals.active, submitted=cache.totals.submitted, review=cache.totals.review;
+    const notSubmitted=cache.attempts.filter(a=>['expired','abandoned'].includes(a.status)).length;
     const cards=[
-      ['📚',cache.totals.exams,'إجمالي الامتحانات','#1e3a8a'],
-      ['🧪',cache.totals.tests,'امتحانات تجريبية','#6d28d9'],
-      
-      ['🚀',published,'امتحانات منشورة','#15803d'],
-      ['🟦',active,'محاولات جارية','#2563eb'],
-      ['📨',submitted,'محاولات مسلّمة','#0f766e'],
-      ['⚠️',review,'حالات تحتاج مراجعة','#b45309'],
-      ['🧠',cache.bankTotal,'سؤال في البنك','#6d28d9']
+      ['📚',cache.totals.exams,'إجمالي الامتحانات','#1e3a8a','exams','all'],
+      ['🧪',cache.totals.tests,'امتحانات تجريبية','#6d28d9','exams','test'],
+      ['🚀',published,'امتحانات منشورة','#15803d','exams','published'],
+      ['📋',cache.totals.attempts,'إجمالي المحاولات','#334155','attempts','all'],
+      ['📨',submitted,'محاولات مسلّمة','#0f766e','attempts','submitted'],
+      ['⏱️',notSubmitted,'لم يسلم / انتهى وقته','#64748b','attempts','closed'],
+      ['🟦',active,'محاولات جارية','#2563eb','live','all'],
+      ['⚠️',review,'حالات تحتاج مراجعة','#b45309','alerts','all'],
+      ['🧠',cache.bankTotal,'سؤال في البنك','#6d28d9','bank','all']
     ];
     const el=$('#ecc-metrics'); if(!el)return;
-    el.innerHTML=cards.map(c=>'<div style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#fff"><div style="font-size:19px">'+c[0]+'</div><div style="font-size:25px;font-weight:900;color:'+c[3]+';margin:4px 0">'+Number(c[1]).toLocaleString('en-US')+'</div><div style="font-size:11px;color:#64748b">'+c[2]+'</div></div>').join('');
+    el.innerHTML=cards.map((c,i)=>'<button type="button" data-metric="'+c[4]+'" data-metric-filter="'+c[5]+'" aria-label="فتح '+esc(c[2])+'" style="text-align:right;cursor:pointer;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#fff;transition:transform .15s,box-shadow .15s" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 5px 16px #0f172a18\'" onmouseout="this.style.transform=\'none\';this.style.boxShadow=\'none\'"><div style="font-size:19px">'+c[0]+'</div><div style="font-size:25px;font-weight:900;color:'+c[3]+';margin:4px 0">'+Number(c[1]).toLocaleString('en-US')+'</div><div style="font-size:11px;color:#64748b">'+c[2]+'</div><div style="font-size:10px;color:#2563eb;margin-top:6px">اضغط لفتح التفاصيل ←</div></button>').join('');
+    el.querySelectorAll('[data-metric]').forEach(b=>b.addEventListener('click',()=>{
+      const target=b.dataset.metric, f=b.dataset.metricFilter||'all';
+      if(target==='attempts')attemptFilter=f; else if(target==='exams')examFilter=f;
+      else {attemptFilter='all';examFilter='all';}
+      activeTab=target; searchTerm=''; render();
+      const root=$('#'+ID); root?.scrollIntoView({behavior:'smooth',block:'start'});
+    }));
   }
   function examName(id){return cache.exams.find(x=>x.id===id)?.title || 'امتحان غير معروف';}
   function attemptRows(rows) {
     const filtered=rows.filter(a=>{
+      if(activeTab==='attempts'&&attemptFilter==='submitted'&&a.status!=='submitted')return false;
+      if(activeTab==='attempts'&&attemptFilter==='closed'&&!['expired','abandoned'].includes(a.status))return false;
+      if(activeTab==='attempts'&&attemptFilter==='test'&&!cache.exams.find(x=>x.id===a.exam_id)?.is_test)return false;
       const q=searchTerm.trim().toLowerCase();
       if(!q)return true;
       return [cache.students[String(a.student_id)],a.student_id,examName(a.exam_id),statusLabel(a.status)].join(' ').toLowerCase().includes(q);
@@ -140,14 +152,16 @@
     const panel=$('#ecc-panel'); if(!panel)return;
     if(activeTab==='exams'){
       const counts={}; cache.attempts.forEach(a=>counts[a.exam_id]=(counts[a.exam_id]||0)+1);
-      const published=cache.totals.published;
-      const tests=cache.totals.tests;
-      panel.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;margin-bottom:14px"><div class="card" style="padding:12px"><b style="font-size:24px">'+cache.exams.length+'</b><div>امتحانات محمّلة</div></div><div class="card" style="padding:12px"><b style="font-size:24px;color:#15803d">'+published+'</b><div>منشور فعلي</div></div><div class="card" style="padding:12px"><b style="font-size:24px;color:#6d28d9">'+tests+'</b><div>تجريبي</div></div></div><div style="overflow:auto"><table style="width:100%;min-width:760px;border-collapse:collapse"><thead><tr style="background:#f1f5f9"><th>اسم الامتحان</th><th>الحالة</th><th>الفرع</th><th>المدة</th><th>بداية الإتاحة</th><th>نهاية الإتاحة</th><th>الدرجة النهائية</th><th>محاولات ظاهرة</th></tr></thead><tbody>'+(cache.exams.length?cache.exams.map(x=>'<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:9px"><b>'+esc(x.title)+'</b></td><td>'+(x.is_test?'<span style="color:#6d28d9">تجريبي</span>':x.is_published?'<span style="color:#15803d">منشور</span>':'مسودة / غير منشور')+'</td><td>'+esc(x.branch||'—')+'</td><td>'+esc(x.duration_minutes||'—')+' دقيقة</td><td>'+fmt(x.available_from)+'</td><td>'+fmt(x.available_until)+'</td><td>'+esc(x.total_score??'—')+'</td><td>'+Number(counts[x.id]||0).toLocaleString('en-US')+'</td></tr>').join(''):'<tr><td colspan="8" style="padding:18px;text-align:center">لا توجد امتحانات في السجلات المحمّلة.</td></tr>')+'</tbody></table></div><p style="margin-top:10px;color:#64748b;font-size:11px">المحاولات الظاهرة محسوبة من أحدث 300 سجل محمّل. أدوات الإنشاء والتعديل والنشر الحالية لم يتم تغييرها.</p>';
+      const shownExams=cache.exams.filter(x=>examFilter==='test'?!!x.is_test:examFilter==='published'?!!x.is_published&&!x.is_test:true);
+      panel.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px"><b>قائمة الامتحانات</b><span style="font-size:12px;color:#64748b">'+(examFilter==='test'?'الامتحانات التجريبية':examFilter==='published'?'الامتحانات المنشورة':'كل الامتحانات')+' · '+shownExams.length+'</span><button class="btn btn-outline btn-sm" id="ecc-exam-filter-all">عرض الكل</button></div><div style="overflow:auto"><table style="width:100%;min-width:760px;border-collapse:collapse"><thead><tr style="background:#f1f5f9"><th>اسم الامتحان</th><th>الحالة</th><th>الفرع</th><th>المدة</th><th>بداية الإتاحة</th><th>نهاية الإتاحة</th><th>الدرجة النهائية</th><th>محاولات ظاهرة</th></tr></thead><tbody>'+(shownExams.length?shownExams.map(x=>'<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:9px"><b>'+esc(x.title)+'</b></td><td>'+(x.is_test?'<span style="color:#6d28d9">تجريبي</span>':x.is_published?'<span style="color:#15803d">منشور</span>':'مسودة / غير منشور')+'</td><td>'+esc(x.branch||'—')+'</td><td>'+esc(x.duration_minutes||'—')+' دقيقة</td><td>'+fmt(x.available_from)+'</td><td>'+fmt(x.available_until)+'</td><td>'+esc(x.total_score??'—')+'</td><td>'+Number(counts[x.id]||0).toLocaleString('en-US')+'</td></tr>').join(''):'<tr><td colspan="8" style="padding:18px;text-align:center">لا توجد امتحانات مطابقة.</td></tr>')+'</tbody></table></div><p style="margin-top:10px;color:#64748b;font-size:11px">أدوات الإنشاء والتعديل والنشر الحالية لم يتم تغييرها.</p>';
+      $('#ecc-exam-filter-all')?.addEventListener('click',()=>{examFilter='all';render();});
     } else if(activeTab==='live'){
       const rows=cache.attempts.filter(a=>a.status==='in_progress');
       panel.innerHTML='<div style="padding:10px 0 14px;color:#475569">المحاولات الجارية حاليًا حسب آخر مزامنة. يتم التحديث التلقائي كل 15 ثانية أثناء فتح صفحة الامتحانات.</div>'+tableSection(rows);
     } else if(activeTab==='attempts'){
-      panel.innerHTML=tableSection(cache.attempts);
+      const labels={all:'كل المحاولات',submitted:'المحاولات المسلّمة',closed:'المحاولات التي لم تُسلّم / انتهى وقتها',test:'المحاولات التجريبية'};
+      panel.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><b>'+labels[attemptFilter]+'</b><button class="btn btn-outline btn-sm" id="ecc-attempt-filter-all">عرض كل المحاولات</button></div>'+tableSection(cache.attempts);
+      $('#ecc-attempt-filter-all')?.addEventListener('click',()=>{attemptFilter='all';render();});
     } else if(activeTab==='alerts'){
       const rows=cache.attempts.filter(a=>a.flagged_cheating||Number(a.violation_count||0)>0);
       panel.innerHTML='<div style="padding:10px 0;color:#92400e;background:#fffbeb;border-radius:9px">تنبيه: كل حالة هنا تحتاج مراجعة بشرية؛ فقد يكون السبب انقطاع اتصال أو حدث متصفح وليس غشًا.</div>'+tableSection(rows);
