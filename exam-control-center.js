@@ -34,7 +34,8 @@
           <button class="btn btn-sm btn-outline" data-tab="attempts">سجل المحاولات</button>
           <button class="btn btn-sm btn-outline" data-tab="alerts">الإنذارات للمراجعة</button>
           <button class="btn btn-sm btn-outline" data-tab="results">النتائج والتحليل</button>
-          <button class="btn btn-sm btn-outline" data-tab="bank">بنك الأسئلة</button>\n          <button class="btn btn-sm btn-outline" data-tab="audit">سجل العمليات</button>
+          <button class="btn btn-sm btn-outline" data-tab="bank">بنك الأسئلة</button>
+          <button class="btn btn-sm btn-outline" data-tab="audit">سجل العمليات</button>
         </div>
         <div id="ecc-panel"><div style="padding:24px;text-align:center;color:#64748b">جاري تحميل بيانات مركز القيادة...</div></div>
         <div style="border-top:1px solid #e2e8f0;margin-top:14px;padding-top:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:#64748b;font-size:11px"><span>المراقبة تعرض إشارات النظام ولا تصدر حكمًا آليًا بالغش.</span><span id="ecc-updated">لم يتم التحديث بعد</span></div>
@@ -58,7 +59,7 @@
     if (live) live.textContent = '● جاري التحديث';
     try {
       const client = db();
-      const [attemptRes, examRes, studentRes, batchRes, bankCountRes, allCountRes, activeCountRes, submittedCountRes, reviewCountRes, auditRes] = await Promise.all([
+      const [attemptRes, examRes, studentRes, batchRes, bankCountRes, allCountRes, activeCountRes, submittedCountRes, reviewCountRes, auditRes, publishedExamCountRes, testExamCountRes] = await Promise.all([
         client.from('exam_attempts').select('id,exam_id,student_id,status,started_at,submitted_at,score,max_score,flagged_cheating,violation_count,violation_log,time_taken_seconds').order('started_at',{ascending:false}).limit(300),
         client.from('exams').select('id,title,is_published,total_score,is_test,branch,duration_minutes,available_from,available_until,created_at,round',{count:'exact'}).order('created_at',{ascending:false}).limit(500),
         client.from('students').select('id,name').limit(3000),
@@ -68,9 +69,11 @@
         client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','in_progress'),
         client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','submitted'),
         client.from('exam_attempts').select('id',{count:'exact',head:true}).or('flagged_cheating.eq.true,violation_count.gt.0'),
-        client.from('employee_activity_log').select('id,actor_user_id,action_type,module,entity_table,entity_id,title,details,created_at').order('created_at',{ascending:false}).limit(150)
+        client.from('employee_activity_log').select('id,actor_user_id,action_type,module,entity_table,entity_id,title,details,created_at').order('created_at',{ascending:false}).limit(150),
+        client.from('exams').select('id',{count:'exact',head:true}).eq('is_published',true).eq('is_test',false),
+        client.from('exams').select('id',{count:'exact',head:true}).eq('is_test',true)
       ]);
-      for (const r of [attemptRes,examRes,studentRes,batchRes,bankCountRes,allCountRes,activeCountRes,submittedCountRes,reviewCountRes]) if (r.error) throw r.error;
+      for (const r of [attemptRes,examRes,studentRes,batchRes,bankCountRes,allCountRes,activeCountRes,submittedCountRes,reviewCountRes,publishedExamCountRes,testExamCountRes]) if (r.error) throw r.error;
       cache.attempts = attemptRes.data || [];
       cache.exams = examRes.data || [];
       cache.students = Object.fromEntries((studentRes.data || []).map(s=>[String(s.id),s.name]));
@@ -78,7 +81,7 @@
       cache.auditRows = auditRes.error ? [] : (auditRes.data || []);
       cache.auditError = auditRes.error ? (auditRes.error.message || String(auditRes.error)) : null;
       cache.bankTotal = bankCountRes.count || 0;
-      cache.totals = {attempts:allCountRes.count||0,active:activeCountRes.count||0,submitted:submittedCountRes.count||0,review:reviewCountRes.count||0,exams:examRes.count||0,published:cache.exams.filter(x=>x.is_published&&!x.is_test).length,tests:cache.exams.filter(x=>x.is_test).length};
+      cache.totals = {attempts:allCountRes.count||0,active:activeCountRes.count||0,submitted:submittedCountRes.count||0,review:reviewCountRes.count||0,exams:examRes.count||0,published:publishedExamCountRes.count||0,tests:testExamCountRes.count||0};
       cache.updatedAt = new Date();
       render();
       if (live) { live.textContent = '● متصل'; live.style.background = '#166534'; }
