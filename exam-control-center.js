@@ -75,7 +75,8 @@
       cache.exams = examRes.data || [];
       cache.students = Object.fromEntries((studentRes.data || []).map(s=>[String(s.id),s.name]));
       cache.batches = batchRes.data || [];
-      cache.auditRows = auditRes.error ? [] : (auditRes.data || []);\n      cache.auditError = auditRes.error ? (auditRes.error.message || String(auditRes.error)) : null;
+      cache.auditRows = auditRes.error ? [] : (auditRes.data || []);
+      cache.auditError = auditRes.error ? (auditRes.error.message || String(auditRes.error)) : null;
       cache.bankTotal = bankCountRes.count || 0;
       cache.totals = {attempts:allCountRes.count||0,active:activeCountRes.count||0,submitted:submittedCountRes.count||0,review:reviewCountRes.count||0};
       cache.updatedAt = new Date();
