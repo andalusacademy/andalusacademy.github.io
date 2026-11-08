@@ -5,7 +5,7 @@
   const $ = (s, root=document) => root.querySelector(s);
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const db = () => window.sb || null;
-  let cache = { attempts: [], exams: [], students: {}, batches: [], auditRows: [], bankTotal: 0, totals: {attempts:0,active:0,submitted:0,review:0}, updatedAt: null };
+  let cache = { attempts: [], exams: [], students: {}, batches: [], auditRows: [], auditError: null, bankTotal: 0, totals: {attempts:0,active:0,submitted:0,review:0}, updatedAt: null };
   let timer = null, channel = null, busy = false, activeTab = 'overview', searchTerm = '';
   const fmt = v => v ? new Date(v).toLocaleString('ar-EG', { dateStyle:'short', timeStyle:'short' }) : '—';
   const statusLabel = s => ({in_progress:'جاري الآن',submitted:'تم التسليم',expired:'انتهى الوقت',abandoned:'منقطع',cancelled:'ملغي'})[s] || s || 'غير محدد';
@@ -29,11 +29,13 @@
         <div id="ecc-metrics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:9px"></div>
         <div style="display:flex;gap:7px;flex-wrap:wrap;margin:14px 0" id="ecc-tabs">
           <button class="btn btn-sm btn-primary" data-tab="overview">نظرة عامة</button>
+          <button class="btn btn-sm btn-outline" data-tab="exams">إدارة ومتابعة الامتحانات</button>
           <button class="btn btn-sm btn-outline" data-tab="live">المراقبة المباشرة</button>
           <button class="btn btn-sm btn-outline" data-tab="attempts">سجل المحاولات</button>
           <button class="btn btn-sm btn-outline" data-tab="alerts">الإنذارات للمراجعة</button>
           <button class="btn btn-sm btn-outline" data-tab="results">النتائج والتحليل</button>
-          <button class="btn btn-sm btn-outline" data-tab="bank">بنك الأسئلة</button>\n          <button class="btn btn-sm btn-outline" data-tab="audit">سجل العمليات</button>
+          <button class="btn btn-sm btn-outline" data-tab="bank">بنك الأسئلة</button>
+          <button class="btn btn-sm btn-outline" data-tab="audit">سجل العمليات</button>
         </div>
         <div id="ecc-panel"><div style="padding:24px;text-align:center;color:#64748b">جاري تحميل بيانات مركز القيادة...</div></div>
         <div style="border-top:1px solid #e2e8f0;margin-top:14px;padding-top:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:#64748b;font-size:11px"><span>المراقبة تعرض إشارات النظام ولا تصدر حكمًا آليًا بالغش.</span><span id="ecc-updated">لم يتم التحديث بعد</span></div>
@@ -57,9 +59,9 @@
     if (live) live.textContent = '● جاري التحديث';
     try {
       const client = db();
-      const [attemptRes, examRes, studentRes, batchRes, bankCountRes, allCountRes, activeCountRes, submittedCountRes, reviewCountRes, auditRes] = await Promise.all([
+      const [attemptRes, examRes, studentRes, batchRes, bankCountRes, allCountRes, activeCountRes, submittedCountRes, reviewCountRes, auditRes, publishedExamCountRes, testExamCountRes] = await Promise.all([
         client.from('exam_attempts').select('id,exam_id,student_id,status,started_at,submitted_at,score,max_score,flagged_cheating,violation_count,violation_log,time_taken_seconds').order('started_at',{ascending:false}).limit(300),
-        client.from('exams').select('id,title,is_published,total_score,is_test').order('created_at',{ascending:false}).limit(500),
+        client.from('exams').select('id,title,is_published,total_score,is_test,branch,duration_minutes,available_from,available_until,created_at,round',{count:'exact'}).order('created_at',{ascending:false}).limit(500),
         client.from('students').select('id,name').limit(3000),
         client.from('exam_question_generation_batches').select('id,title,subject_name,question_type,requested_count,saved_count,status,error_message,created_at').order('created_at',{ascending:false}).limit(300),
         client.from('exam_question_bank').select('id',{count:'exact',head:true}),
@@ -67,16 +69,19 @@
         client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','in_progress'),
         client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','submitted'),
         client.from('exam_attempts').select('id',{count:'exact',head:true}).or('flagged_cheating.eq.true,violation_count.gt.0'),
-        client.from('employee_activity_log').select('id,actor_user_id,action_type,module,entity_table,entity_id,title,details,created_at').order('created_at',{ascending:false}).limit(150)
+        client.from('employee_activity_log').select('id,actor_user_id,action_type,module,entity_table,entity_id,title,details,created_at').order('created_at',{ascending:false}).limit(150),
+        client.from('exams').select('id',{count:'exact',head:true}).eq('is_published',true).eq('is_test',false),
+        client.from('exams').select('id',{count:'exact',head:true}).eq('is_test',true)
       ]);
-      for (const r of [attemptRes,examRes,studentRes,batchRes,bankCountRes,allCountRes,activeCountRes,submittedCountRes,reviewCountRes,auditRes]) if (r.error) throw r.error;
+      for (const r of [attemptRes,examRes,studentRes,batchRes,bankCountRes,allCountRes,activeCountRes,submittedCountRes,reviewCountRes,publishedExamCountRes,testExamCountRes]) if (r.error) throw r.error;
       cache.attempts = attemptRes.data || [];
       cache.exams = examRes.data || [];
       cache.students = Object.fromEntries((studentRes.data || []).map(s=>[String(s.id),s.name]));
       cache.batches = batchRes.data || [];
-      cache.auditRows = auditRes.data || [];
+      cache.auditRows = auditRes.error ? [] : (auditRes.data || []);
+      cache.auditError = auditRes.error ? (auditRes.error.message || String(auditRes.error)) : null;
       cache.bankTotal = bankCountRes.count || 0;
-      cache.totals = {attempts:allCountRes.count||0,active:activeCountRes.count||0,submitted:submittedCountRes.count||0,review:reviewCountRes.count||0};
+      cache.totals = {attempts:allCountRes.count||0,active:activeCountRes.count||0,submitted:submittedCountRes.count||0,review:reviewCountRes.count||0,exams:examRes.count||0,published:publishedExamCountRes.count||0,tests:testExamCountRes.count||0};
       cache.updatedAt = new Date();
       render();
       if (live) { live.textContent = '● متصل'; live.style.background = '#166534'; }
@@ -88,10 +93,12 @@
     } finally { busy = false; }
   }
   function metrics() {
-    const published=cache.exams.filter(x=>x.is_published&&!x.is_test).length;
+    const published=cache.totals.published;
     const active=cache.totals.active, submitted=cache.totals.submitted, review=cache.totals.review;
     const cards=[
-      ['📚',cache.exams.length,'إجمالي الامتحانات','#1e3a8a'],
+      ['📚',cache.totals.exams,'إجمالي الامتحانات','#1e3a8a'],
+      ['🧪',cache.totals.tests,'امتحانات تجريبية','#6d28d9'],
+      
       ['🚀',published,'امتحانات منشورة','#15803d'],
       ['🟦',active,'محاولات جارية','#2563eb'],
       ['📨',submitted,'محاولات مسلّمة','#0f766e'],
@@ -131,7 +138,12 @@
     const root=$('#'+ID); if(!root)return;
     metrics();
     const panel=$('#ecc-panel'); if(!panel)return;
-    if(activeTab==='live'){
+    if(activeTab==='exams'){
+      const counts={}; cache.attempts.forEach(a=>counts[a.exam_id]=(counts[a.exam_id]||0)+1);
+      const published=cache.totals.published;
+      const tests=cache.totals.tests;
+      panel.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;margin-bottom:14px"><div class="card" style="padding:12px"><b style="font-size:24px">'+cache.exams.length+'</b><div>امتحانات محمّلة</div></div><div class="card" style="padding:12px"><b style="font-size:24px;color:#15803d">'+published+'</b><div>منشور فعلي</div></div><div class="card" style="padding:12px"><b style="font-size:24px;color:#6d28d9">'+tests+'</b><div>تجريبي</div></div></div><div style="overflow:auto"><table style="width:100%;min-width:760px;border-collapse:collapse"><thead><tr style="background:#f1f5f9"><th>اسم الامتحان</th><th>الحالة</th><th>الفرع</th><th>المدة</th><th>بداية الإتاحة</th><th>نهاية الإتاحة</th><th>الدرجة النهائية</th><th>محاولات ظاهرة</th></tr></thead><tbody>'+(cache.exams.length?cache.exams.map(x=>'<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:9px"><b>'+esc(x.title)+'</b></td><td>'+(x.is_test?'<span style="color:#6d28d9">تجريبي</span>':x.is_published?'<span style="color:#15803d">منشور</span>':'مسودة / غير منشور')+'</td><td>'+esc(x.branch||'—')+'</td><td>'+esc(x.duration_minutes||'—')+' دقيقة</td><td>'+fmt(x.available_from)+'</td><td>'+fmt(x.available_until)+'</td><td>'+esc(x.total_score??'—')+'</td><td>'+Number(counts[x.id]||0).toLocaleString('en-US')+'</td></tr>').join(''):'<tr><td colspan="8" style="padding:18px;text-align:center">لا توجد امتحانات في السجلات المحمّلة.</td></tr>')+'</tbody></table></div><p style="margin-top:10px;color:#64748b;font-size:11px">المحاولات الظاهرة محسوبة من أحدث 300 سجل محمّل. أدوات الإنشاء والتعديل والنشر الحالية لم يتم تغييرها.</p>';
+    } else if(activeTab==='live'){
       const rows=cache.attempts.filter(a=>a.status==='in_progress');
       panel.innerHTML='<div style="padding:10px 0 14px;color:#475569">المحاولات الجارية حاليًا حسب آخر مزامنة. يتم التحديث التلقائي كل 15 ثانية أثناء فتح صفحة الامتحانات.</div>'+tableSection(rows);
     } else if(activeTab==='attempts'){
@@ -149,7 +161,7 @@
       const sum=cache.batches.reduce((n,b)=>n+Number(b.saved_count||0),0);
       panel.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+cache.bankTotal+'</b><div>إجمالي أسئلة البنك</div></div><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+total+'</b><div>مجموعات التوليد</div></div><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+sum+'</b><div>مجموع المحفوظ بالمجموعات</div></div></div><div style="overflow:auto"><table style="width:100%;min-width:700px"><thead><tr><th>المجموعة</th><th>المادة</th><th>النوع</th><th>المطلوب</th><th>المحفوظ</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>'+(cache.batches.length?cache.batches.map(b=>'<tr><td>'+esc(b.title||b.id)+'</td><td>'+esc(b.subject_name)+'</td><td>'+esc(b.question_type)+'</td><td>'+b.requested_count+'</td><td>'+b.saved_count+'</td><td>'+esc(b.status)+(b.error_message?' — '+esc(b.error_message):'')+'</td><td>'+fmt(b.created_at)+'</td></tr>').join(''):'<tr><td colspan="7" style="padding:18px;text-align:center">لا توجد مجموعات توليد بعد.</td></tr>')+'</tbody></table></div><p style="margin-top:10px;font-size:12px;color:#64748b">إدارة الأسئلة والتوليد التفصيلية من استوديو إنشاء الامتحان داخل مكتبة المادة.</p>';
     } else if(activeTab==='audit'){
-      panel.innerHTML='<div style="margin-bottom:10px;color:#64748b;font-size:12px">آخر 150 عملية مسجلة في سجل نشاط الإدارة والموظفين — عرض فقط دون تعديل السجلات.</div><div style="overflow:auto"><table style="width:100%;min-width:760px"><thead><tr><th>الوقت</th><th>القسم</th><th>نوع العملية</th><th>الوصف</th><th>الكيان</th><th>تفاصيل إضافية</th></tr></thead><tbody>'+(cache.auditRows.length?cache.auditRows.map(x=>'<tr><td>'+fmt(x.created_at)+'</td><td>'+esc(x.module||'—')+'</td><td>'+esc(x.action_type||'—')+'</td><td>'+esc(x.title||'—')+'</td><td>'+esc([x.entity_table,x.entity_id].filter(Boolean).join(' · ')||'—')+'</td><td><details><summary>عرض</summary><pre style="white-space:pre-wrap;max-width:360px">'+esc(JSON.stringify(x.details||{},null,2))+'</pre></details></td></tr>').join(''):'<tr><td colspan="6" style="padding:18px;text-align:center">لا توجد عمليات مسجلة.</td></tr>')+'</tbody></table></div>';
+      panel.innerHTML=(cache.auditError ? '<div style="padding:10px;background:#fff7ed;color:#9a3412;border-radius:9px;margin-bottom:10px">تعذر تحميل سجل العمليات فقط: '+esc(cache.auditError)+' — باقي لوحة القيادة تعمل بصورة مستقلة.</div>' : '')+'<div style="margin-bottom:10px;color:#64748b;font-size:12px">آخر 150 عملية مسجلة في سجل نشاط الإدارة والموظفين — عرض فقط دون تعديل السجلات.</div><div style="overflow:auto"><table style="width:100%;min-width:760px"><thead><tr><th>الوقت</th><th>القسم</th><th>نوع العملية</th><th>الوصف</th><th>الكيان</th><th>تفاصيل إضافية</th></tr></thead><tbody>'+(cache.auditRows.length?cache.auditRows.map(x=>'<tr><td>'+fmt(x.created_at)+'</td><td>'+esc(x.module||'—')+'</td><td>'+esc(x.action_type||'—')+'</td><td>'+esc(x.title||'—')+'</td><td>'+esc([x.entity_table,x.entity_id].filter(Boolean).join(' · ')||'—')+'</td><td><details><summary>عرض</summary><pre style="white-space:pre-wrap;max-width:360px">'+esc(JSON.stringify(x.details||{},null,2))+'</pre></details></td></tr>').join(''):'<tr><td colspan="6" style="padding:18px;text-align:center">لا توجد عمليات مسجلة.</td></tr>')+'</tbody></table></div>';
     } else {
       const statuses={};cache.attempts.forEach(a=>statuses[a.status||'unknown']=(statuses[a.status||'unknown']||0)+1);
       const recent=cache.attempts.slice(0,8);
