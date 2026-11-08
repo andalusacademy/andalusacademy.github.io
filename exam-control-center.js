@@ -60,7 +60,7 @@
       const client = db();
       const [attemptRes, examRes, studentRes, batchRes, bankCountRes, allCountRes, activeCountRes, submittedCountRes, reviewCountRes, auditRes] = await Promise.all([
         client.from('exam_attempts').select('id,exam_id,student_id,status,started_at,submitted_at,score,max_score,flagged_cheating,violation_count,violation_log,time_taken_seconds').order('started_at',{ascending:false}).limit(300),
-        client.from('exams').select('id,title,is_published,total_score,is_test').order('created_at',{ascending:false}).limit(500),
+        client.from('exams').select('id,title,is_published,total_score,is_test,branch,duration_minutes,available_from,available_until,created_at,round',{count:'exact'}).order('created_at',{ascending:false}).limit(500),
         client.from('students').select('id,name').limit(3000),
         client.from('exam_question_generation_batches').select('id,title,subject_name,question_type,requested_count,saved_count,status,error_message,created_at').order('created_at',{ascending:false}).limit(300),
         client.from('exam_question_bank').select('id',{count:'exact',head:true}),
@@ -78,7 +78,7 @@
       cache.auditRows = auditRes.error ? [] : (auditRes.data || []);
       cache.auditError = auditRes.error ? (auditRes.error.message || String(auditRes.error)) : null;
       cache.bankTotal = bankCountRes.count || 0;
-      cache.totals = {attempts:allCountRes.count||0,active:activeCountRes.count||0,submitted:submittedCountRes.count||0,review:reviewCountRes.count||0};
+      cache.totals = {attempts:allCountRes.count||0,active:activeCountRes.count||0,submitted:submittedCountRes.count||0,review:reviewCountRes.count||0,exams:examRes.count||0,published:cache.exams.filter(x=>x.is_published&&!x.is_test).length,tests:cache.exams.filter(x=>x.is_test).length};
       cache.updatedAt = new Date();
       render();
       if (live) { live.textContent = '● متصل'; live.style.background = '#166534'; }
@@ -90,10 +90,12 @@
     } finally { busy = false; }
   }
   function metrics() {
-    const published=cache.exams.filter(x=>x.is_published&&!x.is_test).length;
+    const published=cache.totals.published;
     const active=cache.totals.active, submitted=cache.totals.submitted, review=cache.totals.review;
     const cards=[
-      ['📚',cache.exams.length,'إجمالي الامتحانات','#1e3a8a'],
+      ['📚',cache.totals.exams,'إجمالي الامتحانات','#1e3a8a'],
+      ['🧪',cache.totals.tests,'امتحانات تجريبية','#6d28d9'],
+      
       ['🚀',published,'امتحانات منشورة','#15803d'],
       ['🟦',active,'محاولات جارية','#2563eb'],
       ['📨',submitted,'محاولات مسلّمة','#0f766e'],
@@ -135,7 +137,7 @@
     const panel=$('#ecc-panel'); if(!panel)return;
     if(activeTab==='exams'){
       const counts={}; cache.attempts.forEach(a=>counts[a.exam_id]=(counts[a.exam_id]||0)+1);
-      const published=cache.exams.filter(x=>x.is_published&&!x.is_test).length;
+      const published=cache.totals.published;
       const tests=cache.exams.filter(x=>x.is_test).length;
       panel.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;margin-bottom:14px"><div class="card" style="padding:12px"><b style="font-size:24px">'+cache.exams.length+'</b><div>امتحانات محمّلة</div></div><div class="card" style="padding:12px"><b style="font-size:24px;color:#15803d">'+published+'</b><div>منشور فعلي</div></div><div class="card" style="padding:12px"><b style="font-size:24px;color:#6d28d9">'+tests+'</b><div>تجريبي</div></div></div><div style="overflow:auto"><table style="width:100%;min-width:760px;border-collapse:collapse"><thead><tr style="background:#f1f5f9"><th>اسم الامتحان</th><th>الحالة</th><th>الفرع</th><th>المدة</th><th>بداية الإتاحة</th><th>نهاية الإتاحة</th><th>الدرجة النهائية</th><th>محاولات ظاهرة</th></tr></thead><tbody>'+(cache.exams.length?cache.exams.map(x=>'<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:9px"><b>'+esc(x.title)+'</b></td><td>'+(x.is_test?'<span style="color:#6d28d9">تجريبي</span>':x.is_published?'<span style="color:#15803d">منشور</span>':'مسودة / غير منشور')+'</td><td>'+esc(x.branch||'—')+'</td><td>'+esc(x.duration_minutes||'—')+' دقيقة</td><td>'+fmt(x.available_from)+'</td><td>'+fmt(x.available_until)+'</td><td>'+esc(x.total_score??'—')+'</td><td>'+Number(counts[x.id]||0).toLocaleString('en-US')+'</td></tr>').join(''):'<tr><td colspan="8" style="padding:18px;text-align:center">لا توجد امتحانات في السجلات المحمّلة.</td></tr>')+'</tbody></table></div><p style="margin-top:10px;color:#64748b;font-size:11px">المحاولات الظاهرة محسوبة من أحدث 300 سجل محمّل. أدوات الإنشاء والتعديل والنشر الحالية لم يتم تغييرها.</p>';
     } else if(activeTab==='live'){
