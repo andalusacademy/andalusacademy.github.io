@@ -11,6 +11,7 @@
   function notify(message, type) { if (typeof window.showToast === 'function') window.showToast(message, type || 'success'); else alert(message); }
   function getSelectedFiles() { return [...document.querySelectorAll('#exam-material-files-list .exam-material-file-cb:checked')].map(el => el.value); }
   function getSubject() {
+    if (window.__andalusExamSubjectOverride) return String(window.__andalusExamSubjectOverride).trim();
     const title = document.getElementById('exam-material-workspace-title')?.textContent || '';
     const fromTitle = title.replace(/^\s*📚\s*مكتبة المادة\s*:\s*/i, '').trim();
     return fromTitle || 'المادة التدريبية';
