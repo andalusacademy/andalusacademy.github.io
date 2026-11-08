@@ -158,8 +158,9 @@
         panel.innerHTML='<h3>مصدر الأسئلة وتحديد الطلاب</h3><p class="aes-muted">مصدر أسئلة الامتحان هو بنك الأسئلة المركزي فقط. لا يتم دمج مجموعات التوليد أو تعديل الأسئلة الأصلية.</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button type="button" class="btn btn-primary" id="aes-open-bank">📚 اختيار الأسئلة من بنك الأسئلة</button><button type="button" class="btn btn-outline" id="aes-open-generator">⚙️ توليد أسئلة جديدة إلى البنك</button></div><div id="aes-target-slot"></div><div id="aes-program-slot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:12px"></div>';
         if(targetPanel)$('#aes-target-slot',panel).appendChild(targetPanel);
         programWrappers.forEach(el=>$('#aes-program-slot',panel).appendChild(el));
-        $('#aes-open-bank',panel).onclick=()=>{if(typeof window.startAiExamGeneration==='function')window.startAiExamGeneration();else window.showToast?.('واجهة بنك الأسئلة غير جاهزة.');};
-        $('#aes-open-generator',panel).onclick=()=>{if(typeof window.startAiExamGeneration==='function')window.startAiExamGeneration();else window.showToast?.('واجهة بنك الأسئلة غير جاهزة.');};
+        const syncWorkspaceSubject=()=>{const select=fieldMap.get('exam-subject')?.clone;const title=select?.selectedOptions?.[0]?.textContent?.trim();const heading=$('#exam-material-workspace-title');if(title&&heading)heading.textContent='📚 مكتبة المادة: '+title;};
+        $('#aes-open-bank',panel).onclick=()=>{syncWorkspaceSubject();if(typeof window.startAiExamGeneration==='function')window.startAiExamGeneration();else window.showToast?.('واجهة بنك الأسئلة غير جاهزة.');};
+        $('#aes-open-generator',panel).onclick=()=>{syncWorkspaceSubject();if(typeof window.startAiExamGeneration==='function')window.startAiExamGeneration();else window.showToast?.('واجهة بنك الأسئلة غير جاهزة.');};
       } else if(stage===2){
         panel.innerHTML='<h3>الوقت والدرجات</h3><p class="aes-muted">حدد مدة كافية ونافذة زمنية صحيحة. تأكد أن النهاية بعد البداية.</p>';
         panel.appendChild(stepHosts[1]);
@@ -213,6 +214,7 @@
     originalBodyChildren.forEach(el=>{if(el.id!=='andalus-exam-targeting')el.style.display='none';});
     // Hide original controls only; the new controls are visual clones that write back to originals.
     render();
+    modal.__aesReset = () => { stage = 0; fieldMap.forEach(({source,clone}) => { if(clone.type==='checkbox') clone.checked=source.checked; else clone.value=source.value; }); render(); };
   }
 
   function wrapOpen() {
@@ -220,7 +222,7 @@
     if(typeof original!=='function'||original.__aesWrapped)return false;
     const wrapped=function(){
       const result=original.apply(this,arguments);
-      setTimeout(()=>decorate($('#modal-exam')),0);
+      setTimeout(()=>{ const modal=$('#modal-exam'); if(modal?.dataset.aesReady==='1') modal.__aesReset?.(); else decorate(modal); },0);
       return result;
     };
     wrapped.__aesWrapped=true;
