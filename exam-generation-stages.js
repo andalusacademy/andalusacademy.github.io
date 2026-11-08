@@ -300,6 +300,6 @@
       if (button) { button.disabled = false; button.textContent = '🧩 إنشاء امتحان من بنك الأسئلة'; }
     }
   }
-  function install() { window.startAiExamGeneration = openStageModal; window.__andalusStagedExamGeneration = { open: openStageModal, readDraft, persistGenerationBatch }; console.info('Andalus staged exam generation loaded.'); }
+  function install() { window.startAiExamGeneration = openStageModal; window.__andalusStagedExamGeneration = { open: openStageModal, readDraft, persistGenerationBatch }; if (!document.querySelector('script[data-andalus-exam-studio]')) { const s = document.createElement('script'); s.src = 'exam-studio-wizard.js?v=1'; s.async = true; s.dataset.andalusExamStudio = '1'; document.head.appendChild(s); } console.info('Andalus staged exam generation loaded.'); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
 })();
