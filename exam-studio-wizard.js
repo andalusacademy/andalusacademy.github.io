@@ -120,6 +120,8 @@
     const stepHosts = [0,2].map(i=>{const d=document.createElement('div');d.className='aes-grid';d.dataset.fieldsStep=i;return d;});
     fields.forEach(f=>{const host=stepHosts.find(x=>Number(x.dataset.fieldsStep)===f.step);if(host){const pair=cloneField(f,host);if(pair)fieldMap.set(f.id,pair);}});
     let stage=0;
+    const targetPanel = $('#andalus-exam-targeting',modal);
+    const programWrappers = [...modal.querySelectorAll('.exam-prog-cb')].map(cb=>cb.closest('label')||cb.parentElement).filter((el,i,arr)=>el&&!arr.slice(0,i).includes(el));
 
     function updateSummary() {
       const val=id=>$('#'+id,studio)?.value || $('#' + id,modal)?.value || '—';
@@ -153,9 +155,9 @@
         panel.innerHTML='<h3>البيانات الأساسية</h3><p class="aes-muted">ابدأ باسم واضح وحدد المادة التي سيُسحب منها بنك الأسئلة.</p>';
         panel.appendChild(stepHosts[0]);
       } else if(stage===1){
-        panel.innerHTML='<h3>مصدر الأسئلة وتحديد الطلاب</h3><p class="aes-muted">مصدر أسئلة الامتحان هو بنك الأسئلة المركزي فقط. لا يتم دمج مجموعات التوليد أو تعديل الأسئلة الأصلية.</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button type="button" class="btn btn-primary" id="aes-open-bank">📚 اختيار الأسئلة من بنك الأسئلة</button><button type="button" class="btn btn-outline" id="aes-open-generator">⚙️ توليد أسئلة جديدة إلى البنك</button></div><div id="aes-target-slot"></div>';
-        const targetPanel=$('#andalus-exam-targeting',modal);
+        panel.innerHTML='<h3>مصدر الأسئلة وتحديد الطلاب</h3><p class="aes-muted">مصدر أسئلة الامتحان هو بنك الأسئلة المركزي فقط. لا يتم دمج مجموعات التوليد أو تعديل الأسئلة الأصلية.</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button type="button" class="btn btn-primary" id="aes-open-bank">📚 اختيار الأسئلة من بنك الأسئلة</button><button type="button" class="btn btn-outline" id="aes-open-generator">⚙️ توليد أسئلة جديدة إلى البنك</button></div><div id="aes-target-slot"></div><div id="aes-program-slot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:12px"></div>';
         if(targetPanel)$('#aes-target-slot',panel).appendChild(targetPanel);
+        programWrappers.forEach(el=>$('#aes-program-slot',panel).appendChild(el));
         $('#aes-open-bank',panel).onclick=()=>{if(typeof window.startAiExamGeneration==='function')window.startAiExamGeneration();else window.showToast?.('واجهة بنك الأسئلة غير جاهزة.');};
         $('#aes-open-generator',panel).onclick=()=>{if(typeof window.startAiExamGeneration==='function')window.startAiExamGeneration();else window.showToast?.('واجهة بنك الأسئلة غير جاهزة.');};
       } else if(stage===2){
