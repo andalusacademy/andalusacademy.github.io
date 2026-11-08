@@ -63,6 +63,7 @@
   }
 
   function findSaveButton(modal) {
+    if (modal.__aesSaveButton) return modal.__aesSaveButton;
     return [...modal.querySelectorAll('button')].find(b =>
       (b.getAttribute('onclick') || '').replace(/\s/g,'') === 'saveExam()' ||
       /نشر الامتحان|حفظ الامتحان|إنشاء الامتحان/.test(b.textContent || '')
@@ -116,6 +117,7 @@
     body.insertBefore(studio, body.firstChild);
 
     const fieldMap = new Map();
+    modal.__aesSaveButton = findSaveButton(modal);
     const panel = $('#aes-stage-panel', studio);
     const stepHosts = [0,2].map(i=>{const d=document.createElement('div');d.className='aes-grid';d.dataset.fieldsStep=i;return d;});
     fields.forEach(f=>{const host=stepHosts.find(x=>Number(x.dataset.fieldsStep)===f.step);if(host){const pair=cloneField(f,host);if(pair)fieldMap.set(f.id,pair);}});
@@ -158,7 +160,7 @@
         panel.innerHTML='<h3>مصدر الأسئلة وتحديد الطلاب</h3><p class="aes-muted">مصدر أسئلة الامتحان هو بنك الأسئلة المركزي فقط. لا يتم دمج مجموعات التوليد أو تعديل الأسئلة الأصلية.</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button type="button" class="btn btn-primary" id="aes-open-bank">📚 اختيار الأسئلة من بنك الأسئلة</button><button type="button" class="btn btn-outline" id="aes-open-generator">⚙️ توليد أسئلة جديدة إلى البنك</button></div><div id="aes-target-slot"></div><div id="aes-program-slot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:12px"></div>';
         if(targetPanel)$('#aes-target-slot',panel).appendChild(targetPanel);
         programWrappers.forEach(el=>$('#aes-program-slot',panel).appendChild(el));
-        const syncWorkspaceSubject=()=>{const select=fieldMap.get('exam-subject')?.clone;const title=select?.selectedOptions?.[0]?.textContent?.trim();const heading=$('#exam-material-workspace-title');if(title&&heading)heading.textContent='📚 مكتبة المادة: '+title;};
+        const syncWorkspaceSubject=()=>{const select=fieldMap.get('exam-subject')?.clone;const title=select?.selectedOptions?.[0]?.textContent?.trim();const heading=$('#exam-material-workspace-title');if(title){window.__andalusExamSubjectOverride=title;if(heading)heading.textContent='📚 مكتبة المادة: '+title;}};
         $('#aes-open-bank',panel).onclick=()=>{syncWorkspaceSubject();if(typeof window.startAiExamGeneration==='function')window.startAiExamGeneration();else window.showToast?.('واجهة بنك الأسئلة غير جاهزة.');};
         $('#aes-open-generator',panel).onclick=()=>{syncWorkspaceSubject();if(typeof window.startAiExamGeneration==='function')window.startAiExamGeneration();else window.showToast?.('واجهة بنك الأسئلة غير جاهزة.');};
       } else if(stage===2){
