@@ -11,6 +11,7 @@
   function notify(message, type) { if (typeof window.showToast === 'function') window.showToast(message, type || 'success'); else alert(message); }
   function getSelectedFiles() { return [...document.querySelectorAll('#exam-material-files-list .exam-material-file-cb:checked')].map(el => el.value); }
   function getSubject() {
+    if (window.__andalusExamSubjectOverride) return String(window.__andalusExamSubjectOverride).trim();
     const title = document.getElementById('exam-material-workspace-title')?.textContent || '';
     const fromTitle = title.replace(/^\s*📚\s*مكتبة المادة\s*:\s*/i, '').trim();
     return fromTitle || 'المادة التدريبية';
@@ -300,6 +301,6 @@
       if (button) { button.disabled = false; button.textContent = '🧩 إنشاء امتحان من بنك الأسئلة'; }
     }
   }
-  function install() { window.startAiExamGeneration = openStageModal; window.__andalusStagedExamGeneration = { open: openStageModal, readDraft, persistGenerationBatch }; console.info('Andalus staged exam generation loaded.'); }
+  function install() { window.startAiExamGeneration = openStageModal; window.__andalusStagedExamGeneration = { open: openStageModal, readDraft, persistGenerationBatch }; if (!document.querySelector('script[data-andalus-exam-studio]')) { const s = document.createElement('script'); s.src = 'exam-studio-wizard.js?v=1'; s.async = true; s.dataset.andalusExamStudio = '1'; document.head.appendChild(s); } console.info('Andalus staged exam generation loaded.'); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true }); else install();
 })();
