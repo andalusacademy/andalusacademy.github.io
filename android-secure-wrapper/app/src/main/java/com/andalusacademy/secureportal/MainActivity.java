@@ -13,7 +13,10 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.window.OnBackInvokedCallback;
-import android.window.OnBackInvokedDispatcher;\n\nimport androidx.webkit.WebSettingsCompat;\nimport androidx.webkit.WebViewFeature;
+import android.window.OnBackInvokedDispatcher;
+
+import androidx.webkit.WebSettingsCompat;
+import androidx.webkit.WebViewFeature;
 
 import java.util.ArrayList;
 
@@ -35,7 +38,12 @@ public class MainActivity extends Activity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
-        settings.setGeolocationEnabled(true);\n        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_AUTHENTICATION)) {\n            WebSettingsCompat.setWebAuthenticationSupport(\n                settings, WebSettingsCompat.WEB_AUTHENTICATION_SUPPORT_FOR_APP\n            );\n        }
+        settings.setGeolocationEnabled(true);
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_AUTHENTICATION)) {
+            WebSettingsCompat.setWebAuthenticationSupport(
+                settings, WebSettingsCompat.WEB_AUTHENTICATION_SUPPORT_FOR_APP
+            );
+        }
         settings.setAllowFileAccess(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
         webView.setWebViewClient(new WebViewClient());
