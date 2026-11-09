@@ -89,7 +89,7 @@ profile=u;$('who').textContent=u.full_name||u.username;$('branch').textContent='
 if(u.role==='admin')$('adminArea').classList.remove('hidden');
 const {data:cfg,error:ce}=await sb.from('staff_attendance_settings').select('*').eq('branch','كفر الدوار').single();if(ce)throw ce;settings=cfg;
 $('radius').value=cfg.radius_m;$('accuracy').value=cfg.max_accuracy_m;
-const {data:cred}=await api('status');passkey=cred.hasCredential;$('passkeyStatus').textContent=passkey?'البصمة مسجلة على هذا الحساب':'لم يتم تسجيل بصمة لهذا الحساب';$('passkeyStatus').className='status '+(passkey?'ok':'warn');$('punchBtn').disabled=!passkey;
+const cred=await api('status');passkey=Boolean(cred?.hasCredential);$('passkeyStatus').textContent=passkey?'البصمة مسجلة على هذا الحساب':'لم يتم تسجيل بصمة لهذا الحساب';$('passkeyStatus').className='status '+(passkey?'ok':'warn');$('punchBtn').disabled=!passkey;
 await refreshHistory();if(u.role==='admin')await refreshAdmin();say('تم الدخول بنجاح. اختر تسجيل البصمة أولًا إذا كان هذا أول استخدام.','ok');
 }catch(e){say(e.message||'حدث خطأ أثناء تحميل النظام.','err')}}
 async function loadWebAuthn(){if(!webAuthn)webAuthn=await import('https://esm.sh/@simplewebauthn/browser@13.1.2');return webAuthn}
