@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>بصمة موظفي أكاديمية الأندلس</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--navy:#09264b;--blue:#1769aa;--sky:#eaf4ff;--ink:#152b45;--muted:#64748b;--line:#dbe5ef;--bg:#f4f7fb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Tahoma,Arial,sans-serif;color:var(--ink)}
+header{background:linear-gradient(120deg,#061b38,#155d9c);color:white;padding:24px max(18px,calc((100% - 1120px)/2));box-shadow:0 8px 24px #0b2b501c}
+header h1{margin:0 0 8px;font-size:23px}header p{margin:0;color:#d5eaff}
+main{max-width:1120px;margin:24px auto;padding:0 16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:white;border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 8px 25px #163c6510}
+.card h2{font-size:18px;margin:0 0 14px;color:var(--navy)}
+.muted{color:var(--muted);font-size:13px;line-height:1.7}.big{font-size:26px;font-weight:900;color:var(--navy)}
+button{border:0;border-radius:12px;padding:12px 16px;font-weight:800;cursor:pointer;background:var(--blue);color:white;margin:4px 0}
+button.secondary{background:#e7f1fb;color:#174a7b}button.danger{background:#b42318}
+button:disabled{opacity:.5;cursor:not-allowed}
+input,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;margin:5px 0 12px;font:inherit}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}
+.status{padding:12px;border-radius:12px;background:var(--sky);margin:10px 0;font-weight:700}
+.ok{background:#e9f8ef;color:#126338}.warn{background:#fff5df;color:#805400}.err{background:#fff0ef;color:#a1261b}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px}th,td{padding:11px;border-bottom:1px solid var(--line);text-align:right}th{background:#f1f6fb;color:var(--navy)}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
+.hidden{display:none!important}.actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:600px){header h1{font-size:19px}.card{padding:15px}}
+</style>
+</head>
+<body>
+<header><h1>🔐 بصمة حضور وانصراف موظفي أكاديمية الأندلس</h1><p>تحقق بيومتري على الجهاز + تحديد موقع لحظي داخل نطاق فرع كفر الدوار</p></header>
+<main>
+<div id="message" class="status">جارٍ التحقق من جلسة الدخول...</div>
+<section id="employeeArea" class="grid hidden">
+ <article class="card">
+  <h2>بيانات الموظف</h2><div id="who" class="big">—</div><div id="branch" class="muted">فرع كفر الدوار</div>
+  <div id="passkeyStatus" class="status warn">لم يتم تسجيل بصمة لهذا الجهاز بعد</div>
+  <button id="registerBtn">تسجيل بصمة الجهاز</button>
+  <p class="muted">يتم التحقق من البصمة/الوجه محليًا على الهاتف أو الكمبيوتر باستخدام Passkey. لا يتم إرسال صورة البصمة أو الوجه إلى الأكاديمية.</p>
+ </article>
+ <article class="card">
+  <h2>تسجيل الحضور والانصراف</h2><div id="todayStatus" class="status">جارٍ تحميل حالة اليوم...</div>
+  <button id="punchBtn" disabled>تسجيل الحضور / الانصراف بالبصمة</button>
+  <p class="muted">سيتم طلب الموقع عند الضغط فقط. لا يوجد تتبع للموقع في الخلفية. يجب أن تكون دقة GPS ضمن الحد المسموح وأن تكون داخل النطاق المحدد.</p>
+ </article>
+ <article class="card">
+  <h2>سجل حركاتي</h2><div id="myHistory" class="muted">جارٍ التحميل...</div>
+ </article>
+</section>
+<section id="adminArea" class="hidden">
+ <div class="grid">
+  <article class="card"><h2>إعدادات نطاق الفرع</h2>
+   <label>نصف قطر السماح بالمتر</label><input id="radius" type="number" min="25" max="500">
+   <label>أقصى دقة GPS مقبولة بالمتر</label><input id="accuracy" type="number" min="10" max="200">
+   <div class="muted">نقطة المركز: 31.137440053548712, 30.131224610401542</div>
+   <button id="saveSettings">حفظ الإعدادات</button>
+  </article>
+  <article class="card"><h2>ملخص اليوم</h2><div id="adminStats" class="big">—</div><div class="muted">عدد الموظفين الذين سجلوا دخولًا اليوم</div></article>
+ </div>
+ <article class="card" style="margin-top:16px"><div class="row"><h2>سجل حضور الموظفين</h2><input id="filterDate" type="date"></div>
+  <div class="tablewrap"><table><thead><tr><th>الموظف</th><th>الفرع</th><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>المدة</th><th>الحالة</th></tr></thead><tbody id="adminRows"></tbody></table></div>
+ </article>
+ <article class="card" style="margin-top:16px"><h2>طلبات الاستثناء والتصحيح</h2><div id="exceptions" class="muted">جارٍ التحميل...</div></article>
+</section>
+</main>
+<script type="module">
+const SUPABASE_URL='https://uvwarprsghwvrfmdaaqv.supabase.co';
+const SUPABASE_KEY='sb_publishable_MBvIDp_gVme16l3nqwyTBw_qog5lUBW';
+const FUNCTION_URL=SUPABASE_URL+'/functions/v1/staff-attendance';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const $=id=>document.getElementById(id);
+let session=null,profile=null,settings=null,passkey=false,webAuthn=null;
+const say=(s,type='')=>{$('message').className='status '+type;$('message').textContent=s};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(action,extra={}){const {data:{session:s}}=await sb.auth.getSession();if(!s)throw Error('انتهت جلسة الدخول. سجل دخولك من النظام الرئيسي أولًا.');const r=await fetch(FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.access_token,'apikey':SUPABASE_KEY},body:JSON.stringify({action,...extra})});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.message||j.error||'تعذر تنفيذ العملية');return j}
+async function init(){try{const {data:{session:s}}=await sb.auth.getSession();if(!s){say('سجّل دخولك من النظام الرئيسي أولًا، ثم افتح صفحة بصمة الموظفين.','warn');return}session=s;
+const {data:u,error}=await sb.from('user_profiles').select('id,username,full_name,role,branch,is_active').eq('id',s.user.id).single();if(error||!u||!u.is_active||!['admin','employee'].includes(u.role))throw Error('الحساب غير مصرح له باستخدام نظام بصمة الموظفين.');
+profile=u;$('who').textContent=u.full_name||u.username;$('branch').textContent='الفرع: '+(u.branch||'غير محدد');$('employeeArea').classList.remove('hidden');
+if(u.role==='admin')$('adminArea').classList.remove('hidden');
+const {data:cfg,error:ce}=await sb.from('staff_attendance_settings').select('*').eq('branch','كفر الدوار').single();if(ce)throw ce;settings=cfg;
+$('radius').value=cfg.radius_m;$('accuracy').value=cfg.max_accuracy_m;
+const {data:cred}=await api('status');passkey=cred.hasCredential;$('passkeyStatus').textContent=passkey?'البصمة مسجلة على هذا الحساب':'لم يتم تسجيل بصمة لهذا الحساب';$('passkeyStatus').className='status '+(passkey?'ok':'warn');$('punchBtn').disabled=!passkey;
+await refreshHistory();if(u.role==='admin')await refreshAdmin();say('تم الدخول بنجاح. اختر تسجيل البصمة أولًا إذا كان هذا أول استخدام.','ok');
+}catch(e){say(e.message||'حدث خطأ أثناء تحميل النظام.','err')}}
+async function loadWebAuthn(){if(!webAuthn)webAuthn=await import('https://esm.sh/@simplewebauthn/browser@13.1.2');return webAuthn}
+$('registerBtn').onclick=async()=>{try{$('registerBtn').disabled=true;say('جارٍ تجهيز تسجيل البصمة...');const w=await loadWebAuthn();const {options}=await api('register-options');const response=await w.startRegistration({optionsJSON:options});await api('register-verify',{response});passkey=true;$('passkeyStatus').textContent='تم تسجيل البصمة بنجاح على هذا الجهاز';$('passkeyStatus').className='status ok';$('punchBtn').disabled=false;say('تم تسجيل البصمة بنجاح. يمكنك الآن تسجيل الحضور والانصراف.','ok')}catch(e){say(e.message||'تعذر تسجيل البصمة.','err')}finally{$('registerBtn').disabled=false}};
+function getLocation(){return new Promise((resolve,reject)=>{if(!navigator.geolocation)return reject(Error('المتصفح لا يدعم تحديد الموقع'));navigator.geolocation.getCurrentPosition(p=>resolve({latitude:p.coords.latitude,longitude:p.coords.longitude,accuracy:p.coords.accuracy}),e=>reject(Error(e.code===1?'يجب السماح بإذن الموقع':e.code===2?'تعذر تحديد الموقع. فعّل GPS وحاول مرة أخرى':'انتهت مهلة تحديد الموقع')), {enableHighAccuracy:true,timeout:20000,maximumAge:0})})}
+$('punchBtn').onclick=async()=>{try{$('punchBtn').disabled=true;say('يرجى الانتظار: نتحقق من الموقع ثم نطلب البصمة...');const loc=await getLocation();const w=await loadWebAuthn();const {options}=await api('auth-options');const response=await w.startAuthentication({optionsJSON:options});const result=await api('punch',{response,location:loc});say(result.eventType==='check_in'?'تم تسجيل الحضور بنجاح.':'تم تسجيل الانصراف بنجاح.','ok');await refreshHistory()}catch(e){say(e.message||'تعذر تسجيل الحركة.','err')}finally{$('punchBtn').disabled=!passkey}};
+async function refreshHistory(){const {data,error}=await sb.from('staff_attendance_sessions').select('*').eq('employee_id',profile.id).order('work_date',{ascending:false}).limit(10);if(error)throw error;$('todayStatus').textContent=data?.[0]?.work_date===new Date().toLocaleDateString('en-CA')?(data[0].check_out_at?'تم تسجيل الحضور والانصراف اليوم': 'تم تسجيل الحضور اليوم — لم يتم تسجيل الانصراف بعد'):'لم يتم تسجيل حضور اليوم بعد';$('myHistory').innerHTML=data?.length?data.map(x=>'<div class="status">'+esc(x.work_date)+' · حضور '+esc(new Date(x.check_in_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}))+' · انصراف '+(x.check_out_at?esc(new Date(x.check_out_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})):'—')+'</div>').join(''):'لا توجد حركات مسجلة بعد.'}
+$('saveSettings').onclick=async()=>{try{const radius=Number($('radius').value),accuracy=Number($('accuracy').value);if(radius<25||radius>500||accuracy<10||accuracy>200)throw Error('النطاق 25–500 متر، ودقة GPS من 10–200 متر.');const {error}=await sb.from('staff_attendance_settings').update({radius_m:radius,max_accuracy_m:accuracy,updated_at:new Date().toISOString(),updated_by:profile.id}).eq('branch','كفر الدوار');if(error)throw error;settings.radius_m=radius;settings.max_accuracy_m=accuracy;say('تم حفظ إعدادات نطاق الفرع.','ok')}catch(e){say(e.message,'err')}};
+$('filterDate').value=new Date().toLocaleDateString('en-CA');$('filterDate').onchange=refreshAdmin;
+async function refreshAdmin(){const date=$('filterDate').value||new Date().toLocaleDateString('en-CA');let q=sb.from('staff_attendance_sessions').select('*').eq('work_date',date).order('check_in_at',{ascending:false});const {data,error}=await q;if(error)throw error;const ids=[...new Set((data||[]).map(x=>x.employee_id))];let people={};if(ids.length){const {data:p}=await sb.from('user_profiles').select('id,full_name,username').in('id',ids);(p||[]).forEach(x=>people[x.id]=x)}$('adminStats').textContent=(data||[]).length;$('adminRows').innerHTML=(data||[]).map(x=>{const p=people[x.employee_id]||{};let duration=x.check_out_at?Math.max(0,Math.round((new Date(x.check_out_at)-new Date(x.check_in_at))/60000))+' دقيقة':'—';return '<tr><td>'+esc(p.full_name||p.username||x.employee_id)+'</td><td>'+esc(x.branch)+'</td><td>'+esc(x.work_date)+'</td><td>'+esc(new Date(x.check_in_at).toLocaleTimeString('ar-EG'))+'</td><td>'+(x.check_out_at?esc(new Date(x.check_out_at).toLocaleTimeString('ar-EG')):'لم ينصرف')+'</td><td>'+duration+'</td><td>'+(x.check_out_at?'مكتمل':'داخل المركز')+'</td></tr>'}).join('')||'<tr><td colspan="7">لا توجد سجلات في هذا التاريخ.</td></tr>';
+const {data:ex}=await sb.from('staff_attendance_exceptions').select('*').eq('status','pending').order('requested_at',{ascending:false}).limit(20);$('exceptions').innerHTML=ex?.length?ex.map(x=>'<div class="status">'+esc(x.requested_event)+' — '+esc(x.reason)+' <span class="muted">'+esc(new Date(x.requested_at).toLocaleString('ar-EG'))+'</span></div>').join(''):'لا توجد طلبات معلقة.'}
+init();
+</script>
+</body></html>
