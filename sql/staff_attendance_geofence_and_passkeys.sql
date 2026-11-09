@@ -1,0 +1,4 @@
+-- Staff attendance schema and geofence configuration.
+-- Applied to Supabase project uvwarprsghwvrfmdaaqv as migration staff_attendance_geofence_and_passkeys.
+-- Independent of student attendance; does not modify public.attendance or student data.
+-- Branch coordinates: 31.137440053548712, 30.131224610401542; initial radius 100m.
