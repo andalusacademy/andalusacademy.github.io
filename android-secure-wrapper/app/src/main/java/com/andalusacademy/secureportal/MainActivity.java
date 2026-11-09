@@ -6,6 +6,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.WindowManager;
+import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -18,8 +19,12 @@ import java.util.ArrayList;
 
 public class MainActivity extends Activity {
     private static final int MEDIA_PERMISSION_REQUEST = 4107;
+    private static final int LOCATION_PERMISSION_REQUEST = 4108;
+    private static final String TRUSTED_ORIGIN = "https://andalusacademy.github.io";
     private WebView webView;
     private PermissionRequest pendingRequest;
+    private GeolocationPermissions.Callback pendingGeoCallback;
+    private String pendingGeoOrigin;
     private OnBackInvokedCallback backInvokedCallback;
 
     @Override public void onCreate(Bundle savedInstanceState) {
@@ -30,6 +35,7 @@ public class MainActivity extends Activity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
+        settings.setGeolocationEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
         webView.setWebViewClient(new WebViewClient());
@@ -48,6 +54,29 @@ public class MainActivity extends Activity {
                     }
                 });
             }
+
+            @Override public void onGeolocationPermissionsShowPrompt(
+                String origin, GeolocationPermissions.Callback callback
+            ) {
+                runOnUiThread(() -> {
+                    if (!TRUSTED_ORIGIN.equals(origin)) {
+                        callback.invoke(origin, false, false);
+                        return;
+                    }
+                    if (hasLocationPermission()) {
+                        callback.invoke(origin, true, false);
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        pendingGeoCallback = callback;
+                        pendingGeoOrigin = origin;
+                        requestPermissions(new String[] {
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        }, LOCATION_PERMISSION_REQUEST);
+                    } else {
+                        callback.invoke(origin, false, false);
+                    }
+                });
+            }
         });
         setContentView(webView);
         if (Build.VERSION.SDK_INT >= 33) {
@@ -61,6 +90,11 @@ public class MainActivity extends Activity {
     private boolean hasMediaPermissions() {
         return checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
             && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean hasLocationPermission() {
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void grantRequestedMedia(PermissionRequest request) {
@@ -86,6 +120,13 @@ public class MainActivity extends Activity {
             if (hasMediaPermissions()) grantRequestedMedia(request);
             else request.deny();
         }
+        if (requestCode == LOCATION_PERMISSION_REQUEST && pendingGeoCallback != null) {
+            GeolocationPermissions.Callback callback = pendingGeoCallback;
+            String origin = pendingGeoOrigin;
+            pendingGeoCallback = null;
+            pendingGeoOrigin = null;
+            callback.invoke(origin, hasLocationPermission(), false);
+        }
     }
 
     @Override protected void onResume() {
@@ -96,8 +137,6 @@ public class MainActivity extends Activity {
 
     @Override protected void onPause() {
         if (webView != null) {
-            // Leaving the Android app while an exam is active is an exam exit.
-            // The page also listens for visibilitychange; this native hook is a fallback.
             webView.evaluateJavascript(
                 "(function(){if(typeof window.finalizeExamOnExit==='function'){window.finalizeExamOnExit('android_app_background');}})();",
                 null
@@ -109,7 +148,6 @@ public class MainActivity extends Activity {
 
     private void handleAppBack() {
         if (webView == null) return;
-        // The web app owns navigation: return to the previous portal/page instead of closing the app.
         webView.evaluateJavascript(
             "(function(){if(typeof window.andalusGoBack==='function'){window.andalusGoBack();}else if(window.history.length>1){window.history.back();}})();",
             null);
