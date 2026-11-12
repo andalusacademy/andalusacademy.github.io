@@ -42,6 +42,12 @@ function inject(){
   document.getElementById('ss-ai-new-btn').addEventListener('click',startNewSummary);
   [['ss-ai-mc-enabled','ss-ai-mc-count'],['ss-ai-tf-enabled','ss-ai-tf-count'],['ss-ai-essay-enabled','ss-ai-essay-count']].forEach(([check,count])=>{const box=document.getElementById(check),input=document.getElementById(count);box.addEventListener('change',()=>{input.disabled=!box.checked;if(!box.checked)input.value='';else input.focus();});});
  }
+ if(!document.getElementById('ss-ready-pdf-card')){
+  const ready=document.createElement('div');ready.id='ss-ready-pdf-card';ready.className='card';
+  ready.innerHTML='<div class="card-header"><h3>📄 رفع ملخص جاهز للبيع</h3><span style="font-size:12px;color:var(--muted)">PDF جاهز — بدون توليد أسئلة</span></div><div style="padding:16px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px"><div class="form-group"><label>اسم الملخص</label><input id="ss-ready-title" class="search-input" maxlength="180" placeholder="مثال: ملخص أساسيات التمريض" style="width:100%"></div><div class="form-group"><label>اسم المادة</label><input id="ss-ready-subject" class="search-input" maxlength="160" placeholder="اسم المادة" style="width:100%"></div><div class="form-group" style="grid-column:1/-1"><label>ملف الملخص PDF</label><input id="ss-ready-file" class="search-input" type="file" accept="application/pdf,.pdf" style="width:100%"><small style="color:var(--muted)">الحد الأقصى 15 ميجابايت.</small></div><div class="form-group" style="grid-column:1/-1"><label>وصف مختصر (اختياري)</label><textarea id="ss-ready-description" class="search-input" maxlength="3000" style="width:100%;min-height:60px"></textarea></div></div><button class="btn btn-gold" id="ss-ready-create" type="button">حفظ الملخص الجاهز</button><div id="ss-ready-pdf-status" style="margin-top:10px"></div></div>';
+  const anchor=document.getElementById('ss-ai-generator-card');if(anchor)anchor.insertAdjacentElement('afterend',ready);else page.prepend(ready);
+  document.getElementById('ss-ready-create').addEventListener('click',createReadyPdfSummary);
+ }
  if(!document.getElementById('ss-question-review-card')){
   const card=document.createElement('div');card.id='ss-question-review-card';card.className='card';
   card.innerHTML='<div class="card-header"><h3>📝 ٢) مراجعة الأسئلة والإجابات ومصادر الصفحات</h3><span id="ss-question-counts" style="font-size:12px;color:var(--muted)">ارفع المادة أولًا</span></div>'+
@@ -85,6 +91,31 @@ function inject(){
   document.getElementById('ss-manage-student-search').addEventListener('input',renderTargetStudents);
  }
  hideLegacy();
+}
+async function createReadyPdfSummary(){
+ const sbc=client(),title=document.getElementById('ss-ready-title')?.value.trim(),subject=document.getElementById('ss-ready-subject')?.value.trim(),description=document.getElementById('ss-ready-description')?.value.trim()||'',file=document.getElementById('ss-ready-file')?.files?.[0],statusEl=document.getElementById('ss-ready-pdf-status'),button=document.getElementById('ss-ready-create');
+ if(!sbc||!statusEl||!button)return;
+ if(!title||title.length<2||!subject)return statusEl.textContent='اكتب اسم الملخص واسم المادة.';
+ if(!file||(!file.type.includes('pdf')&&!file.name.toLowerCase().endsWith('.pdf')))return statusEl.textContent='اختر ملف PDF جاهزًا.';
+ if(file.size>15*1024*1024)return statusEl.textContent='حجم الملف يجب ألا يتجاوز 15 ميجابايت.';
+ button.disabled=true;button.textContent='جاري رفع الملف...';statusEl.textContent='جاري إنشاء المنتج ورفع ملف PDF بشكل آمن...';
+ let summaryId=null,path='';
+ try{
+  const auth=await sbc.auth.getSession();if(!auth.data?.session)throw new Error('جلسة المدير غير صالحة. سجّل الدخول مرة أخرى.');
+  const made=await sbc.from('study_summaries').insert({title,subject_name:subject,description,price:0,validity_days:30,is_published:false,is_approved:true,created_by:auth.data.session.user.id,ai_generation_status:'ready',generated_question_count:0,enabled_batches:[],enabled_question_types:[],target_all:true}).select('id').single();
+  if(made.error)throw made.error;summaryId=made.data.id;path='summary-'+summaryId+'/delivery-'+Date.now()+'.pdf';
+  const uploaded=await sbc.storage.from('study-summary-pdfs').upload(path,file,{contentType:'application/pdf',upsert:false});
+  if(uploaded.error)throw uploaded.error;
+  const saved=await sbc.from('study_summaries').update({delivery_pdf_path:uploaded.data?.path||path,ai_generation_status:'ready',updated_at:new Date().toISOString()}).eq('id',summaryId);
+  if(saved.error)throw saved.error;
+  statusEl.textContent='تم حفظ الملخص الجاهز كمسودة معتمدة للمحتوى. اضبط السعر والجمهور ومدة الوصول من إعدادات / نشر.';
+  document.getElementById('ss-ready-title').value='';document.getElementById('ss-ready-subject').value='';document.getElementById('ss-ready-description').value='';document.getElementById('ss-ready-file').value='';
+  await refreshSummaries();
+ }catch(e){
+  if(path)await sbc.storage.from('study-summary-pdfs').remove([path]);
+  if(summaryId)await sbc.from('study_summaries').delete().eq('id',summaryId);
+  statusEl.textContent='تعذر حفظ الملخص الجاهز: '+(e?.message||String(e));
+ }finally{button.disabled=false;button.textContent='حفظ الملخص الجاهز';}
 }
 async function createSummaryFromQuestionBank(){
  const sbc=client();
@@ -383,7 +414,7 @@ async function loadManageSummary(){
  const enabledBatches=Array.isArray(data.enabled_batches)?data.enabled_batches.map(Number):[];
  const batchQuery=await sbc.from('study_summary_questions').select('batch_no').eq('summary_id',id).eq('is_selected',true).eq('is_approved',true).order('batch_no');
  const availableBatches=[...new Set((batchQuery.data||[]).map(q=>Number(q.batch_no)).filter(n=>n>0))];
- document.getElementById('ss-manage-batches').innerHTML=availableBatches.length?availableBatches.map(n=>'<label style="display:flex;gap:7px;align-items:center"><input type="checkbox" data-summary-batch="'+n+'" '+(enabledBatches.includes(n)?'checked':'')+'> الجزء '+n+' ('+String.fromCharCode(64+n)+')</label>').join(''):'لا توجد أجزاء معتمدة تحتوي على أسئلة مختارة.';
+ document.getElementById('ss-manage-batches').innerHTML=availableBatches.length?availableBatches.map(n=>'<label style="display:flex;gap:7px;align-items:center"><input type="checkbox" data-summary-batch="'+n+'" '+(enabledBatches.includes(n)?'checked':'')+'> الجزء '+n+' ('+String.fromCharCode(64+n)+')</label>').join(''):(data.delivery_pdf_path?'هذا المنتج ملف PDF جاهز — لا يحتاج إلى أسئلة تفاعلية.':'لا توجد أجزاء معتمدة تحتوي على أسئلة مختارة.');
  const enabledTypes=Array.isArray(data.enabled_question_types)?data.enabled_question_types:['mcq','true_false','essay'];
  document.querySelectorAll('#ss-manage-types input[data-summary-type]').forEach(box=>box.checked=enabledTypes.includes(box.dataset.summaryType));
  const qs=await sbc.from('study_summary_questions').select('id,batch_no').eq('summary_id',id).eq('is_selected',true).eq('is_approved',true);
@@ -396,8 +427,8 @@ async function saveManageSummary(publish){
  const priceRaw=document.getElementById('ss-manage-price').value.trim(),price=Number(priceRaw);syncValidityInput();const validity=Number(document.getElementById('ss-manage-validity').value),validityPreset=document.getElementById('ss-manage-validity-preset').value,fromVal=document.getElementById('ss-manage-from').value,untilVal=document.getElementById('ss-manage-until').value;
  const paymentProvider=document.getElementById('ss-manage-payment-provider').value.trim(),walletNumber=document.getElementById('ss-manage-wallet-number').value.trim(),targetAll=document.getElementById('ss-manage-target-all').checked,targetBranches=getTargetChecks('branch'),targetSystems=getTargetChecks('system'),targetBatches=getTargetChecks('batch');
  if(!priceRaw||!Number.isFinite(price)||price<0||!Number.isInteger(validity)||validity<1||(validityPreset==='custom'&&validity>3650)||(validityPreset!=='custom'&&validityPreset!=='36500'&&validity>3650)){el.textContent='راجع السعر ومدة الصلاحية. المدة المخصصة من يوم إلى 3650 يومًا.';return;}if(!fromVal||!untilVal||new Date(untilVal)<=new Date(fromVal)){el.textContent='حدد بداية ونهاية صحيحتين للإتاحة.';return;}if(!targetAll&&!targetBranches.length&&!targetSystems.length&&!targetBatches.length&&!selectedTargetStudentIds.size){el.textContent='حدد الجمهور: كل الطلاب أو الفروع أو الأنظمة أو البرامج أو طلابًا محددين.';return;}if(publish&&(!paymentProvider||!walletNumber)){el.textContent='أدخل وسيلة التحويل ورقم المحفظة قبل نشر الملخص للطلاب.';return;}if(walletNumber&&!/^[0-9+\s()-]{6,40}$/.test(walletNumber)){el.textContent='راجع رقم المحفظة؛ أدخل رقمًا صحيحًا فقط.';return;}
- const enabledBatches=[...document.querySelectorAll('#ss-manage-batches input[data-summary-batch]:checked')].map(box=>Number(box.dataset.summaryBatch)),enabledTypes=[...document.querySelectorAll('#ss-manage-types input[data-summary-type]:checked')].map(box=>box.dataset.summaryType);if(!enabledBatches.length||!enabledTypes.length){el.textContent='حدد جزءًا واحدًا ونوع سؤال واحدًا على الأقل.';return;}
- for(const id of ids){const q=await sbc.from('study_summary_questions').select('id').eq('summary_id',id).eq('is_selected',true).eq('is_approved',true).in('batch_no',enabledBatches).in('question_type',enabledTypes);if(q.error)throw q.error;if(!(q.data||[]).length){const row=await sbc.from('study_summaries').select('title').eq('id',id).maybeSingle();el.textContent='الملخص «'+(row.data?.title||id)+'» لا يحتوي أسئلة معتمدة تطابق الأجزاء والأنواع المحددة. لم تُحفظ أي إعدادات.';return;}}
+ const enabledBatches=[...document.querySelectorAll('#ss-manage-batches input[data-summary-batch]:checked')].map(box=>Number(box.dataset.summaryBatch)),enabledTypes=[...document.querySelectorAll('#ss-manage-types input[data-summary-type]:checked')].map(box=>box.dataset.summaryType);
+  for(const id of ids){const [q,row]=await Promise.all([sbc.from('study_summary_questions').select('id').eq('summary_id',id).eq('is_selected',true).eq('is_approved',true).in('batch_no',enabledBatches.length?enabledBatches:[-1]).in('question_type',enabledTypes.length?enabledTypes:['__none__']),sbc.from('study_summaries').select('title,delivery_pdf_path').eq('id',id).maybeSingle()]);if(q.error)throw q.error;if(!(q.data||[]).length&&!row.data?.delivery_pdf_path){el.textContent='الملخص «'+(row.data?.title||id)+'» لا يحتوي أسئلة معتمدة أو ملف PDF جاهزًا.';return;}if((q.data||[]).length&&(!enabledBatches.length||!enabledTypes.length)){el.textContent='حدد جزءًا ونوع سؤال واحدًا على الأقل لهذا الملخص.';return;}}
  const payload={price,validity_days:validity,payment_provider:paymentProvider||null,payment_wallet_number:walletNumber||null,enabled_batches:enabledBatches,enabled_question_types:enabledTypes,target_all:targetAll,target_branch:targetAll?null:(targetBranches.length?JSON.stringify(targetBranches):null),target_system:targetAll?null:(targetSystems.length?JSON.stringify(targetSystems):null),target_batch:targetAll?null:(targetBatches.length?JSON.stringify(targetBatches):null),available_from:new Date(fromVal).toISOString(),available_until:new Date(untilVal).toISOString(),is_published:!!publish,published_at:publish?new Date().toISOString():null,updated_at:new Date().toISOString()};
  for(const id of ids){const result=await sbc.from('study_summaries').update(payload).eq('id',id).eq('is_approved',true);if(result.error){el.textContent='تعذر حفظ إعدادات أحد الملخصات: '+result.error.message;return;}const cleared=await sbc.from('study_summary_target_students').delete().eq('summary_id',id);if(cleared.error){el.textContent='تم حفظ الإعدادات لكن تعذر تحديث قائمة الطلاب: '+cleared.error.message;return;}if(!targetAll&&selectedTargetStudentIds.size){const targetRows=[...selectedTargetStudentIds].map(student_id=>({summary_id:id,student_id}));const savedTargets=await sbc.from('study_summary_target_students').insert(targetRows);if(savedTargets.error){el.textContent='تم حفظ إعدادات المنتج لكن تعذر حفظ الطلاب المحددين: '+savedTargets.error.message;return;}}}
  el.textContent=(publish?'تم نشر ':'تم حفظ إعدادات ')+ids.length+' ملخص/ملخصات '+(publish?'للطلاب ضمن وقت الإتاحة المحدد.':' دون النشر للطلاب.');if(publish&&typeof showToast==='function')showToast('تم نشر '+ids.length+' ملخص/ملخصات للطلاب المستهدفين.','success');await refreshSummaries();if(typeof window.loadStudySummaryOrdersAdmin==='function')await window.loadStudySummaryOrdersAdmin();
