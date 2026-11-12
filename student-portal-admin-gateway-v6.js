@@ -155,6 +155,8 @@
     host.innerHTML='<div id="'+MODAL_ID+'" class="card" style="width:100%;max-width:100%;margin:0;position:relative;inset:auto;overflow:visible;border-radius:16px;box-shadow:none">'+gatewayMarkup()+'</div>';
     host.querySelector('#andulus-student-gateway-close').onclick=closeGateway;
     host.querySelector('#gateway-summaries').onclick=openExistingSummary;
+    const notificationsButton=host.querySelector('#gateway-notifications');
+    if(notificationsButton) notificationsButton.onclick=openExistingNotifications;
     host.querySelector('#gateway-ai').onclick=openAiDashboard;
     window.scrollTo({top:0,behavior:'smooth'});
   }
