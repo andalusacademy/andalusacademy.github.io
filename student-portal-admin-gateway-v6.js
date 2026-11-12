@@ -65,6 +65,7 @@
   }
 
   function returnFromNotifications() {
+    document.getElementById('andalus-notifications-back-to-gateway')?.remove();
     const page=document.getElementById('page-notifications');
     if(page && notificationsOriginalHome?.parent){
       const home=notificationsOriginalHome;
