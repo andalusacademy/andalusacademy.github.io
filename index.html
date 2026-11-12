@@ -15157,7 +15157,7 @@ async function loadNotificationsAdmin() {
   // Click handling is delegated from document because this table is rebuilt dynamically.
 }
 
-async async function showNotificationStats(notificationId) {
+async function showNotificationStats(notificationId) {
   const renderStatsState = (html) => {
     let overlay = document.getElementById('notification-stats-overlay');
     if (!overlay) {
