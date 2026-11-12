@@ -244,7 +244,7 @@
     }
     panel.querySelectorAll('[data-attempt]').forEach(b=>b.addEventListener('click',()=>{const a=cache.attempts.find(x=>x.id===b.dataset.attempt);if(a)details(a);}));
     panel.querySelectorAll('[data-remedial-student]').forEach(b=>b.addEventListener('click',()=>{
-      const student=analytics.students.find(x=>x.id===b.dataset.remedialStudent);if(!student)return;
+      const student=questionAnalytics().students.find(x=>x.id===b.dataset.remedialStudent);if(!student)return;
       const rows=[['رقم القيد','اسم الطالب','السؤال','إجابة الطالب','الإجابة الصحيحة','الصعوبة','المادة'],...student.wrongQuestions.map(x=>[student.id,student.name,x.question.question_text,x.answer,x.question.correct_answer,x.question.difficulty,cache.subjects[String(cache.exams.find(e=>e.id===x.question.exam_id)?.subject_id)]||'غير محدد'])];
       if(rows.length===1){if(window.showToast)window.showToast('لا توجد إجابات خاطئة مسجلة لهذا الطالب.','info');return;}
       downloadCsv('andalus-remedial-'+student.id+'.csv',rows,'خطة علاجية');
