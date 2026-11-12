@@ -17364,13 +17364,53 @@ async function openStudentStudySummaryPdf(id){
   if(!summary||![true,1,'1','true','t','TRUE','yes'].includes(summary.has_access)||!summary.has_pdf){showToast('لا توجد صلاحية فعّالة لفتح ملف هذا الملخص.','error');return;}
   if(!studentPortalFaceToken){showToast('انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.','error');return;}
   const box=document.getElementById('student-portal-content');
-  box.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted)">جاري تجهيز ملف الملخص الآمن...</div>';
+  box.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted)">جاري تجهيز عارض الملخص المحمي...</div>';
   try{
     const response=await fetch(sb.supabaseUrl+'/functions/v1/get-study-summary-file',{method:'POST',headers:{'Content-Type':'application/json',apikey:sb.supabaseKey},body:JSON.stringify({session_token:studentPortalFaceToken,summary_id:id})});
     const result=await response.json().catch(()=>({}));
-    if(!response.ok||!result.ok||!result.signed_url)throw new Error(result.reason==='access_denied'?'لا توجد صلاحية فعّالة لفتح الملف.':'تعذر تجهيز رابط الملف الآمن.');
-    box.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button class="btn btn-outline btn-sm" onclick="goToPortalStudySummaries()">← رجوع للمكتبة</button><strong>'+ssEsc(summary.title)+'</strong><a class="btn btn-gold btn-sm" href="'+ssEsc(result.signed_url)+'" target="_blank" rel="noopener">فتح / تنزيل PDF</a></div><iframe src="'+ssEsc(result.signed_url)+'" title="ملخص دراسي" style="width:100%;height:78vh;border:1px solid var(--border);border-radius:10px;background:#fff"></iframe><p style="font-size:11px;color:var(--muted);margin-top:8px">رابط الملف مؤقت وينتهي تلقائيًا بعد 15 دقيقة.</p>';
-  }catch(e){box.innerHTML='<div style="padding:18px;color:#b91c1c;text-align:center">'+ssEsc(e?.message||e)+'</div><button class="btn btn-outline" onclick="goToPortalStudySummaries()">رجوع للمكتبة</button>';}
+    if(!response.ok||!result.ok||!result.signed_url)throw new Error(result.reason==='access_denied'?'لا توجد صلاحية فعّالة لفتح الملف.':'تعذر تجهيز الملف الآمن.');
+    box.innerHTML=`<style>
+      #ss-protected-reader{position:relative;background:#475569;padding:12px;border-radius:12px;overflow:hidden}
+      #ss-protected-pages{display:grid;gap:14px;justify-items:center;max-height:78vh;overflow:auto;overscroll-behavior:contain}
+      #ss-protected-pages canvas{display:block;max-width:100%;height:auto!important;background:#fff;box-shadow:0 2px 12px #0005}
+      #ss-protected-reader .ss-watermark{position:absolute;inset:0;pointer-events:none;z-index:3;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(5,1fr);align-items:center;justify-items:center;overflow:hidden}
+      #ss-protected-reader .ss-watermark span{color:rgba(15,23,42,.19);font-weight:900;font-size:clamp(12px,2vw,20px);transform:rotate(-28deg);white-space:nowrap;text-shadow:0 1px 1px #fff8}
+      #ss-protected-reader,#ss-protected-reader *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+    </style>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="btn btn-outline btn-sm" onclick="goToPortalStudySummaries()">← رجوع للمكتبة</button>
+      <strong>${ssEsc(summary.title)}</strong><span style="font-size:12px;color:#b45309;font-weight:800">عرض محمي • بدون تنزيل مباشر</span>
+    </div>
+    <div id="ss-protected-reader"><div id="ss-protected-pages"></div><div class="ss-watermark" aria-hidden="true">${Array.from({length:10},()=>'<span>الأندلس • نسخة مخصصة • '+String(studentPortalFaceToken).slice(-8)+'</span>').join('')}</div></div>
+    <p style="font-size:11px;color:var(--muted);margin-top:8px">هذا المحتوى مخصص لحسابك. يمنع العارض أدوات النسخ والتنزيل والطباعة المعتادة، وتظهر علامة مائية لتتبع النسخ المسربة.</p>`;
+    const reader=document.getElementById('ss-protected-reader');
+    ['contextmenu','copy','cut','dragstart'].forEach(evt=>reader.addEventListener(evt,e=>e.preventDefault()));
+    document.addEventListener('keydown',window.__ssProtectedKeys||(window.__ssProtectedKeys=function(e){
+      if((e.ctrlKey||e.metaKey)&&['s','p','c','x','u'].includes(String(e.key).toLowerCase()))e.preventDefault();
+    }));
+    if(!window.pdfjsLib){
+      await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';script.onload=resolve;script.onerror=()=>reject(new Error('تعذر تحميل عارض PDF المحمي.'));document.head.appendChild(script);});
+    }
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf=await window.pdfjsLib.getDocument({url:result.signed_url}).promise;
+    const pages=document.getElementById('ss-protected-pages');
+    for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
+      if(!document.getElementById('ss-protected-reader'))return;
+      const page=await pdf.getPage(pageNo);
+      const baseViewport=page.getViewport({scale:1});
+      const width=Math.min(pages.clientWidth||900,900);
+      const scale=Math.min(2.0,Math.max(1,width/baseViewport.width));
+      const viewport=page.getViewport({scale});
+      const canvas=document.createElement('canvas');
+      const context=canvas.getContext('2d',{alpha:false});
+      canvas.width=Math.floor(viewport.width);canvas.height=Math.floor(viewport.height);
+      canvas.setAttribute('aria-label','صفحة '+pageNo);
+      pages.appendChild(canvas);
+      await page.render({canvasContext:context,viewport}).promise;
+    }
+  }catch(e){
+    box.innerHTML='<div style="padding:18px;color:#b91c1c;text-align:center">'+ssEsc(e?.message||e)+'</div><button class="btn btn-outline" onclick="goToPortalStudySummaries()">رجوع للمكتبة</button>';
+  }
 }
 async function renderStudentStudySummaryQuestion(){
   const box=document.getElementById('student-portal-content');
