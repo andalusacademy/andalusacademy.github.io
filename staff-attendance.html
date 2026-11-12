@@ -70,6 +70,12 @@ table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px}th,td{p
   <div class="tablewrap"><table><thead><tr><th>الموظف</th><th>الفرع</th><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>المدة</th><th>الحالة</th></tr></thead><tbody id="adminRows"></tbody></table></div>
  </article>
  <article class="card" style="margin-top:16px"><h2>طلبات الاستثناء والتصحيح</h2><div id="exceptions" class="muted">جارٍ التحميل...</div></article>
+ <article class="card" style="margin-top:16px">
+  <div class="row"><div><h2>إدارة بصمات الموظفين</h2><p class="muted">متابعة أجهزة Passkey المسجلة وإلغاء اعتماد جهاز مفقود أو مستبدل.</p></div><button id="refreshCredentials" class="secondary" type="button">تحديث القائمة</button></div>
+  <div id="credentialSummary" class="status">جارٍ تحميل بيانات البصمات...</div>
+  <div class="tablewrap"><table><thead><tr><th>الموظف</th><th>الفرع</th><th>حالة البصمة</th><th>نوع الجهاز</th><th>المزامنة</th><th>تاريخ التسجيل</th><th>آخر استخدام</th><th>آخر حركة حضور/انصراف</th><th>الإجراء</th></tr></thead><tbody id="credentialRows"></tbody></table></div>
+  <p class="muted">إلغاء البصمة يمنع استخدام هذا الاعتماد في تسجيل الحضور والانصراف من جهة الخادم، لكنه لا يحذف بيانات البصمة المحلية من الهاتف ولا يمسح سجل الحضور السابق. سيحتاج الموظف إلى تسجيل Passkey جديد.</p>
+ </article>
 </section>
 </main>
 <script type="module">
@@ -91,13 +97,45 @@ if(u.role==='admin')$('adminArea').classList.remove('hidden');
 const {data:cfg,error:ce}=await sb.from('staff_attendance_settings').select('*').eq('branch','كفر الدوار').single();if(ce)throw ce;settings=cfg;
 $('radius').value=cfg.radius_m;$('accuracy').value=cfg.max_accuracy_m;
 const cred=await api('status');passkey=Boolean(cred?.hasCredential);$('passkeyStatus').textContent=passkey?'البصمة مسجلة على هذا الحساب':'لم يتم تسجيل بصمة لهذا الحساب';$('passkeyStatus').className='status '+(passkey?'ok':'warn');$('punchBtn').disabled=!passkey;
-await refreshHistory();if(u.role==='admin')await refreshAdmin();say('تم الدخول بنجاح. اختر تسجيل البصمة أولًا إذا كان هذا أول استخدام.','ok');
+await refreshHistory();if(u.role==='admin'){await refreshAdmin();await refreshCredentials();}say('تم الدخول بنجاح. اختر تسجيل البصمة أولًا إذا كان هذا أول استخدام.','ok');
 }catch(e){say(e.message||'حدث خطأ أثناء تحميل النظام.','err')}}
 async function loadWebAuthn(){if(!webAuthn)webAuthn=await import('https://esm.sh/@simplewebauthn/browser@13.1.2');return webAuthn}
 $('registerBtn').onclick=async()=>{try{$('registerBtn').disabled=true;say('جارٍ تجهيز تسجيل البصمة...');const w=await loadWebAuthn();const {options}=await api('register-options');const response=await w.startRegistration({optionsJSON:options});await api('register-verify',{response});passkey=true;$('passkeyStatus').textContent='تم تسجيل البصمة بنجاح على هذا الجهاز';$('passkeyStatus').className='status ok';$('punchBtn').disabled=false;say('تم تسجيل البصمة بنجاح. يمكنك الآن تسجيل الحضور والانصراف.','ok')}catch(e){say(e.message||'تعذر تسجيل البصمة.','err')}finally{$('registerBtn').disabled=false}};
 function getLocation(){return new Promise((resolve,reject)=>{if(!navigator.geolocation)return reject(Error('المتصفح لا يدعم تحديد الموقع'));navigator.geolocation.getCurrentPosition(p=>resolve({latitude:p.coords.latitude,longitude:p.coords.longitude,accuracy:p.coords.accuracy}),e=>reject(Error(e.code===1?'يجب السماح بإذن الموقع':e.code===2?'تعذر تحديد الموقع. فعّل GPS وحاول مرة أخرى':'انتهت مهلة تحديد الموقع')), {enableHighAccuracy:true,timeout:20000,maximumAge:0})})}
 $('punchBtn').onclick=async()=>{try{$('punchBtn').disabled=true;say('يرجى الانتظار: نتحقق من الموقع ثم نطلب البصمة...');const loc=await getLocation();const w=await loadWebAuthn();const {options}=await api('auth-options');const response=await w.startAuthentication({optionsJSON:options});const result=await api('punch',{response,location:loc});say(result.eventType==='check_in'?'تم تسجيل الحضور بنجاح.':'تم تسجيل الانصراف بنجاح.','ok');await refreshHistory()}catch(e){say(e.message||'تعذر تسجيل الحركة.','err')}finally{$('punchBtn').disabled=!passkey}};
 $('exceptionBtn').onclick=async()=>{try{const reason=$('exceptionReason').value.trim();if(reason.length<5)throw Error('اكتب سبب الطلب بشكل واضح.');const {error}=await sb.from('staff_attendance_exceptions').insert({employee_id:profile.id,requested_event:$('exceptionType').value,reason});if(error)throw error;$('exceptionReason').value='';say('تم إرسال طلبك للإدارة للمراجعة.','ok')}catch(e){say(e.message||'تعذر إرسال الطلب.','err')}};
+async function refreshCredentials(){
+ try{
+  $('credentialSummary').textContent='جارٍ تحميل قائمة الموظفين والأجهزة...';
+  const result=await api('admin-list-credentials');
+  const rows=[];
+  let registered=0,total=0;
+  for(const employee of (result.employees||[])){
+   const devices=employee.credentials||[];
+   total+=devices.length;if(devices.length)registered++;
+   if(!devices.length){
+    rows.push('<tr><td>'+esc(employee.fullName||employee.username)+'</td><td>'+esc(employee.branch||'—')+'</td><td><span class="status warn">غير مسجلة</span></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>');
+   }else for(const device of devices){
+    const type=device.deviceType==='multiDevice'?'متزامنة / متعددة الأجهزة':device.deviceType==='singleDevice'?'مرتبطة بهذا الجهاز':'غير محدد';
+    const sync=device.backedUp?'مدعومة بالمزامنة':'غير مدعومة بالمزامنة';
+    const transports=(device.transports||[]).map(x=>({internal:'داخل الجهاز',hybrid:'هاتف/جهاز قريب',usb:'USB',nfc:'NFC',ble:'Bluetooth'}[x]||x)).join('، ')||'غير محدد';
+    const last=employee.lastAttendance;
+    const lastMovement=last?(esc(last.work_date)+'<div class="muted">حضور '+(last.check_in_at?esc(cairoTime(last.check_in_at)):'—')+' · انصراف '+(last.check_out_at?esc(cairoTime(last.check_out_at)):'لم يسجل')):'لا توجد حركات';
+    rows.push('<tr><td>'+esc(employee.fullName||employee.username)+'</td><td>'+esc(employee.branch||'—')+'</td><td><span class="status ok">مسجلة</span></td><td>'+esc(type)+'<div class="muted">'+esc(transports)+'</div></td><td>'+esc(sync)+'</td><td>'+esc(new Date(device.createdAt).toLocaleString('ar-EG',{timeZone:'Africa/Cairo'}))+'</td><td>'+ (device.lastUsedAt?esc(new Date(device.lastUsedAt).toLocaleString('ar-EG',{timeZone:'Africa/Cairo'})):'لم تستخدم بعد')+'</td><td>'+lastMovement+'</td><td><button class="danger" data-revoke-credential="'+esc(device.id)+'" data-employee="'+esc(employee.fullName||employee.username)+'">إلغاء البصمة</button></td></tr>');
+   }
+  }
+  $('credentialRows').innerHTML=rows.join('')||'<tr><td colspan="9">لا يوجد موظفون مسجلون.</td></tr>';
+  $('credentialSummary').textContent='عدد الموظفين: '+(result.employees||[]).length+' · موظفون لديهم بصمة: '+registered+' · إجمالي الأجهزة المسجلة: '+total;
+  $('credentialRows').querySelectorAll('[data-revoke-credential]').forEach(btn=>btn.onclick=async()=>{
+   const who=btn.dataset.employee||'الموظف';
+   if(!confirm('تأكيد إلغاء اعتماد البصمة لهذا الجهاز لدى '+who+'؟ لن يتم حذف سجل الحضور السابق، وسيحتاج الموظف لتسجيل بصمة جديدة.'))return;
+   btn.disabled=true;
+   try{await api('admin-revoke-credential',{credentialRowId:btn.dataset.revokeCredential});say('تم إلغاء اعتماد البصمة بنجاح.','ok');await refreshCredentials()}
+   catch(e){say(e.message||'تعذر إلغاء البصمة.','err');btn.disabled=false}
+  });
+ }catch(e){$('credentialSummary').textContent=e.message||'تعذر تحميل قائمة البصمات.';$('credentialSummary').className='status err'}
+}
+$('refreshCredentials').onclick=refreshCredentials;
 async function refreshHistory(){const {data,error}=await sb.from('staff_attendance_sessions').select('*').eq('employee_id',profile.id).order('work_date',{ascending:false}).limit(10);if(error)throw error;$('todayStatus').textContent=data?.[0]?.work_date===todayCairo()?(data[0].check_out_at?'تم تسجيل الحضور والانصراف اليوم': 'تم تسجيل الحضور اليوم — لم يتم تسجيل الانصراف بعد'):'لم يتم تسجيل حضور اليوم بعد';$('myHistory').innerHTML=data?.length?data.map(x=>'<div class="status">'+esc(x.work_date)+' · حضور '+esc(cairoTime(x.check_in_at))+' · انصراف '+(x.check_out_at?esc(cairoTime(x.check_out_at)):'—')+'</div>').join(''):'لا توجد حركات مسجلة بعد.'}
 $('saveSettings').onclick=async()=>{try{const radius=Number($('radius').value),accuracy=Number($('accuracy').value);if(radius<25||radius>500||accuracy<10||accuracy>200)throw Error('النطاق 25–500 متر، ودقة GPS من 10–200 متر.');const {error}=await sb.from('staff_attendance_settings').update({radius_m:radius,max_accuracy_m:accuracy,updated_at:new Date().toISOString(),updated_by:profile.id}).eq('branch','كفر الدوار');if(error)throw error;settings.radius_m=radius;settings.max_accuracy_m=accuracy;say('تم حفظ إعدادات نطاق الفرع.','ok')}catch(e){say(e.message,'err')}};
 $('filterDate').value=todayCairo();$('filterDate').onchange=refreshAdmin;
