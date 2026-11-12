@@ -17397,7 +17397,7 @@ async function openStudentStudySummaryPdf(id){
     for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
       if(!document.getElementById('ss-protected-reader'))return;
       const page=await pdf.getPage(pageNo);
-      const baseViewport=page.getViewport({scale:1);
+      const baseViewport=page.getViewport({scale:1});
       const width=Math.min(pages.clientWidth||900,900);
       const scale=Math.min(2.0,Math.max(1,width/baseViewport.width));
       const viewport=page.getViewport({scale});
