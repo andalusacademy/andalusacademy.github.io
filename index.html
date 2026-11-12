@@ -1168,6 +1168,19 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
                 <div class="form-group" id="notification-student-wrap" style="display:none;"><label>رقم القيد (اختياري لتخصيص التنبيه)</label><input id="notification-student-id" placeholder="رقم القيد"></div>
                 <div class="form-group"><label>موعد النشر (اختياري)</label><input id="notification-scheduled-for" type="datetime-local"></div>
                 <div class="form-group"><label>تاريخ الانتهاء (اختياري)</label><input id="notification-expires-at" type="datetime-local"></div>
+                <div class="form-group" style="grid-column:1/-1;">
+                  <label>أيام ظهور الإشعار</label>
+                  <div style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#f8fafc;">
+                    <label><input class="notification-active-day" type="checkbox" value="6"> السبت</label>
+                    <label><input class="notification-active-day" type="checkbox" value="0"> الأحد</label>
+                    <label><input class="notification-active-day" type="checkbox" value="1"> الاثنين</label>
+                    <label><input class="notification-active-day" type="checkbox" value="2"> الثلاثاء</label>
+                    <label><input class="notification-active-day" type="checkbox" value="3"> الأربعاء</label>
+                    <label><input class="notification-active-day" type="checkbox" value="4"> الخميس</label>
+                    <label><input class="notification-active-day" type="checkbox" value="5"> الجمعة</label>
+                  </div>
+                  <small style="display:block;color:var(--muted);margin-top:5px;">لو ما اخترتش أيام، الإشعار هيظهر كل يوم خلال فترة النشر.</small>
+                </div>
               </div>
               <div class="form-group"><label>محتوى التنبيه</label><textarea id="notification-body" rows="4" maxlength="5000" placeholder="اكتب تفاصيل التنبيه..." style="width:100%;"></textarea></div>
               <button class="btn btn-gold" onclick="saveNotification()">نشر التنبيه</button>
@@ -15128,12 +15141,13 @@ async function loadNotificationsAdmin() {
   }
   const audienceNames={all:'الجميع',student:'الطلاب',parent:'أولياء الأمور',branch:'فرع',program:'برنامج',staff:'الموظفون'};
   const priorityNames={low:'منخفضة',normal:'عادية',high:'عالية',urgent:'عاجلة'};
+  const notificationDayNames=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   tbody.innerHTML=(data||[]).map(n=>{
     const state=n.is_published ? ((n.scheduled_for && new Date(n.scheduled_for)>new Date())?'مجدول':'منشور') : 'مسودة';
     return `<tr><td><strong>${escapeHtml(n.title)}</strong><div style="font-size:11px;color:var(--muted);max-width:320px;">${escapeHtml(n.body)}</div>${(n.show_on_login || n.priority === 'urgent')?'<div style="margin-top:5px;"><span style="display:inline-block;border-radius:5px;padding:2px 7px;background:#fff7ed;color:#9a3412;font-size:11px;font-weight:800;">🔔 نافذة عند الدخول</span></div>':''}</td>
       <td>${escapeHtml(audienceNames[n.audience]||n.audience)}${n.branch?' · '+escapeHtml(n.branch):''}${n.program?' · '+escapeHtml(n.program):''}${n.student_id?' · '+escapeHtml(n.student_id):''}</td>
       <td>${escapeHtml(priorityNames[n.priority]||n.priority)}</td><td>${escapeHtml(state)}</td>
-      <td>${n.published_at?new Date(n.published_at).toLocaleString('ar-EG'):(n.scheduled_for?new Date(n.scheduled_for).toLocaleString('ar-EG'):'—')}</td>
+      <td>${n.published_at?new Date(n.published_at).toLocaleString('ar-EG'):(n.scheduled_for?new Date(n.scheduled_for).toLocaleString('ar-EG'):'—')}<div style="font-size:11px;color:var(--muted);margin-top:4px;">الأيام: ${Array.isArray(n.metadata?.active_days)&&n.metadata.active_days.length?n.metadata.active_days.map(d=>notificationDayNames[Number(d)]).filter(Boolean).join('، '):'كل الأيام'}</div></td>
       <td><button class="btn btn-outline btn-sm" onclick="toggleNotificationPublish('${n.id}',${n.is_published?'false':'true'})">${n.is_published?'إيقاف':'نشر'}</button> <button class="btn btn-danger btn-sm" onclick="deleteNotification('${n.id}')">حذف</button></td></tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;padding:18px;">لا توجد تنبيهات بعد.</td></tr>';
 }
@@ -15159,6 +15173,7 @@ async function saveNotification() {
     program:audience==='program'?(document.getElementById('notification-program').value.trim()||null):null,
     student_id:['student','parent'].includes(audience)?(document.getElementById('notification-student-id').value.trim()||null):null,
     scheduled_for:scheduledFor, expires_at:expiresAt,
+    metadata:{active_days:[...document.querySelectorAll('.notification-active-day:checked')].map(el=>Number(el.value))},
     is_published:true, published_at:scheduledFor && new Date(scheduledFor)>new Date()?null:new Date().toISOString(),
     created_by:authData?.user?.id || null
   };
@@ -15171,6 +15186,7 @@ async function saveNotification() {
   document.getElementById('notification-student-id').value='';
   document.getElementById('notification-scheduled-for').value='';
   document.getElementById('notification-expires-at').value='';
+  document.querySelectorAll('.notification-active-day').forEach(el=>el.checked=false);
   if(document.getElementById('notification-show-on-login'))document.getElementById('notification-show-on-login').checked=false;
   await loadNotificationsAdmin();
 }
@@ -17478,7 +17494,7 @@ async function changeStudySummaryQuestion(delta){
 <script src="employee-activity-log.js?v=3"></script>
 <script src="./global-back-navigation.js?v=3"></script>
 <script src="./student-unified-section-navigation.js?v=2"></script>
-<script src="./student-portal-admin-gateway-v5.js?v=1"></script>
+<script src="./student-portal-admin-gateway-v6.js?v=1"></script>
 <script src="./icon-depth-3d.js?v=2"></script>
 <script src="./exam-generation-stages.js?v=2"></script>
 <script src="./exam-essay-support.js?v=2"></script>
