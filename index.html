@@ -1161,7 +1161,7 @@ input.invalid,select.invalid{border-color:var(--danger);background:#fef2f2;}
                 <div class="form-group"><label>عنوان التنبيه</label><input id="notification-title" maxlength="180" placeholder="عنوان واضح للتنبيه"></div>
                 <div class="form-group"><label>نوع التنبيه</label><select id="notification-type"><option value="general">عام</option><option value="academic">أكاديمي</option><option value="attendance">حضور وغياب</option><option value="payments">مدفوعات</option><option value="exam">امتحانات</option><option value="competition">مسابقات</option><option value="request">طلبات وشكاوى</option><option value="system">النظام</option></select></div>
                 <div class="form-group"><label>الأولوية</label><select id="notification-priority"><option value="normal">عادية</option><option value="low">منخفضة</option><option value="high">عالية</option><option value="urgent">عاجلة</option></select></div>
-                <div class="form-group" id="notification-show-on-login-wrap" style="grid-column:1/-1;"><label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;"><input id="notification-show-on-login" type="checkbox" style="margin-top:4px;transform:scale(1.1);"><span><strong>إظهار نافذة مهمة فور دخول الطالب</strong><small style="display:block;color:var(--muted);font-weight:400;line-height:1.8;margin-top:3px;">سيظهر عنوان الإشعار ومحتواه تلقائيًا في بوابة الطالب، ويظل غير مقروء حتى يضغط الطالب «قرأت الإشعار». ويمكنه التأجيل إلى دخوله القادم.</small></span></label></div>
+                <div class="form-group" id="notification-show-on-login-wrap" style="grid-column:1/-1;"><label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;"><input id="notification-show-on-login" type="checkbox" checked style="margin-top:4px;transform:scale(1.1);"><span><strong>إظهار نافذة مهمة فور دخول الطالب</strong><small style="display:block;color:var(--muted);font-weight:400;line-height:1.8;margin-top:3px;">سيظهر عنوان الإشعار ومحتواه تلقائيًا في بوابة الطالب، ويظل غير مقروء حتى يضغط الطالب «قرأت الإشعار». ويمكنه التأجيل إلى دخوله القادم.</small></span></label></div>
                 <div class="form-group"><label>المستهدفون</label><select id="notification-audience" onchange="toggleNotificationTargetFields()"><option value="all">الجميع</option><option value="student">الطلاب</option><option value="parent">أولياء الأمور</option><option value="branch">فرع محدد</option><option value="program">برنامج محدد</option><option value="staff">الموظفون</option></select></div>
                 <div class="form-group" id="notification-branch-wrap" style="display:none;"><label>الفرع</label><select id="notification-branch"><option value="كفر الدوار">كفر الدوار</option><option value="فرع اسكندرية">فرع اسكندرية</option></select></div>
                 <div class="form-group" id="notification-program-wrap" style="display:none;"><label>اسم البرنامج</label><input id="notification-program" maxlength="180" placeholder="اسم البرنامج كما هو مسجل"></div>
@@ -15187,7 +15187,7 @@ async function saveNotification() {
   document.getElementById('notification-scheduled-for').value='';
   document.getElementById('notification-expires-at').value='';
   document.querySelectorAll('.notification-active-day').forEach(el=>el.checked=false);
-  if(document.getElementById('notification-show-on-login'))document.getElementById('notification-show-on-login').checked=false;
+  if(document.getElementById('notification-show-on-login'))document.getElementById('notification-show-on-login').checked=true;
   await loadNotificationsAdmin();
 }
 
@@ -17494,7 +17494,7 @@ async function changeStudySummaryQuestion(delta){
 <script src="employee-activity-log.js?v=3"></script>
 <script src="./global-back-navigation.js?v=3"></script>
 <script src="./student-unified-section-navigation.js?v=2"></script>
-<script src="./student-portal-admin-gateway-v6.js?v=1"></script>
+<script src="./student-portal-admin-gateway-v6.js?v=2"></script>
 <script src="./icon-depth-3d.js?v=2"></script>
 <script src="./exam-generation-stages.js?v=2"></script>
 <script src="./exam-essay-support.js?v=2"></script>
