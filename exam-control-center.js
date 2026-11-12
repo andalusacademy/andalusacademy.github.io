@@ -5,7 +5,7 @@
   const $ = (s, root=document) => root.querySelector(s);
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const db = () => window.sb || null;
-  let cache = { attempts: [], exams: [], students: {}, batches: [], auditRows: [], auditError: null, bankTotal: 0, totals: {attempts:0,active:0,submitted:0,review:0}, updatedAt: null };
+  let cache = { attempts: [], exams: [], students: {}, batches: [], questions: [], subjects: [], auditRows: [], auditError: null, bankTotal: 0, totals: {attempts:0,active:0,submitted:0,review:0}, updatedAt: null };
   let timer = null, channel = null, busy = false, activeTab = 'overview', searchTerm = '', attemptFilter = 'all', examFilter = 'all';
   const fmt = v => v ? new Date(v).toLocaleString('ar-EG', { dateStyle:'short', timeStyle:'short' }) : '—';
   const statusLabel = s => ({in_progress:'جاري الآن',submitted:'تم التسليم',expired:'انتهى الوقت',abandoned:'منقطع',cancelled:'ملغي'})[s] || s || 'غير محدد';
@@ -34,6 +34,7 @@
           <button class="btn btn-sm btn-outline" data-tab="attempts">سجل المحاولات</button>
           <button class="btn btn-sm btn-outline" data-tab="alerts">الإنذارات للمراجعة</button>
           <button class="btn btn-sm btn-outline" data-tab="results">النتائج والتحليل</button>
+          <button class="btn btn-sm btn-outline" data-tab="question-analysis">تحليل الأسئلة والضعف</button>
           <button class="btn btn-sm btn-outline" data-tab="bank">بنك الأسئلة</button>
           <button class="btn btn-sm btn-outline" data-tab="audit">سجل العمليات</button>
         </div>
@@ -59,12 +60,14 @@
     if (live) live.textContent = '● جاري التحديث';
     try {
       const client = db();
-      const [attemptRes, examRes, studentRes, batchRes, bankCountRes, allCountRes, activeCountRes, submittedCountRes, reviewCountRes, auditRes, publishedExamCountRes, testExamCountRes] = await Promise.all([
-        client.from('exam_attempts').select('id,exam_id,student_id,status,started_at,submitted_at,score,max_score,flagged_cheating,violation_count,violation_log,time_taken_seconds').order('started_at',{ascending:false}).limit(300),
-        client.from('exams').select('id,title,is_published,total_score,is_test,branch,duration_minutes,available_from,available_until,created_at,round',{count:'exact'}).order('created_at',{ascending:false}).limit(500),
+      const [attemptRes, examRes, studentRes, batchRes, bankCountRes, questionRes, subjectRes, allCountRes, activeCountRes, submittedCountRes, reviewCountRes, auditRes, publishedExamCountRes, testExamCountRes] = await Promise.all([
+        client.from('exam_attempts').select('id,exam_id,student_id,status,started_at,submitted_at,score,max_score,flagged_cheating,violation_count,violation_log,time_taken_seconds,question_order,answers').order('started_at',{ascending:false}).limit(1000),
+        client.from('exams').select('id,title,subject_id,is_published,total_score,is_test,branch,duration_minutes,available_from,available_until,created_at,round',{count:'exact'}).order('created_at',{ascending:false}).limit(500),
         client.from('students').select('id,name').limit(3000),
         client.from('exam_question_generation_batches').select('id,title,subject_name,question_type,requested_count,saved_count,status,error_message,created_at').order('created_at',{ascending:false}).limit(300),
         client.from('exam_question_bank').select('id',{count:'exact',head:true}),
+        client.from('exam_questions').select('id,exam_id,question_text,question_type,correct_answer,difficulty,source_group,source_question_bank_id,points').limit(5000),
+        client.from('subjects').select('id,name').limit(500),
         client.from('exam_attempts').select('id',{count:'exact',head:true}),
         client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','in_progress'),
         client.from('exam_attempts').select('id',{count:'exact',head:true}).eq('status','submitted'),
@@ -73,11 +76,13 @@
         client.from('exams').select('id',{count:'exact',head:true}).eq('is_published',true).eq('is_test',false),
         client.from('exams').select('id',{count:'exact',head:true}).eq('is_test',true)
       ]);
-      for (const r of [attemptRes,examRes,studentRes,batchRes,bankCountRes,allCountRes,activeCountRes,submittedCountRes,reviewCountRes,publishedExamCountRes,testExamCountRes]) if (r.error) throw r.error;
+      for (const r of [attemptRes,examRes,studentRes,batchRes,bankCountRes,questionRes,subjectRes,allCountRes,activeCountRes,submittedCountRes,reviewCountRes,publishedExamCountRes,testExamCountRes]) if (r.error) throw r.error;
       cache.attempts = attemptRes.data || [];
       cache.exams = examRes.data || [];
       cache.students = Object.fromEntries((studentRes.data || []).map(s=>[String(s.id),s.name]));
       cache.batches = batchRes.data || [];
+      cache.questions = questionRes.data || [];
+      cache.subjects = Object.fromEntries((subjectRes.data || []).map(s=>[String(s.id),s.name]));
       cache.auditRows = auditRes.error ? [] : (auditRes.data || []);
       cache.auditError = auditRes.error ? (auditRes.error.message || String(auditRes.error)) : null;
       cache.bankTotal = bankCountRes.count || 0;
@@ -143,6 +148,43 @@
   function tableSection(rows) {
     return '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 12px"><b>سجل أحدث '+rows.length+' محاولة</b><input id="ecc-search" placeholder="بحث باسم الطالب أو رقم القيد أو الامتحان" value="'+esc(searchTerm)+'" style="max-width:320px;width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:9px"></div><div id="ecc-attempt-table">'+attemptRows(rows)+'</div><div id="ecc-detail"></div>';
   }
+  function normalizeAnswer(value) {
+    let s=String(value==null?'':value).trim().toLowerCase().replace(/\s+/g,' ');
+    const aliases={'صح':'true','صحيح':'true','true':'true','1':'true','خطأ':'false','خطا':'false','غلط':'false','false':'false','0':'false'};
+    return Object.prototype.hasOwnProperty.call(aliases,s)?aliases[s]:s;
+  }
+  function questionAnalytics() {
+    const questions=new Map(cache.questions.map(q=>[String(q.id),q]));
+    const stats=new Map();
+    const studentStats=new Map();
+    const official=cache.attempts.filter(a=>a.status==='submitted' && !cache.exams.find(x=>x.id===a.exam_id)?.is_test);
+    official.forEach(a=>{
+      const order=Array.isArray(a.question_order)?a.question_order:[];
+      const answers=a.answers&&typeof a.answers==='object'?a.answers:{};
+      const studentKey=String(a.student_id);
+      if(!studentStats.has(studentKey))studentStats.set(studentKey,{attempts:0,score:0,max:0,wrong:0,blank:0});
+      const ss=studentStats.get(studentKey);ss.attempts++;ss.score+=Number(a.score||0);ss.max+=Number(a.max_score||100);
+      order.forEach(id=>{
+        const q=questions.get(String(id));if(!q)return;
+        const key=String(q.id);if(!stats.has(key))stats.set(key,{question:q,seen:0,answered:0,correct:0,incorrect:0,blank:0,gradable:!/(essay|written|short)/i.test(String(q.question_type||''))});
+        const st=stats.get(key);st.seen++;
+        const raw=answers[key];const has=raw!==undefined&&raw!==null&&String(raw).trim()!=='';
+        if(!has){st.blank++;ss.blank++;return;}
+        st.answered++;
+        if(st.gradable){
+          if(normalizeAnswer(raw)===normalizeAnswer(q.correct_answer)){st.correct++;}
+          else {st.incorrect++;ss.wrong++;}
+        }
+      });
+    });
+    const rows=[...stats.values()].map(s=>({...s,accuracy:s.gradable&&s.answered?s.correct/s.answered*100:null,subject:cache.subjects[String(cache.exams.find(e=>e.id===s.question.exam_id)?.subject_id)]||'غير محدد'})).sort((a,b)=>(a.accuracy??101)-(b.accuracy??101));
+    const students=[...studentStats.entries()].map(([id,s])=>({id,name:cache.students[id]||('طالب '+id),...s,average:s.max?s.score/s.max*100:0})).sort((a,b)=>a.average-b.average);
+    return {rows,students,officialCount:official.length};
+  }
+  function downloadCsv(filename, rows) {
+    const csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  }
   function renderTableOnly(){
     const el=$('#ecc-attempt-table'); if(el)el.innerHTML=attemptRows(activeTab==='live'?cache.attempts.filter(a=>a.status==='in_progress'):activeTab==='alerts'?cache.attempts.filter(a=>a.flagged_cheating||Number(a.violation_count||0)>0):cache.attempts);
   }
@@ -170,10 +212,17 @@
       const avg=rows.length?rows.reduce((n,a)=>n+Number(a.score||0),0)/rows.length:0;
       const passed=rows.filter(a=>Number(a.max_score)>0&&Number(a.score)/Number(a.max_score)>=.5).length;
       panel.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px"><div class="card" style="padding:12px"><b style="font-size:24px">'+rows.length+'</b><div>نتائج مكتملة في أحدث السجلات</div></div><div class="card" style="padding:12px"><b style="font-size:24px">'+avg.toFixed(1)+'</b><div>متوسط الدرجة</div></div><div class="card" style="padding:12px"><b style="font-size:24px">'+(rows.length?Math.round(passed/rows.length*100):0)+'%</b><div>نسبة النجاح (50% فأكثر)</div></div></div>'+tableSection(rows);
+    } else if(activeTab==='question-analysis'){
+      const analytics=questionAnalytics();
+      const analyzable=analytics.rows.filter(x=>x.gradable&&x.answered>0);
+      const hard=analyzable.filter(x=>x.accuracy<50).length;
+      const avg=analyzable.length?analyzable.reduce((n,x)=>n+x.accuracy,0)/analyzable.length:0;
+      panel.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><div><h3 style="margin:0 0 4px">تحليل أداء الأسئلة</h3><div style="font-size:12px;color:#64748b">مبني على المحاولات الرسمية المسلّمة فقط، مع استبعاد الامتحانات التجريبية</div></div><button class="btn btn-gold btn-sm" id="ecc-export-question-analysis">⬇ تصدير تحليل الأسئلة Excel/CSV</button></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:14px"><div class="card" style="padding:12px"><b style="font-size:24px">'+analytics.officialCount+'</b><div>محاولة رسمية مكتملة</div></div><div class="card" style="padding:12px"><b style="font-size:24px">'+analytics.rows.length+'</b><div>أسئلة تم تحليلها</div></div><div class="card" style="padding:12px"><b style="font-size:24px">'+hard+'</b><div>أسئلة نسبة الإجابة الصحيحة عليها أقل من 50%</div></div><div class="card" style="padding:12px"><b style="font-size:24px">'+avg.toFixed(1)+'%</b><div>متوسط دقة الإجابة على الأسئلة القابلة للتصحيح</div></div></div><h4 style="margin:12px 0">الأسئلة الأكثر احتياجًا للمراجعة</h4><div style="overflow:auto"><table style="width:100%;min-width:850px;border-collapse:collapse"><thead><tr style="background:#f1f5f9"><th>السؤال</th><th>المادة</th><th>النوع</th><th>الصعوبة</th><th>عدد مرات الظهور</th><th>إجابات صحيحة</th><th>إجابات خاطئة</th><th>نسبة الصحة</th></tr></thead><tbody>'+(analytics.rows.length?analytics.rows.slice(0,100).map(x=>'<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:9px;max-width:360px">'+esc(x.question.question_text)+'</td><td>'+esc(x.subject)+'</td><td>'+esc(x.question.question_type)+'</td><td>'+esc(x.question.difficulty||'—')+'</td><td>'+x.seen+'</td><td>'+x.correct+'</td><td>'+x.incorrect+'</td><td>'+(x.accuracy==null?'غير قابلة للتصحيح آليًا':x.accuracy.toFixed(1)+'%')+'</td></tr>').join(''):'<tr><td colspan="8" style="padding:18px;text-align:center">لا توجد بيانات كافية لتحليل الأسئلة حتى الآن.</td></tr>')+'</tbody></table></div><h4 style="margin:18px 0 8px">طلاب يحتاجون إلى دعم إضافي</h4><div style="overflow:auto"><table style="width:100%;min-width:620px"><thead><tr><th>الطالب</th><th>عدد المحاولات</th><th>متوسط النتيجة</th><th>إجابات خاطئة مرصودة</th><th>أسئلة بلا إجابة</th></tr></thead><tbody>'+(analytics.students.filter(x=>x.attempts).slice(0,30).map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.attempts+'</td><td>'+x.average.toFixed(1)+'%</td><td>'+x.wrong+'</td><td>'+x.blank+'</td></tr>').join('')||'<tr><td colspan="5" style="padding:16px;text-align:center">لا توجد بيانات طلاب كافية.</td></tr>')+'</tbody></table></div><p style="font-size:11px;color:#64748b;margin-top:10px">ملاحظة: الأسئلة المقالية لا تدخل في دقة التصحيح الآلي. انخفاض نسبة الصحة مؤشر تعليمي لمراجعة السؤال وشرح المادة، وليس حكمًا على الطالب أو جودة السؤال وحده.</p>';
+      $('#ecc-export-question-analysis')?.addEventListener('click',()=>downloadCsv('andalus-question-analysis.csv',[['السؤال','المادة','النوع','الصعوبة','مرات الظهور','إجابات','صحيحة','خاطئة','بلا إجابة','نسبة الصحة %'],...analytics.rows.map(x=>[x.question.question_text,x.subject,x.question.question_type,x.question.difficulty,x.seen,x.answered,x.correct,x.incorrect,x.blank,x.accuracy==null?'':x.accuracy.toFixed(1)])]));
     } else if(activeTab==='bank'){
       const total=cache.batches.length;
       const sum=cache.batches.reduce((n,b)=>n+Number(b.saved_count||0),0);
-      panel.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+cache.bankTotal+'</b><div>إجمالي أسئلة البنك</div></div><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+total+'</b><div>مجموعات التوليد</div></div><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+sum+'</b><div>مجموع المحفوظ بالمجموعات</div></div></div><div style="overflow:auto"><table style="width:100%;min-width:700px"><thead><tr><th>المجموعة</th><th>المادة</th><th>النوع</th><th>المطلوب</th><th>المحفوظ</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>'+(cache.batches.length?cache.batches.map(b=>'<tr><td>'+esc(b.title||b.id)+'</td><td>'+esc(b.subject_name)+'</td><td>'+esc(b.question_type)+'</td><td>'+b.requested_count+'</td><td>'+b.saved_count+'</td><td>'+esc(b.status)+(b.error_message?' — '+esc(b.error_message):'')+'</td><td>'+fmt(b.created_at)+'</td></tr>').join(''):'<tr><td colspan="7" style="padding:18px;text-align:center">لا توجد مجموعات توليد بعد.</td></tr>')+'</tbody></table></div><p style="margin-top:10px;font-size:12px;color:#64748b">إدارة الأسئلة والتوليد التفصيلية من استوديو إنشاء الامتحان داخل مكتبة المادة.</p>';
+      panel.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+cache.bankTotal+'</b><div>أسئلة البنك القابلة لإعادة الاستخدام</div></div><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+cache.questions.length+'</b><div>أسئلة محفوظة داخل الامتحانات</div></div><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+total+'</b><div>مجموعات التوليد</div></div><div class="card" style="padding:12px;min-width:140px"><b style="font-size:24px">'+sum+'</b><div>مجموع المحفوظ بالمجموعات</div></div></div><div style="overflow:auto"><table style="width:100%;min-width:700px"><thead><tr><th>المجموعة</th><th>المادة</th><th>النوع</th><th>المطلوب</th><th>المحفوظ</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>'+(cache.batches.length?cache.batches.map(b=>'<tr><td>'+esc(b.title||b.id)+'</td><td>'+esc(b.subject_name)+'</td><td>'+esc(b.question_type)+'</td><td>'+b.requested_count+'</td><td>'+b.saved_count+'</td><td>'+esc(b.status)+(b.error_message?' — '+esc(b.error_message):'')+'</td><td>'+fmt(b.created_at)+'</td></tr>').join(''):'<tr><td colspan="7" style="padding:18px;text-align:center">لا توجد مجموعات توليد بعد.</td></tr>')+'</tbody></table></div><p style="margin-top:10px;font-size:12px;color:#64748b">إدارة الأسئلة والتوليد التفصيلية من استوديو إنشاء الامتحان داخل مكتبة المادة.</p>';
     } else if(activeTab==='audit'){
       panel.innerHTML=(cache.auditError ? '<div style="padding:10px;background:#fff7ed;color:#9a3412;border-radius:9px;margin-bottom:10px">تعذر تحميل سجل العمليات فقط: '+esc(cache.auditError)+' — باقي لوحة القيادة تعمل بصورة مستقلة.</div>' : '')+'<div style="margin-bottom:10px;color:#64748b;font-size:12px">آخر 150 عملية مسجلة في سجل نشاط الإدارة والموظفين — عرض فقط دون تعديل السجلات.</div><div style="overflow:auto"><table style="width:100%;min-width:760px"><thead><tr><th>الوقت</th><th>القسم</th><th>نوع العملية</th><th>الوصف</th><th>الكيان</th><th>تفاصيل إضافية</th></tr></thead><tbody>'+(cache.auditRows.length?cache.auditRows.map(x=>'<tr><td>'+fmt(x.created_at)+'</td><td>'+esc(x.module||'—')+'</td><td>'+esc(x.action_type||'—')+'</td><td>'+esc(x.title||'—')+'</td><td>'+esc([x.entity_table,x.entity_id].filter(Boolean).join(' · ')||'—')+'</td><td><details><summary>عرض</summary><pre style="white-space:pre-wrap;max-width:360px">'+esc(JSON.stringify(x.details||{},null,2))+'</pre></details></td></tr>').join(''):'<tr><td colspan="6" style="padding:18px;text-align:center">لا توجد عمليات مسجلة.</td></tr>')+'</tbody></table></div>';
     } else {
