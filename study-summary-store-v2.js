@@ -4,7 +4,7 @@ const $ = (s, r=document) => r.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const db = () => window.sb || (typeof sb !== 'undefined' ? sb : null);
 let mounted=false, loading=false, storageReady=false, storageBusy=false, products=[], students=[], selectedStudentIds=new Set(), selectedProductId='';
-let activeMode='ready', reviewVisible=false, orderBusy=false, lastRefreshAt=0;
+let activeMode='ready', reviewVisible=false, orderBusy=false, lastRefreshAt=0, lastPurgeAttempt=0;
 const status=(id,msg,ok=false)=>{const el=$('#'+id);if(el)el.innerHTML='<div style="padding:10px 12px;border-radius:9px;background:'+(ok?'#ecfdf5':'#fff7ed')+';color:'+(ok?'#166534':'#9a3412')+';line-height:1.7">'+esc(msg)+'</div>';};
 function markup(){
  const page=$('#page-study-summaries');if(!page||$('#ss-store-v2'))return;
@@ -187,7 +187,7 @@ async function refreshProducts(){
   body.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>loadProduct(b.dataset.edit)));
   body.querySelectorAll('[data-review]').forEach(b=>b.addEventListener('click',()=>{selectedProductId=b.dataset.review;openReview();}));
   body.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',()=>deleteProduct(b.dataset.delete)));
-  if(selectedProductId&&products.some(x=>x.id===selectedProductId))await loadProduct(selectedProductId);
+  if(selectedProductId&&products.some(x=>x.id===selectedProductId)&&$('#ss-v2-settings')?.style.display==='none')await loadProduct(selectedProductId);
   else if(!products.length){selectedProductId='';$('#ss-v2-settings').style.display='none';}
  }catch(e){$('#ss-v2-products').textContent='تعذر تحميل المنتجات: '+(e.message||String(e));}
  finally{loading=false;}
@@ -295,7 +295,7 @@ function wire(){
  const page=$('#page-study-summaries');if(!page)return;
  if(!mounted){markup();mounted=true;refreshProducts();refreshOrders();purgeStorage();loadStudents().catch(e=>status('ss-v2-source-status',e.message||String(e)));}
  hideOld();
- if(!storageReady&&!storageBusy)purgeStorage();
+ if(!storageReady&&!storageBusy&&Date.now()-lastPurgeAttempt>10000){lastPurgeAttempt=Date.now();purgeStorage();}
  if(page.style.display!=='none'&&Date.now()-lastRefreshAt>8000){lastRefreshAt=Date.now();refreshProducts();refreshOrders();}
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&$('#page-study-summaries')){refreshProducts();refreshOrders();}});
