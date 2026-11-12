@@ -137,6 +137,7 @@ async function createReadyPdf(){
  }finally{button.disabled=false;button.textContent='حفظ الملخص الجاهز';}
 }
 async function runLegacyGenerator(mode){
+ const fresh=$('#ss-ai-new-btn');if(fresh){const oldConfirm=window.confirm;window.confirm=()=>true;fresh.click();window.confirm=oldConfirm;}
  const title=$('#ss-v2-gen-title').value.trim(),subject=$('#ss-v2-gen-subject').value.trim(),mc=Number($('#ss-v2-gen-mc').value||0),tf=Number($('#ss-v2-gen-tf').value||0),essay=Number($('#ss-v2-gen-essay').value||0),button=$('#ss-v2-generate');
  if(!title||!subject||mc+tf+essay<1||mc+tf+essay>100)return status('ss-v2-source-status','اكتب الاسم والمادة وحدد من 1 إلى 100 سؤال.');
  if([mc,tf,essay].some(x=>!Number.isInteger(x)||x<0||x>100))return status('ss-v2-source-status','راجع أعداد الأسئلة.');
@@ -280,8 +281,8 @@ async function refreshOrders(){
  }catch(e){$('#ss-v2-orders').textContent='تعذر تحميل الطلبات: '+(e.message||String(e));}
  finally{orderBusy=false;}
 }
-async function reviewOrder(id,status,reason=''){
- try{const {error}=await db().rpc('admin_review_study_summary_order',{p_order_id:id,p_status:status,p_reason:reason||null});if(error)throw error;await refreshOrders();status('ss-v2-source-status','تم تحديث حالة طلب الشراء.',true);}
+async function reviewOrder(id,newStatus,reason=''){
+ try{const {error}=await db().rpc('admin_review_study_summary_order',{p_order_id:id,p_status:newStatus,p_reason:reason||null});if(error)throw error;await refreshOrders();status('ss-v2-source-status','تم تحديث حالة طلب الشراء.',true);}
  catch(e){status('ss-v2-source-status',e.message||String(e));}
 }
 async function openProof(id,rows){
