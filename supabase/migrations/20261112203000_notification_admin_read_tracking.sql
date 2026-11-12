@@ -60,6 +60,7 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.get_notification_admin_stats(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_notification_admin_stats(uuid) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.get_notification_admin_stats(uuid) FROM anon;
 
 CREATE OR REPLACE FUNCTION public.mark_portal_notification_read(p_student_id text, p_phone text, p_portal_type text, p_notification_id uuid)
 RETURNS jsonb
