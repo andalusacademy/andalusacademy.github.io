@@ -28,7 +28,8 @@ AS $function$
       AND st.deleted_at IS NULL
       AND coalesce(st.student_status, 'active') = 'active'
       AND (
-        EXISTS (
+        coalesce(sm.target_all, true)
+        OR EXISTS (
           SELECT 1 FROM public.study_summary_target_students ts
           WHERE ts.summary_id = sm.id AND ts.student_id = p_student_id
         )
@@ -39,13 +40,6 @@ AS $function$
           AND (nullif(btrim(sm.target_branch), '') IS NULL OR public.study_summary_target_matches(sm.target_branch, st.branch))
           AND (nullif(btrim(sm.target_system), '') IS NULL OR public.study_summary_target_matches(sm.target_system, st.system_name))
           AND (nullif(btrim(sm.target_batch), '') IS NULL OR public.study_summary_target_matches(sm.target_batch, st.program))
-        )
-        OR (
-          NOT EXISTS (SELECT 1 FROM public.study_summary_target_students ts WHERE ts.summary_id = sm.id)
-          AND nullif(btrim(sm.target_branch), '') IS NULL
-          AND nullif(btrim(sm.target_system), '') IS NULL
-          AND nullif(btrim(sm.target_batch), '') IS NULL
-          AND coalesce(sm.target_all, true)
         )
       )
   );
