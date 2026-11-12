@@ -114,7 +114,7 @@ async function refreshCredentials(){
    const devices=employee.credentials||[];
    total+=devices.length;if(devices.length)registered++;
    if(!devices.length){
-    rows.push('<tr><td>'+esc(employee.fullName||employee.username)+'</td><td>'+esc(employee.branch||'—')+'</td><td><span class="status warn">غير مسجلة</span></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>');
+    rows.push('<tr><td>'+esc(employee.fullName||employee.username)+'</td><td>'+esc(employee.branch||'—')+'</td><td><span class="status warn">غير مسجلة</span></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>');
    }else for(const device of devices){
     const type=device.deviceType==='multiDevice'?'متزامنة / متعددة الأجهزة':device.deviceType==='singleDevice'?'مرتبطة بهذا الجهاز':'غير محدد';
     const sync=device.backedUp?'مدعومة بالمزامنة':'غير مدعومة بالمزامنة';
