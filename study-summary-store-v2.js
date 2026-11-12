@@ -4,7 +4,7 @@ const $ = (s, r=document) => r.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const db = () => window.sb || (typeof sb !== 'undefined' ? sb : null);
 let mounted=false, loading=false, storageReady=false, storageBusy=false, products=[], students=[], selectedStudentIds=new Set(), selectedProductId='';
-let activeMode='ready', reviewVisible=false, orderBusy=false;
+let activeMode='ready', reviewVisible=false, orderBusy=false, lastRefreshAt=0;
 const status=(id,msg,ok=false)=>{const el=$('#'+id);if(el)el.innerHTML='<div style="padding:10px 12px;border-radius:9px;background:'+(ok?'#ecfdf5':'#fff7ed')+';color:'+(ok?'#166534':'#9a3412')+';line-height:1.7">'+esc(msg)+'</div>';};
 function markup(){
  const page=$('#page-study-summaries');if(!page||$('#ss-store-v2'))return;
@@ -56,7 +56,7 @@ function markup(){
  $('#ss-v2-orders-refresh').addEventListener('click',refreshOrders);
  root.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
  $('#ss-v2-validity').addEventListener('change',()=>{$('#ss-v2-custom-days').style.display=$('#ss-v2-validity').value==='custom'?'':'none';});
- $('#ss-v2-audience').addEventListener('change',()=>{$('#ss-v2-student-picker').style.display=$('#ss-v2-audience').value==='selected'?'':'none';});
+ $('#ss-v2-audience').addEventListener('change',()=>{const show=$('#ss-v2-audience').value==='selected';$('#ss-v2-student-picker').style.display=show?'':'none';if(show)loadStudents().catch(e=>status('ss-v2-settings-status',e.message||String(e)));});
  $('#ss-v2-student-search').addEventListener('input',renderStudents);
  $('#ss-v2-save').addEventListener('click',()=>saveProduct(false));
  $('#ss-v2-publish').addEventListener('click',()=>saveProduct(true));
@@ -234,7 +234,7 @@ async function saveProduct(publish,unpublish=false){
  try{
   const {data,error}=await db().rpc('admin_save_study_summary_product',{p_summary_id:selectedProductId,p_price:price,p_validity_days:days,p_payment_provider:provider||null,p_wallet_number:wallet||null,p_target_all:targetAll,p_student_ids:targetAll?[]:[...selectedStudentIds],p_publish:unpublish?false:!!publish});
   if(error)throw error;if(data?.ok===false)throw new Error(data.reason||'تعذر حفظ المنتج.');
-  status('ss-v2-settings-status',publish?'تم نشر المنتج للطلاب المحددين.':'تم حفظ الإعدادات بنجاح.',true);
+  status('ss-v2-settings-status',publish?'تم نشر المنتج للطلاب المحددين.':(unpublish?'تم إيقاف نشر المنتج.':'تم حفظ الإعدادات بنجاح.'),true);
   await refreshProducts();await refreshOrders();
  }catch(e){status('ss-v2-settings-status',e.message||String(e));}
  finally{button.disabled=false;}
@@ -296,6 +296,7 @@ function wire(){
  if(!mounted){markup();mounted=true;refreshProducts();refreshOrders();purgeStorage();loadStudents().catch(e=>status('ss-v2-source-status',e.message||String(e)));}
  hideOld();
  if(!storageReady&&!storageBusy)purgeStorage();
+ if(page.style.display!=='none'&&Date.now()-lastRefreshAt>8000){lastRefreshAt=Date.now();refreshProducts();refreshOrders();}
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&$('#page-study-summaries')){refreshProducts();refreshOrders();}});
 window.addEventListener('focus',()=>{if($('#page-study-summaries')){refreshProducts();refreshOrders();}});
