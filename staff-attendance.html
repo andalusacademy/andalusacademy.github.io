@@ -73,7 +73,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px}th,td{p
  <article class="card" style="margin-top:16px">
   <div class="row"><div><h2>إدارة بصمات الموظفين</h2><p class="muted">متابعة أجهزة Passkey المسجلة وإلغاء اعتماد جهاز مفقود أو مستبدل.</p></div><button id="refreshCredentials" class="secondary" type="button">تحديث القائمة</button></div>
   <div id="credentialSummary" class="status">جارٍ تحميل بيانات البصمات...</div>
-  <div class="tablewrap"><table><thead><tr><th>الموظف</th><th>الفرع</th><th>حالة البصمة</th><th>نوع الجهاز</th><th>المزامنة</th><th>تاريخ التسجيل</th><th>آخر استخدام</th><th>الإجراء</th></tr></thead><tbody id="credentialRows"></tbody></table></div>
+  <div class="tablewrap"><table><thead><tr><th>الموظف</th><th>الفرع</th><th>حالة البصمة</th><th>نوع الجهاز</th><th>المزامنة</th><th>تاريخ التسجيل</th><th>آخر استخدام</th><th>آخر حركة حضور/انصراف</th><th>الإجراء</th></tr></thead><tbody id="credentialRows"></tbody></table></div>
   <p class="muted">إلغاء البصمة يمنع استخدام هذا الاعتماد في تسجيل الحضور والانصراف من جهة الخادم، لكنه لا يحذف بيانات البصمة المحلية من الهاتف ولا يمسح سجل الحضور السابق. سيحتاج الموظف إلى تسجيل Passkey جديد.</p>
  </article>
 </section>
@@ -119,10 +119,12 @@ async function refreshCredentials(){
     const type=device.deviceType==='multiDevice'?'متزامنة / متعددة الأجهزة':device.deviceType==='singleDevice'?'مرتبطة بهذا الجهاز':'غير محدد';
     const sync=device.backedUp?'مدعومة بالمزامنة':'غير مدعومة بالمزامنة';
     const transports=(device.transports||[]).map(x=>({internal:'داخل الجهاز',hybrid:'هاتف/جهاز قريب',usb:'USB',nfc:'NFC',ble:'Bluetooth'}[x]||x)).join('، ')||'غير محدد';
-    rows.push('<tr><td>'+esc(employee.fullName||employee.username)+'</td><td>'+esc(employee.branch||'—')+'</td><td><span class="status ok">مسجلة</span></td><td>'+esc(type)+'<div class="muted">'+esc(transports)+'</div></td><td>'+esc(sync)+'</td><td>'+esc(new Date(device.createdAt).toLocaleString('ar-EG',{timeZone:'Africa/Cairo'}))+'</td><td>'+ (device.lastUsedAt?esc(new Date(device.lastUsedAt).toLocaleString('ar-EG',{timeZone:'Africa/Cairo'})):'لم تستخدم بعد')+'</td><td><button class="danger" data-revoke-credential="'+esc(device.id)+'" data-employee="'+esc(employee.fullName||employee.username)+'">إلغاء البصمة</button></td></tr>');
+    const last=employee.lastAttendance;
+    const lastMovement=last?(esc(last.work_date)+'<div class="muted">حضور '+(last.check_in_at?esc(cairoTime(last.check_in_at)):'—')+' · انصراف '+(last.check_out_at?esc(cairoTime(last.check_out_at)):'لم يسجل')):'لا توجد حركات';
+    rows.push('<tr><td>'+esc(employee.fullName||employee.username)+'</td><td>'+esc(employee.branch||'—')+'</td><td><span class="status ok">مسجلة</span></td><td>'+esc(type)+'<div class="muted">'+esc(transports)+'</div></td><td>'+esc(sync)+'</td><td>'+esc(new Date(device.createdAt).toLocaleString('ar-EG',{timeZone:'Africa/Cairo'}))+'</td><td>'+ (device.lastUsedAt?esc(new Date(device.lastUsedAt).toLocaleString('ar-EG',{timeZone:'Africa/Cairo'})):'لم تستخدم بعد')+'</td><td>'+lastMovement+'</td><td><button class="danger" data-revoke-credential="'+esc(device.id)+'" data-employee="'+esc(employee.fullName||employee.username)+'">إلغاء البصمة</button></td></tr>');
    }
   }
-  $('credentialRows').innerHTML=rows.join('')||'<tr><td colspan="8">لا يوجد موظفون مسجلون.</td></tr>';
+  $('credentialRows').innerHTML=rows.join('')||'<tr><td colspan="9">لا يوجد موظفون مسجلون.</td></tr>';
   $('credentialSummary').textContent='عدد الموظفين: '+(result.employees||[]).length+' · موظفون لديهم بصمة: '+registered+' · إجمالي الأجهزة المسجلة: '+total;
   $('credentialRows').querySelectorAll('[data-revoke-credential]').forEach(btn=>btn.onclick=async()=>{
    const who=btn.dataset.employee||'الموظف';
