@@ -15139,17 +15139,39 @@ async function loadNotificationsAdmin() {
     tbody.innerHTML = '<tr><td colspan="6" style="color:#b91c1c;padding:18px;">تعذر تحميل التنبيهات: '+escapeHtml(error.message||'خطأ غير معروف')+'</td></tr>';
     return;
   }
+  const {data:statsResult}=await sb.rpc('get_notification_admin_stats',{p_notification_id:null});
+  const statsById=new Map((statsResult?.items||[]).map(item=>[item.id,item]));
   const audienceNames={all:'الجميع',student:'الطلاب',parent:'أولياء الأمور',branch:'فرع',program:'برنامج',staff:'الموظفون'};
   const priorityNames={low:'منخفضة',normal:'عادية',high:'عالية',urgent:'عاجلة'};
   const notificationDayNames=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   tbody.innerHTML=(data||[]).map(n=>{
     const state=n.is_published ? ((n.scheduled_for && new Date(n.scheduled_for)>new Date())?'مجدول':'منشور') : 'مسودة';
     return `<tr><td><strong>${escapeHtml(n.title)}</strong><div style="font-size:11px;color:var(--muted);max-width:320px;">${escapeHtml(n.body)}</div>${(n.show_on_login || n.priority === 'urgent')?'<div style="margin-top:5px;"><span style="display:inline-block;border-radius:5px;padding:2px 7px;background:#fff7ed;color:#9a3412;font-size:11px;font-weight:800;">🔔 نافذة عند الدخول</span></div>':''}</td>
-      <td>${escapeHtml(audienceNames[n.audience]||n.audience)}${n.branch?' · '+escapeHtml(n.branch):''}${n.program?' · '+escapeHtml(n.program):''}${n.student_id?' · '+escapeHtml(n.student_id):''}</td>
+      <td>${escapeHtml(audienceNames[n.audience]||n.audience)}${n.branch?' · '+escapeHtml(n.branch):''}${n.program?' · '+escapeHtml(n.program):''}${n.student_id?' · '+escapeHtml(n.student_id):''}
+      <div style="font-size:11px;color:#475569;margin-top:5px;">${statsById.has(n.id)?'تم الاطلاع: '+statsById.get(n.id).read_count+' من '+statsById.get(n.id).target_count+' · لم يطلع: '+statsById.get(n.id).unread_count:'إحصائيات القراءة غير متاحة'}</div>
+      <button type="button" class="btn btn-outline btn-sm" style="margin-top:5px;" onclick="showNotificationStats('${n.id}')">تفاصيل الاطلاع</button></td>
       <td>${escapeHtml(priorityNames[n.priority]||n.priority)}</td><td>${escapeHtml(state)}</td>
       <td>${n.published_at?new Date(n.published_at).toLocaleString('ar-EG'):(n.scheduled_for?new Date(n.scheduled_for).toLocaleString('ar-EG'):'—')}<div style="font-size:11px;color:var(--muted);margin-top:4px;">الأيام: ${Array.isArray(n.metadata?.active_days)&&n.metadata.active_days.length?n.metadata.active_days.map(d=>notificationDayNames[Number(d)]).filter(Boolean).join('، '):'كل الأيام'}</div></td>
       <td><button class="btn btn-outline btn-sm" onclick="toggleNotificationPublish('${n.id}',${n.is_published?'false':'true'})">${n.is_published?'إيقاف':'نشر'}</button> <button class="btn btn-danger btn-sm" onclick="deleteNotification('${n.id}')">حذف</button></td></tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;padding:18px;">لا توجد تنبيهات بعد.</td></tr>';
+}
+
+async function showNotificationStats(notificationId) {
+  if (currentUser?.role !== 'admin') return;
+  const {data,error}=await sb.rpc('get_notification_admin_stats',{p_notification_id:notificationId});
+  if(error || !data?.ok) { showToast('تعذر تحميل تفاصيل الاطلاع: '+(error?.message||'غير مصرح'), 'error'); return; }
+  const item=(data.items||[])[0];
+  if(!item){showToast('لم يتم العثور على الإشعار.','error');return;}
+  const unread=item.unread_students||[];
+  const read=item.read_students||[];
+  let overlay=document.getElementById('notification-stats-overlay');
+  if(!overlay){overlay=document.createElement('div');overlay.id='notification-stats-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:1000001;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:14px;';document.body.appendChild(overlay);}
+  const names=(arr)=>arr.length?arr.map(s=>'<li style="padding:6px 0;border-bottom:1px solid #e2e8f0;">'+escapeHtml(s.name||'طالب')+' <span style="color:#64748b;">('+escapeHtml(s.id)+')</span></li>').join(''):'<li style="padding:8px 0;color:#64748b;">لا يوجد</li>';
+  overlay.innerHTML='<section role="dialog" aria-modal="true" style="width:100%;max-width:650px;max-height:85vh;overflow:auto;background:#fff;border-radius:16px;padding:18px;direction:rtl;">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><h3 style="margin:0;">متابعة قراءة الإشعار</h3><button class="btn btn-outline" onclick="document.getElementById(\'notification-stats-overlay\')?.remove()">إغلاق</button></div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0;"><strong>المستهدفون: '+item.target_count+'</strong><strong style="color:#15803d;">اطلعوا: '+item.read_count+'</strong><strong style="color:#b91c1c;">لم يطلعوا: '+item.unread_count+'</strong></div>'+
+    '<h4 style="margin:12px 0 6px;color:#b91c1c;">لم يطلعوا على الإشعار</h4><ul style="list-style:none;padding:0;margin:0;">'+names(unread)+'</ul>'+
+    '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">عرض الطلاب الذين اطلعوا ('+read.length+')</summary><ul style="list-style:none;padding:8px 0 0;margin:0;">'+names(read)+'</ul></details></section>';
 }
 
 async function saveNotification() {
@@ -15213,6 +15235,7 @@ function renderNotificationCards(items) {
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><strong>${escapeHtml(n.title)}</strong><small>${escapeHtml(priorities[n.priority]||'تنبيه')}</small></div>
     <p style="font-size:13px;line-height:1.8;margin:8px 0;">${escapeHtml(n.body)}</p>
     <small style="color:var(--muted);">${n.published_at?new Date(n.published_at).toLocaleString('ar-EG'):new Date(n.created_at).toLocaleString('ar-EG')}</small>
+    <div style="font-size:11px;margin-top:8px;color:${n.is_read?'#15803d':'#b45309'};">${n.is_read?'✓ تم الاطلاع':'● لم يتم الاطلاع'}</div>
   </article>`).join('');
 }
 
