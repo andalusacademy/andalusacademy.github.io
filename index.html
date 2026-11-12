@@ -15149,11 +15149,15 @@ async function loadNotificationsAdmin() {
     return `<tr><td><strong>${escapeHtml(n.title)}</strong><div style="font-size:11px;color:var(--muted);max-width:320px;">${escapeHtml(n.body)}</div>${(n.show_on_login || n.priority === 'urgent')?'<div style="margin-top:5px;"><span style="display:inline-block;border-radius:5px;padding:2px 7px;background:#fff7ed;color:#9a3412;font-size:11px;font-weight:800;">🔔 نافذة عند الدخول</span></div>':''}</td>
       <td>${escapeHtml(audienceNames[n.audience]||n.audience)}${n.branch?' · '+escapeHtml(n.branch):''}${n.program?' · '+escapeHtml(n.program):''}${n.student_id?' · '+escapeHtml(n.student_id):''}
       <div style="font-size:11px;color:#475569;margin-top:5px;">${statsById.has(n.id)?'تم الاطلاع: '+statsById.get(n.id).read_count+' من '+statsById.get(n.id).target_count+' · لم يطلع: '+statsById.get(n.id).unread_count:'إحصائيات القراءة غير متاحة'}</div>
-      <button type="button" class="btn btn-outline btn-sm" style="margin-top:5px;" onclick="showNotificationStats('${n.id}')">تفاصيل الاطلاع</button></td>
+      <button type="button" class="btn btn-outline btn-sm" style="margin-top:5px;" data-notification-stats="${escapeHtml(n.id)}">تفاصيل الاطلاع</button></td>
       <td>${escapeHtml(priorityNames[n.priority]||n.priority)}</td><td>${escapeHtml(state)}</td>
       <td>${n.published_at?new Date(n.published_at).toLocaleString('ar-EG'):(n.scheduled_for?new Date(n.scheduled_for).toLocaleString('ar-EG'):'—')}<div style="font-size:11px;color:var(--muted);margin-top:4px;">الأيام: ${Array.isArray(n.metadata?.active_days)&&n.metadata.active_days.length?n.metadata.active_days.map(d=>notificationDayNames[Number(d)]).filter(Boolean).join('، '):'كل الأيام'}</div></td>
       <td><button class="btn btn-outline btn-sm" onclick="toggleNotificationPublish('${n.id}',${n.is_published?'false':'true'})">${n.is_published?'إيقاف':'نشر'}</button> <button class="btn btn-danger btn-sm" onclick="deleteNotification('${n.id}')">حذف</button></td></tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;padding:18px;">لا توجد تنبيهات بعد.</td></tr>';
+  // Bind directly after rendering so the details action works even when inline handlers are restricted.
+  tbody.querySelectorAll('[data-notification-stats]').forEach(button => {
+    button.addEventListener('click', () => showNotificationStats(button.getAttribute('data-notification-stats')));
+  });
 }
 
 async function showNotificationStats(notificationId) {
