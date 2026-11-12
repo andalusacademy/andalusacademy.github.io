@@ -137,6 +137,7 @@ async function createReadyPdf(){
  }finally{button.disabled=false;button.textContent='حفظ الملخص الجاهز';}
 }
 async function runLegacyGenerator(mode){
+ if(mode==='material'&&!storageReady)return status('ss-v2-source-status','انتظر انتهاء حذف ملفات المكتبة القديمة قبل رفع ملف المادة.');
  const fresh=$('#ss-ai-new-btn');if(fresh){const oldConfirm=window.confirm;window.confirm=()=>true;fresh.click();window.confirm=oldConfirm;}
  const title=$('#ss-v2-gen-title').value.trim(),subject=$('#ss-v2-gen-subject').value.trim(),mc=Number($('#ss-v2-gen-mc').value||0),tf=Number($('#ss-v2-gen-tf').value||0),essay=Number($('#ss-v2-gen-essay').value||0),button=$('#ss-v2-generate');
  if(!title||!subject||mc+tf+essay<1||mc+tf+essay>100)return status('ss-v2-source-status','اكتب الاسم والمادة وحدد من 1 إلى 100 سؤال.');
