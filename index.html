@@ -15158,28 +15158,55 @@ async function loadNotificationsAdmin() {
 }
 
 async function showNotificationStats(notificationId) {
-  // لا نوقف الزر اعتمادًا على قيمة role محلية قد تختلف بين جلسات لوحة الإدارة؛
-  // صلاحية RPC نفسها هي الحاجز الأمني النهائي.
+  const renderStatsState = (html) => {
+    let overlay = document.getElementById('notification-stats-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'notification-stats-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:1000001;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:14px;';
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = '<section role="dialog" aria-modal="true" style="width:100%;max-width:650px;max-height:85vh;overflow:auto;background:#fff;border-radius:16px;padding:20px;direction:rtl;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><h3 style="margin:0;">متابعة قراءة الإشعار</h3><button type="button" class="btn btn-outline" onclick="document.getElementById(\'notification-stats-overlay\')?.remove()">إغلاق</button></div>' +
+      html + '</section>';
+    return overlay;
+  };
+  if (!notificationId) {
+    renderStatsState('<p style="color:#b91c1c;margin-top:16px;">رقم الإشعار غير موجود. أغلق النافذة وأعد تحميل صفحة الإدارة.</p>');
+    return;
+  }
+  renderStatsState('<div style="padding:28px 8px;text-align:center;color:#475569;"><div style="font-size:28px;margin-bottom:10px;">◌</div>جاري تحميل أسماء الطلاب وحالة الاطلاع...</div>');
   try {
-  if (!notificationId) { showToast('رقم الإشعار غير موجود.','error'); return; }
-  const {data,error}=await sb.rpc('get_notification_admin_stats',{p_notification_id:notificationId});
-  if(error) { showToast('تعذر تحميل تفاصيل الاطلاع: '+(error.message||'خطأ في الاتصال'),'error'); console.error('notification stats RPC:',error); return; }
-  if(!data?.ok) { showToast('تعذر تحميل تفاصيل الاطلاع: '+(data?.error||'الطلب غير مصرح')) ; return; }
-  const item=(data.items||[])[0];
-  if(!item){showToast('لم يتم العثور على الإشعار.','error');return;}
-  const unread=item.unread_students||[];
-  const read=item.read_students||[];
-  let overlay=document.getElementById('notification-stats-overlay');
-  if(!overlay){overlay=document.createElement('div');overlay.id='notification-stats-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:1000001;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:14px;';document.body.appendChild(overlay);}
-  const names=(arr)=>arr.length?arr.map(s=>'<li style="padding:6px 0;border-bottom:1px solid #e2e8f0;">'+escapeHtml(s.name||'طالب')+' <span style="color:#64748b;">('+escapeHtml(s.id)+')</span></li>').join(''):'<li style="padding:8px 0;color:#64748b;">لا يوجد</li>';
-  overlay.innerHTML='<section role="dialog" aria-modal="true" style="width:100%;max-width:650px;max-height:85vh;overflow:auto;background:#fff;border-radius:16px;padding:18px;direction:rtl;">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><h3 style="margin:0;">متابعة قراءة الإشعار</h3><button class="btn btn-outline" onclick="document.getElementById(\'notification-stats-overlay\')?.remove()">إغلاق</button></div>'+
-    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0;"><strong>المستهدفون: '+item.target_count+'</strong><strong style="color:#15803d;">اطلعوا: '+item.read_count+'</strong><strong style="color:#b91c1c;">لم يطلعوا: '+item.unread_count+'</strong></div>'+
-    '<h4 style="margin:12px 0 6px;color:#b91c1c;">لم يطلعوا على الإشعار</h4><ul style="list-style:none;padding:0;margin:0;">'+names(unread)+'</ul>'+
-    '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">عرض الطلاب الذين اطلعوا ('+read.length+')</summary><ul style="list-style:none;padding:8px 0 0;margin:0;">'+names(read)+'</ul></details></section>';
+    const { data, error } = await sb.rpc('get_notification_admin_stats', { p_notification_id: notificationId });
+    if (error) {
+      console.error('notification stats RPC:', error);
+      renderStatsState('<div style="margin-top:16px;padding:14px;border-radius:10px;background:#fef2f2;color:#991b1b;"><strong>تعذر تحميل التفاصيل من قاعدة البيانات</strong><p style="margin:8px 0 0;">' + escapeHtml(error.message || 'خطأ في الاتصال') + '</p></div>');
+      return;
+    }
+    if (!data?.ok) {
+      const reason = data?.reason || data?.error || 'الطلب غير مصرح';
+      console.error('notification stats rejected:', data);
+      renderStatsState('<div style="margin-top:16px;padding:14px;border-radius:10px;background:#fef2f2;color:#991b1b;"><strong>قاعدة البيانات رفضت طلب التفاصيل</strong><p style="margin:8px 0 0;">' + escapeHtml(reason) + '</p><p style="margin:8px 0 0;font-size:12px;color:#7f1d1d;">تحقق من جلسة دخول المدير وصلاحياته، ولم يتم إخفاء سبب الرفض.</p></div>');
+      return;
+    }
+    const item = (data.items || []).find(x => String(x.id) === String(notificationId));
+    if (!item) {
+      renderStatsState('<p style="margin-top:16px;color:#991b1b;">لم تُرجع قاعدة البيانات تفاصيل لهذا الإشعار. قد تكون هناك مشكلة في معرّف الإشعار أو صلاحية الوصول.</p>');
+      return;
+    }
+    const unread = Array.isArray(item.unread_students) ? item.unread_students : [];
+    const read = Array.isArray(item.read_students) ? item.read_students : [];
+    const names = arr => arr.length
+      ? arr.map(s => '<li style="padding:7px 0;border-bottom:1px solid #e2e8f0;">' + escapeHtml(s.name || 'طالب') + ' <span style="color:#64748b;">(' + escapeHtml(s.id || '') + ')</span></li>').join('')
+      : '<li style="padding:8px 0;color:#64748b;">لا يوجد</li>';
+    renderStatsState(
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0;"><strong>المستهدفون: ' + Number(item.target_count || 0) + '</strong><strong style="color:#15803d;">اطلعوا: ' + Number(item.read_count || 0) + '</strong><strong style="color:#b91c1c;">لم يطلعوا: ' + Number(item.unread_count || 0) + '</strong></div>' +
+      '<h4 style="margin:12px 0 6px;color:#b91c1c;">لم يطلعوا على الإشعار (' + unread.length + ')</h4><ul style="list-style:none;padding:0;margin:0;">' + names(unread) + '</ul>' +
+      '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">عرض الطلاب الذين اطلعوا (' + read.length + ')</summary><ul style="list-style:none;padding:8px 0 0;margin:0;">' + names(read) + '</ul></details>'
+    );
   } catch (err) {
-    console.error('showNotificationStats failed:',err);
-    showToast('حدث خطأ أثناء فتح تفاصيل الاطلاع: '+(err?.message||'خطأ غير معروف'),'error');
+    console.error('showNotificationStats failed:', err);
+    renderStatsState('<div style="margin-top:16px;padding:14px;border-radius:10px;background:#fef2f2;color:#991b1b;"><strong>حدث خطأ أثناء فتح التفاصيل</strong><p style="margin:8px 0 0;">' + escapeHtml(err?.message || 'خطأ غير معروف') + '</p></div>');
   }
 }
 window.showNotificationStats = showNotificationStats;
