@@ -32,7 +32,7 @@
     modal.id = 'andalus-exam-drafts-modal';
     modal.className = 'modal-overlay';
     modal.style.zIndex = '1300';
-    modal.innerHTML = '<div class="modal" style="max-width:980px;width:96vw;max-height:92vh;overflow:auto"><div class="modal-header"><div><h3 style="margin:0">📚 المسودات المحفوظة للامتحانات</h3><small style="color:var(--muted)">كل مسودة مستقلة — اختر مسودة واحدة فقط</small></div><button class="btn btn-outline" type="button" id="aed-close">إغلاق</button></div><div class="modal-body"><div id="aed-status" style="margin-bottom:12px"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn btn-outline btn-sm" id="aed-refresh">↻ تحديث</button><button class="btn btn-warning btn-sm" id="aed-restore-local">📥 استعادة المسودة المحلية</button><button class="btn btn-success btn-sm" id="aed-approve">اعتماد المحدد</button><button class="btn btn-gold btn-sm" id="aed-create">🧩 إنشاء امتحان من المحدد</button><button class="btn btn-outline btn-sm" id="aed-clear">إلغاء التحديد</button></div><div id="aed-list"></div><div id="aed-preview" style="margin-top:14px"></div></div></div>';
+    modal.innerHTML = '<div class="modal" style="max-width:980px;width:96vw;max-height:92vh;overflow:auto"><div class="modal-header"><div><h3 style="margin:0">📚 المسودات المحفوظة للامتحانات</h3><small style="color:var(--muted)">كل مسودة مستقلة — اختر مسودة واحدة فقط</small></div><button class="btn btn-outline" type="button" id="aed-close">إغلاق</button></div><div class="modal-body"><div id="aed-status" style="margin-bottom:12px"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn btn-outline btn-sm" id="aed-refresh">↻ تحديث</button><button class="btn btn-warning btn-sm" id="aed-restore-local">📥 استعادة المسودة المحلية</button><button class="btn btn-success btn-sm" id="aed-approve">اعتماد المحدد</button><button class="btn btn-gold btn-sm" id="aed-create">🧩 إنشاء امتحان من المحدد</button><button class="btn btn-primary btn-sm" id="aed-summary">📚 تحويل المحدد إلى ملخص للبيع</button><button class="btn btn-outline btn-sm" id="aed-clear">إلغاء التحديد</button></div><div id="aed-list"></div><div id="aed-preview" style="margin-top:14px"></div></div></div>';
     document.body.appendChild(modal);
     $('#aed-close',modal).onclick = () => modal.classList.remove('open');
     $('#aed-refresh',modal).onclick = load;
@@ -40,6 +40,7 @@
     $('#aed-clear',modal).onclick = () => { selected.clear(); render(); };
     $('#aed-approve',modal).onclick = approveSelected;
     $('#aed-create',modal).onclick = createFromSelected;
+    $('#aed-summary',modal).onclick = createSummaryFromSelected;
     $('#aed-list',modal).addEventListener('change', e => {
       const cb = e.target.closest('[data-draft-id]');
       if (!cb) return;
@@ -170,17 +171,88 @@
     toast('تم اعتماد '+ids.length+' مسودة.');
     await load();
   }
-  async function createFromSelected(){
+  function selectedDraft(){
     const chosen=drafts.filter(d=>selected.has(d.id));
-    if(!chosen.length) return toast('حدد مسودة واحدة فقط.', 'error');
-    if(chosen.length!==1) return toast('لا يمكن تجميع مسودات متعددة. اختر مسودة واحدة فقط.', 'error');
-    const questions=Array.isArray(chosen[0].questions)?chosen[0].questions:[];
-    if(!questions.length) return toast('المسودات المحددة لا تحتوي على أسئلة.', 'error');
-    const subjectName=chosen[0].subject_name || '';
-    const exam={title:chosen[0].title || 'امتحان '+subjectName,subject:subjectName,questions};
-    if(typeof window.showGeneratedExamReview!=='function') return toast('واجهة مراجعة الأسئلة غير جاهزة. حدّث الصفحة ثم حاول مرة أخرى.', 'error');
+    if(!chosen.length){toast('حدد مسودة واحدة فقط.','error');return null;}
+    if(chosen.length!==1){toast('اختر مسودة واحدة فقط.','error');return null;}
+    return chosen[0];
+  }
+  function questionType(q){
+    const t=String(q.type||q.question_type||'mcq').toLowerCase();
+    if(t.includes('essay')||t.includes('مقالي'))return 'essay';
+    if(t.includes('true')||t.includes('صح')||t.includes('false'))return 'true_false';
+    return 'mcq';
+  }
+  function shuffle(list){
+    const a=list.slice();
+    for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+    return a;
+  }
+  async function createFromSelected(){
+    const draft=selectedDraft();if(!draft)return;
+    const questions=Array.isArray(draft.questions)?draft.questions:[];
+    if(!questions.length)return toast('المسودة المحددة لا تحتوي على أسئلة.','error');
+    const n=counts(questions);
+    $('#aed-preview').innerHTML='<div class="card" style="padding:16px;margin-top:12px"><h4>🎯 تحديد توزيع أسئلة الامتحان</h4><p>المتاح في المسودة: '+n.true_false+' صح وغلط، '+n.mcq+' اختياري، '+n.essay+' مقالي — '+questions.length+' إجماليًا</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px"><label>صح وغلط<input id="aed-exam-tf" type="number" min="0" max="'+n.true_false+'" value="'+(n.true_false?Math.min(50,n.true_false):0)+'" class="search-input" style="width:100%"></label><label>اختياري<input id="aed-exam-mcq" type="number" min="0" max="'+n.mcq+'" value="'+(n.mcq?Math.min(50,n.mcq):0)+'" class="search-input" style="width:100%"></label><label>مقالي<input id="aed-exam-essay" type="number" min="0" max="'+n.essay+'" value="0" class="search-input" style="width:100%"></label></div><div id="aed-exam-count-status" style="margin:10px 0;color:var(--muted)">سيتم السحب عشوائيًا من المسودة دون تعديلها.</div><button class="btn btn-gold" id="aed-generate-exam" type="button">إنشاء الامتحان بالتوزيع المحدد</button></div>';
+    $('#aed-generate-exam').onclick=()=>createExamWithDistribution(draft,n);
+  }
+  function createExamWithDistribution(draft,available){
+    const tf=Number($('#aed-exam-tf')?.value),mcq=Number($('#aed-exam-mcq')?.value),essay=Number($('#aed-exam-essay')?.value);
+    const values=[tf,mcq,essay];
+    if(values.some(v=>!Number.isInteger(v)||v<0)){toast('اكتب أعدادًا صحيحة غير سالبة لكل نوع.','error');return;}
+    if(tf>available.true_false||mcq>available.mcq||essay>available.essay){toast('العدد المطلوب أكبر من الأسئلة المتاحة في المسودة.','error');return;}
+    if(tf+mcq+essay<1){toast('حدد سؤالًا واحدًا على الأقل لإنشاء الامتحان.','error');return;}
+    const questions=draft.questions||[],picked=[];
+    for(const [type,count] of [['true_false',tf],['mcq',mcq],['essay',essay]]){
+      const pool=shuffle(questions.filter(q=>questionType(q)===type));
+      picked.push(...pool.slice(0,count));
+    }
+    const mixed=shuffle(picked);
+    const subjectName=draft.subject_name||'';
+    const exam={title:draft.title||'امتحان '+subjectName,subject:subjectName,questions:mixed,source:'exam_draft',draft_id:draft.id};
+    if(typeof window.showGeneratedExamReview!=='function')return toast('واجهة مراجعة الأسئلة غير جاهزة. حدّث الصفحة ثم حاول مرة أخرى.','error');
     window.showGeneratedExamReview(exam);
-    const modal=$('#andalus-exam-drafts-modal'); if(modal) modal.classList.remove('open');
+    const modal=$('#andalus-exam-drafts-modal');if(modal)modal.classList.remove('open');
+  }
+  async function createSummaryFromSelected(){
+    const draft=selectedDraft();if(!draft)return;
+    const questions=Array.isArray(draft.questions)?draft.questions:[];
+    if(!questions.length)return toast('المسودة المحددة لا تحتوي على أسئلة.','error');
+    const db=client();if(!db)return toast('تعذر الاتصال بقاعدة البيانات.','error');
+    const button=$('#aed-summary');if(button){button.disabled=true;button.textContent='جاري تحويل كل الأسئلة...';}
+    let summaryId=null;
+    try{
+      const existing=await db.from('study_summaries').select('id,title,generated_question_count').eq('source_exam_draft_id',draft.id).maybeSingle();
+      if(existing.error)throw existing.error;
+      if(existing.data){summaryId=existing.data.id;toast('تم تحويل هذه المسودة من قبل. لن ننشئ نسخة مكررة.');}
+      else{
+        const auth=await db.auth.getSession();if(!auth.data?.session)throw new Error('جلسة المدير غير صالحة. سجّل الدخول مرة أخرى.');
+        const title=String(draft.title||('ملخص '+(draft.subject_name||''))).trim();
+        const made=await db.from('study_summaries').insert({
+          title,subject_name:draft.subject_name||'',description:'ملخص دراسي مُحوّل من مسودة امتحان — يحتوي على جميع أسئلة المسودة وإجاباتها.',
+          price:0,validity_days:30,is_published:false,is_approved:false,created_by:auth.data.session.user.id,
+          ai_generation_status:'ready',generated_question_count:questions.length,source_exam_draft_id:draft.id
+        }).select('id').single();
+        if(made.error)throw made.error;
+        summaryId=made.data.id;
+        const rows=questions.map((q,i)=>{
+          const type=questionType(q),opts=Array.isArray(q.options)?q.options:(q.options&&typeof q.options==='object'?['a','b','c','d'].map(k=>q.options[k]||q.options[k.toUpperCase()]).filter(Boolean):['a','b','c','d'].map(k=>q['option_'+k]).filter(Boolean));
+          return {summary_id:summaryId,question_text:String(q.question||q.question_text||q.text||'').trim(),answer_text:String(q.answer||q.correct_answer||''),explanation:String(q.explanation||''),order_num:i+1,question_type:type,options:opts,ai_generated:false,is_approved:false,is_selected:true,batch_no:1,source_reference:'مسودة امتحان '+draft.id};
+        });
+        const inserted=await db.from('study_summary_questions').insert(rows);
+        if(inserted.error)throw inserted.error;
+        const verify=await db.from('study_summary_questions').select('id',{count:'exact',head:true}).eq('summary_id',summaryId);
+        if(verify.error||verify.count!==questions.length)throw new Error('تم إنشاء سجل الملخص لكن تعذر تأكيد حفظ كل الأسئلة. راجع المسودات قبل إعادة المحاولة.');
+        toast('تم تحويل المسودة إلى ملخص مراجعة يحتوي على '+questions.length+' سؤالًا بكل الإجابات. الملخص غير معتمد وغير منشور حتى تراجعه وتحدد سعره.');
+      }
+      const modal=$('#andalus-exam-drafts-modal');if(modal)modal.classList.remove('open');
+      if(typeof window.showPage==='function')window.showPage('study-summaries');
+      let tries=0;const reveal=()=>{const sel=$('#ss-review-summary');if(sel&&[...sel.options].some(o=>o.value===summaryId)){sel.value=summaryId;sel.dispatchEvent(new Event('change',{bubbles:true}));return;}if(++tries<12)setTimeout(reveal,500);};
+      setTimeout(reveal,350);
+    }catch(e){
+      if(summaryId){console.error('Draft-to-summary conversion needs review',summaryId,e);}
+      toast('تعذر تحويل المسودة إلى ملخص: '+(e?.message||e),'error');
+    }finally{if(button){button.disabled=false;button.textContent='📚 تحويل المحدد إلى ملخص للبيع';}}
   }
   function addButton(parent,label,handler,id){
     if(!parent||$('#'+id))return;
