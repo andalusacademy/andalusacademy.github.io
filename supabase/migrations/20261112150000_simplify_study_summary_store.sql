@@ -14,112 +14,41 @@ DROP POLICY IF EXISTS study_summary_target_students_admin_all ON public.study_su
 CREATE POLICY study_summary_target_students_admin_all ON public.study_summary_target_students
   FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
-CREATE OR REPLACE FUNCTION public.admin_review_study_summary_order(p_order_id uuid, p_status text, p_reason text DEFAULT NULL::text)
- RETURNS void
- LANGUAGE plpgsql
- SET search_path TO 'public', 'pg_temp'
+CREATE OR REPLACE FUNCTION public.study_summary_student_is_targeted(p_summary_id uuid, p_student_id text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
 AS $function$
-DECLARE
-  v_order public.study_summary_orders%rowtype;
-  v_days integer;
-  v_ent_id uuid;
-  v_package_id uuid;
-  v_summary_id uuid;
-BEGIN
-  IF NOT public.is_admin() THEN RAISE EXCEPTION 'غير مصرح'; END IF;
-  IF p_status NOT IN ('paid', 'pending_payment', 'rejected', 'cancelled') THEN
-    RAISE EXCEPTION 'حالة غير صالحة';
-  END IF;
-
-  SELECT * INTO v_order FROM public.study_summary_orders
-  WHERE id=p_order_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'طلب الشراء غير موجود'; END IF;
-  IF p_status='paid'
-     AND nullif(btrim(coalesce(v_order.payment_reference,'')),'') IS NULL
-     AND nullif(btrim(coalesce(v_order.payment_proof_path,'')),'') IS NULL THEN
-    RAISE EXCEPTION 'لا يمكن تأكيد الدفع دون مرجع تحويل مسجل';
-  END IF;
-
-  UPDATE public.study_summary_orders
-  SET status=p_status,reviewed_by=auth.uid(),reviewed_at=now(),
-      reviewed_reason=NULLIF(trim(coalesce(p_reason,'')),''),
-      updated_at=now()
-  WHERE id=p_order_id;
-
-  IF p_status<>'paid' THEN RETURN; END IF;
-
-  SELECT pi.package_id INTO v_package_id
-  FROM public.study_summary_package_items pi
-  WHERE pi.summary_id=v_order.summary_id LIMIT 1;
-
-  IF v_package_id IS NOT NULL THEN
-    SELECT greatest(coalesce(p.validity_days,2),1) INTO v_days
-    FROM public.study_summary_packages p
-    WHERE p.id=v_package_id AND p.is_active=true;
-    IF v_days IS NULL THEN RAISE EXCEPTION 'الباقة غير مفعلة أو غير موجودة'; END IF;
-
-    FOR v_summary_id IN
-      SELECT pi.summary_id FROM public.study_summary_package_items pi
-      WHERE pi.package_id=v_package_id ORDER BY pi.summary_id
-    LOOP
-      SELECT e.id INTO v_ent_id FROM public.study_summary_entitlements e
-      WHERE e.student_id=v_order.student_id AND e.summary_id=v_summary_id
-      ORDER BY (e.revoked_at IS NULL) DESC,e.created_at DESC
-      LIMIT 1 FOR UPDATE;
-
-      IF v_ent_id IS NULL THEN
-        INSERT INTO public.study_summary_entitlements
-          (student_id,summary_id,order_id,starts_at,expires_at,created_at,revoked_at)
-        VALUES(v_order.student_id,v_summary_id,v_order.id,now(),
-          now()+make_interval(days=>v_days),now(),NULL);
-      ELSE
-        UPDATE public.study_summary_entitlements
-        SET order_id=v_order.id,starts_at=now(),
-            expires_at=now()+make_interval(days=>v_days),revoked_at=NULL
-        WHERE id=v_ent_id;
-      END IF;
-      v_ent_id:=NULL;
-    END LOOP;
-
-    IF EXISTS (
-      SELECT 1 FROM public.study_summary_package_items pi
-      WHERE pi.package_id=v_package_id
-        AND NOT EXISTS (
-          SELECT 1 FROM public.study_summary_entitlements e
-          WHERE e.student_id=v_order.student_id AND e.summary_id=pi.summary_id
-            AND e.revoked_at IS NULL AND e.starts_at<=now()
-            AND (e.expires_at IS NULL OR e.expires_at>now())
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.study_summaries sm
+    JOIN public.students st ON st.id = p_student_id
+    WHERE sm.id = p_summary_id
+      AND st.deleted_at IS NULL
+      AND coalesce(st.student_status, 'active') = 'active'
+      AND (
+        EXISTS (
+          SELECT 1 FROM public.study_summary_target_students ts
+          WHERE ts.summary_id = sm.id AND ts.student_id = p_student_id
         )
-    ) THEN RAISE EXCEPTION 'لم تكتمل إتاحة جميع أجزاء الباقة؛ أُلغيت العملية بالكامل'; END IF;
-  ELSE
-    SELECT greatest(coalesce(sm.validity_days,30),1) INTO v_days
-    FROM public.study_summaries sm WHERE sm.id=v_order.summary_id;
-
-    SELECT e.id INTO v_ent_id FROM public.study_summary_entitlements e
-    WHERE e.student_id=v_order.student_id AND e.summary_id=v_order.summary_id
-    ORDER BY (e.revoked_at IS NULL) DESC,e.created_at DESC
-    LIMIT 1 FOR UPDATE;
-
-    IF v_ent_id IS NULL THEN
-      INSERT INTO public.study_summary_entitlements
-        (student_id,summary_id,order_id,starts_at,expires_at,created_at,revoked_at)
-      VALUES(v_order.student_id,v_order.summary_id, v_order.id,now(),
-        CASE WHEN v_days>=36500 THEN NULL ELSE now()+make_interval(days=>greatest(coalesce(v_days,30),1)) END,
-        now(),NULL);
-    ELSE
-      UPDATE public.study_summary_entitlements
-      SET order_id=v_order.id,starts_at=now(),
-          expires_at=CASE WHEN v_days>=36500 THEN NULL ELSE now()+make_interval(days=>greatest(coalesce(v_days,30),1)) END,
-          revoked_at=NULL
-      WHERE id=v_ent_id;
-    END IF;
-  END IF;
-
-  INSERT INTO public.study_summary_activity(student_id,summary_id,order_id,event_type,metadata)
-  VALUES(v_order.student_id,v_order.summary_id,v_order.id,'access_granted',
-    jsonb_build_object('status','paid','order_code',v_order.order_code,
-      'package_id',v_package_id,'granted_all_items',v_package_id IS NOT NULL));
-END;
+        OR (
+          (nullif(btrim(sm.target_branch), '') IS NOT NULL
+           OR nullif(btrim(sm.target_system), '') IS NOT NULL
+           OR nullif(btrim(sm.target_batch), '') IS NOT NULL)
+          AND (nullif(btrim(sm.target_branch), '') IS NULL OR public.study_summary_target_matches(sm.target_branch, st.branch))
+          AND (nullif(btrim(sm.target_system), '') IS NULL OR public.study_summary_target_matches(sm.target_system, st.system_name))
+          AND (nullif(btrim(sm.target_batch), '') IS NULL OR public.study_summary_target_matches(sm.target_batch, st.program))
+        )
+        OR (
+          NOT EXISTS (SELECT 1 FROM public.study_summary_target_students ts WHERE ts.summary_id = sm.id)
+          AND nullif(btrim(sm.target_branch), '') IS NULL
+          AND nullif(btrim(sm.target_system), '') IS NULL
+          AND nullif(btrim(sm.target_batch), '') IS NULL
+          AND coalesce(sm.target_all, true)
+        )
+      )
+  );
 $function$
 
 CREATE OR REPLACE FUNCTION public.get_student_summary_catalog(p_student_id text)
@@ -177,6 +106,105 @@ WHERE s.is_published=true AND s.is_approved=true
   AND NOT EXISTS (SELECT 1 FROM public.study_summary_package_items pi WHERE pi.summary_id=s.id)
   AND public.study_summary_student_is_targeted(s.id,p_student_id)
 ORDER BY 1;
+$function$
+
+CREATE OR REPLACE FUNCTION public.student_list_study_summaries(p_session_token uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_student_id text; v_result jsonb;
+BEGIN
+  SELECT s.student_id INTO v_student_id
+  FROM public.competition_face_verified_sessions s
+  JOIN public.students st ON st.id=s.student_id
+  WHERE s.token=p_session_token AND s.competition_type='student_portal'
+    AND s.expires_at>now() AND st.deleted_at IS NULL
+    AND coalesce(st.student_status,'active')='active'
+  LIMIT 1;
+  IF v_student_id IS NULL THEN RETURN jsonb_build_object('ok',false,'reason','session_expired'); END IF;
+
+  UPDATE public.study_summary_orders SET status='expired',updated_at=now()
+  WHERE student_id=v_student_id AND status='pending_payment'
+    AND expires_at IS NOT NULL AND expires_at<=now();
+
+  SELECT coalesce(jsonb_agg(x.item ORDER BY x.created_at DESC),'[]'::jsonb) INTO v_result
+  FROM (
+    SELECT sm.created_at,
+      jsonb_build_object(
+        'id',coalesce(pkg.representative_id,sm.id),
+        'title',coalesce(pkg.name,sm.title),
+        'description',CASE WHEN pkg.package_id IS NOT NULL THEN 'باقة ملخصات دراسية' ELSE sm.description END,
+        'subject_name',sm.subject_name,
+        'price',coalesce(pkg.price,sm.price),
+        'validity_days',coalesce(pkg.validity_days,sm.validity_days),
+        'has_pdf',coalesce(sm.delivery_pdf_path IS NOT NULL,false),
+        'question_count',CASE WHEN pkg.package_id IS NOT NULL THEN pkg.question_count ELSE (
+          SELECT count(*) FROM public.study_summary_questions q
+          WHERE q.summary_id=sm.id AND q.is_selected=true AND q.is_approved=true
+            AND q.batch_no IN (SELECT value::integer FROM jsonb_array_elements_text(coalesce(sm.enabled_batches,'[1,2]'::jsonb)))
+            AND q.question_type IN (SELECT value FROM jsonb_array_elements_text(coalesce(sm.enabled_question_types,'["mcq","true_false","essay"]'::jsonb)))
+        ) END,
+        'has_access',CASE WHEN pkg.package_id IS NOT NULL THEN pkg.has_representative_access ELSE EXISTS(
+          SELECT 1 FROM public.study_summary_entitlements e
+          WHERE e.student_id=v_student_id AND e.summary_id=sm.id AND e.revoked_at IS NULL
+            AND e.starts_at<=now() AND (e.expires_at IS NULL OR e.expires_at>now())
+        ) END,
+        'expires_at',CASE WHEN pkg.package_id IS NOT NULL THEN pkg.expires_at ELSE (
+          SELECT max(e.expires_at) FROM public.study_summary_entitlements e
+          WHERE e.student_id=v_student_id AND e.summary_id=sm.id AND e.revoked_at IS NULL
+            AND e.starts_at<=now() AND (e.expires_at IS NULL OR e.expires_at>now())
+        ) END,
+        'pending_order',EXISTS(
+          SELECT 1 FROM public.study_summary_orders o
+          WHERE o.student_id=v_student_id AND o.summary_id=coalesce(pkg.representative_id,sm.id)
+            AND o.status='pending_payment' AND (o.expires_at IS NULL OR o.expires_at>now())
+        )
+      ) AS item
+    FROM public.study_summaries sm
+    LEFT JOIN LATERAL (
+      SELECT p.id AS package_id,p.name,p.price,p.validity_days,
+        (SELECT min(pi0.summary_id::text)::uuid FROM public.study_summary_package_items pi0 WHERE pi0.package_id=p.id) AS representative_id,
+        (SELECT count(*) FROM public.study_summary_questions q
+          JOIN public.study_summaries qsm ON qsm.id=q.summary_id
+          WHERE q.summary_id IN (SELECT pi2.summary_id FROM public.study_summary_package_items pi2 WHERE pi2.package_id=p.id)
+            AND q.is_selected=true AND q.is_approved=true
+            AND q.batch_no IN (SELECT value::integer FROM jsonb_array_elements_text(coalesce(qsm.enabled_batches,'[1,2]'::jsonb)))
+            AND q.question_type IN (SELECT value FROM jsonb_array_elements_text(coalesce(qsm.enabled_question_types,'["mcq","true_false","essay"]'::jsonb)))
+        ) AS question_count,
+        EXISTS(
+          SELECT 1 FROM public.study_summary_entitlements e
+          WHERE e.student_id=v_student_id
+            AND e.summary_id=(SELECT min(pi0.summary_id::text)::uuid FROM public.study_summary_package_items pi0 WHERE pi0.package_id=p.id)
+            AND e.revoked_at IS NULL AND e.starts_at<=now()
+            AND (e.expires_at IS NULL OR e.expires_at>now())
+        ) AS has_representative_access,
+        (SELECT max(e.expires_at) FROM public.study_summary_entitlements e
+          WHERE e.student_id=v_student_id
+            AND e.summary_id=(SELECT min(pi0.summary_id::text)::uuid FROM public.study_summary_package_items pi0 WHERE pi0.package_id=p.id)
+            AND e.revoked_at IS NULL AND e.starts_at<=now()
+            AND (e.expires_at IS NULL OR e.expires_at>now())
+        ) AS expires_at
+      FROM public.study_summary_package_items pi
+      JOIN public.study_summary_packages p ON p.id=pi.package_id AND p.is_active=true
+      WHERE pi.summary_id=sm.id LIMIT 1
+    ) pkg ON true
+    WHERE sm.is_published=true AND sm.is_approved=true
+      AND (sm.available_from IS NULL OR sm.available_from<=now())
+      AND ((sm.available_until IS NULL OR sm.available_until>now()) OR EXISTS(
+        SELECT 1 FROM public.study_summary_entitlements e
+        WHERE e.student_id=v_student_id AND e.summary_id=sm.id AND e.revoked_at IS NULL
+          AND e.starts_at<=now() AND (e.expires_at IS NULL OR e.expires_at>now())
+      ))
+      AND public.study_summary_student_is_targeted(sm.id,v_student_id)
+      AND (pkg.package_id IS NULL OR sm.id=pkg.representative_id)
+  ) x;
+
+  INSERT INTO public.study_summary_activity(student_id,event_type,metadata)
+  VALUES(v_student_id,'list','{}'::jsonb);
+  RETURN jsonb_build_object('ok',true,'summaries',v_result);
+END;
 $function$
 
 CREATE OR REPLACE FUNCTION public.student_create_paid_study_summary_order(p_session_token uuid, p_summary_id uuid)
@@ -296,138 +324,110 @@ BEGIN
 END;
 $function$
 
-CREATE OR REPLACE FUNCTION public.student_list_study_summaries(p_session_token uuid)
- RETURNS jsonb
+CREATE OR REPLACE FUNCTION public.admin_review_study_summary_order(p_order_id uuid, p_status text, p_reason text DEFAULT NULL::text)
+ RETURNS void
  LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
-DECLARE v_student_id text; v_result jsonb;
+DECLARE
+  v_order public.study_summary_orders%rowtype;
+  v_days integer;
+  v_ent_id uuid;
+  v_package_id uuid;
+  v_summary_id uuid;
 BEGIN
-  SELECT s.student_id INTO v_student_id
-  FROM public.competition_face_verified_sessions s
-  JOIN public.students st ON st.id=s.student_id
-  WHERE s.token=p_session_token AND s.competition_type='student_portal'
-    AND s.expires_at>now() AND st.deleted_at IS NULL
-    AND coalesce(st.student_status,'active')='active'
-  LIMIT 1;
-  IF v_student_id IS NULL THEN RETURN jsonb_build_object('ok',false,'reason','session_expired'); END IF;
+  IF NOT public.is_admin() THEN RAISE EXCEPTION 'غير مصرح'; END IF;
+  IF p_status NOT IN ('paid', 'pending_payment', 'rejected', 'cancelled') THEN
+    RAISE EXCEPTION 'حالة غير صالحة';
+  END IF;
 
-  UPDATE public.study_summary_orders SET status='expired',updated_at=now()
-  WHERE student_id=v_student_id AND status='pending_payment'
-    AND expires_at IS NOT NULL AND expires_at<=now();
+  SELECT * INTO v_order FROM public.study_summary_orders
+  WHERE id=p_order_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'طلب الشراء غير موجود'; END IF;
+  IF p_status='paid'
+     AND nullif(btrim(coalesce(v_order.payment_reference,'')),'') IS NULL
+     AND nullif(btrim(coalesce(v_order.payment_proof_path,'')),'') IS NULL THEN
+    RAISE EXCEPTION 'لا يمكن تأكيد الدفع دون مرجع تحويل مسجل';
+  END IF;
 
-  SELECT coalesce(jsonb_agg(x.item ORDER BY x.created_at DESC),'[]'::jsonb) INTO v_result
-  FROM (
-    SELECT sm.created_at,
-      jsonb_build_object(
-        'id',coalesce(pkg.representative_id,sm.id),
-        'title',coalesce(pkg.name,sm.title),
-        'description',CASE WHEN pkg.package_id IS NOT NULL THEN 'باقة ملخصات دراسية' ELSE sm.description END,
-        'subject_name',sm.subject_name,
-        'price',coalesce(pkg.price,sm.price),
-        'validity_days',coalesce(pkg.validity_days,sm.validity_days),
-        'has_pdf',coalesce(sm.delivery_pdf_path IS NOT NULL,false),
-        'question_count',CASE WHEN pkg.package_id IS NOT NULL THEN pkg.question_count ELSE (
-          SELECT count(*) FROM public.study_summary_questions q
-          WHERE q.summary_id=sm.id AND q.is_selected=true AND q.is_approved=true
-            AND q.batch_no IN (SELECT value::integer FROM jsonb_array_elements_text(coalesce(sm.enabled_batches,'[1,2]'::jsonb)))
-            AND q.question_type IN (SELECT value FROM jsonb_array_elements_text(coalesce(sm.enabled_question_types,'["mcq","true_false","essay"]'::jsonb)))
-        ) END,
-        'has_access',CASE WHEN pkg.package_id IS NOT NULL THEN pkg.has_representative_access ELSE EXISTS(
+  UPDATE public.study_summary_orders
+  SET status=p_status,reviewed_by=auth.uid(),reviewed_at=now(),
+      reviewed_reason=NULLIF(trim(coalesce(p_reason,'')),''),
+      updated_at=now()
+  WHERE id=p_order_id;
+
+  IF p_status<>'paid' THEN RETURN; END IF;
+
+  SELECT pi.package_id INTO v_package_id
+  FROM public.study_summary_package_items pi
+  WHERE pi.summary_id=v_order.summary_id LIMIT 1;
+
+  IF v_package_id IS NOT NULL THEN
+    SELECT greatest(coalesce(p.validity_days,2),1) INTO v_days
+    FROM public.study_summary_packages p
+    WHERE p.id=v_package_id AND p.is_active=true;
+    IF v_days IS NULL THEN RAISE EXCEPTION 'الباقة غير مفعلة أو غير موجودة'; END IF;
+
+    FOR v_summary_id IN
+      SELECT pi.summary_id FROM public.study_summary_package_items pi
+      WHERE pi.package_id=v_package_id ORDER BY pi.summary_id
+    LOOP
+      SELECT e.id INTO v_ent_id FROM public.study_summary_entitlements e
+      WHERE e.student_id=v_order.student_id AND e.summary_id=v_summary_id
+      ORDER BY (e.revoked_at IS NULL) DESC,e.created_at DESC
+      LIMIT 1 FOR UPDATE;
+
+      IF v_ent_id IS NULL THEN
+        INSERT INTO public.study_summary_entitlements
+          (student_id,summary_id,order_id,starts_at,expires_at,created_at,revoked_at)
+        VALUES(v_order.student_id,v_summary_id,v_order.id,now(),
+          now()+make_interval(days=>v_days),now(),NULL);
+      ELSE
+        UPDATE public.study_summary_entitlements
+        SET order_id=v_order.id,starts_at=now(),
+            expires_at=now()+make_interval(days=>v_days),revoked_at=NULL
+        WHERE id=v_ent_id;
+      END IF;
+      v_ent_id:=NULL;
+    END LOOP;
+
+    IF EXISTS (
+      SELECT 1 FROM public.study_summary_package_items pi
+      WHERE pi.package_id=v_package_id
+        AND NOT EXISTS (
           SELECT 1 FROM public.study_summary_entitlements e
-          WHERE e.student_id=v_student_id AND e.summary_id=sm.id AND e.revoked_at IS NULL
-            AND e.starts_at<=now() AND (e.expires_at IS NULL OR e.expires_at>now())
-        ) END,
-        'expires_at',CASE WHEN pkg.package_id IS NOT NULL THEN pkg.expires_at ELSE (
-          SELECT max(e.expires_at) FROM public.study_summary_entitlements e
-          WHERE e.student_id=v_student_id AND e.summary_id=sm.id AND e.revoked_at IS NULL
-            AND e.starts_at<=now() AND (e.expires_at IS NULL OR e.expires_at>now())
-        ) END,
-        'pending_order',EXISTS(
-          SELECT 1 FROM public.study_summary_orders o
-          WHERE o.student_id=v_student_id AND o.summary_id=coalesce(pkg.representative_id,sm.id)
-            AND o.status='pending_payment' AND (o.expires_at IS NULL OR o.expires_at>now())
+          WHERE e.student_id=v_order.student_id AND e.summary_id=pi.summary_id
+            AND e.revoked_at IS NULL AND e.starts_at<=now()
+            AND (e.expires_at IS NULL OR e.expires_at>now())
         )
-      ) AS item
-    FROM public.study_summaries sm
-    LEFT JOIN LATERAL (
-      SELECT p.id AS package_id,p.name,p.price,p.validity_days,
-        (SELECT min(pi0.summary_id::text)::uuid FROM public.study_summary_package_items pi0 WHERE pi0.package_id=p.id) AS representative_id,
-        (SELECT count(*) FROM public.study_summary_questions q
-          JOIN public.study_summaries qsm ON qsm.id=q.summary_id
-          WHERE q.summary_id IN (SELECT pi2.summary_id FROM public.study_summary_package_items pi2 WHERE pi2.package_id=p.id)
-            AND q.is_selected=true AND q.is_approved=true
-            AND q.batch_no IN (SELECT value::integer FROM jsonb_array_elements_text(coalesce(qsm.enabled_batches,'[1,2]'::jsonb)))
-            AND q.question_type IN (SELECT value FROM jsonb_array_elements_text(coalesce(qsm.enabled_question_types,'["mcq","true_false","essay"]'::jsonb)))
-        ) AS question_count,
-        EXISTS(
-          SELECT 1 FROM public.study_summary_entitlements e
-          WHERE e.student_id=v_student_id
-            AND e.summary_id=(SELECT min(pi0.summary_id::text)::uuid FROM public.study_summary_package_items pi0 WHERE pi0.package_id=p.id)
-            AND e.revoked_at IS NULL AND e.starts_at<=now()
-            AND (e.expires_at IS NULL OR e.expires_at>now())
-        ) AS has_representative_access,
-        (SELECT max(e.expires_at) FROM public.study_summary_entitlements e
-          WHERE e.student_id=v_student_id
-            AND e.summary_id=(SELECT min(pi0.summary_id::text)::uuid FROM public.study_summary_package_items pi0 WHERE pi0.package_id=p.id)
-            AND e.revoked_at IS NULL AND e.starts_at<=now()
-            AND (e.expires_at IS NULL OR e.expires_at>now())
-        ) AS expires_at
-      FROM public.study_summary_package_items pi
-      JOIN public.study_summary_packages p ON p.id=pi.package_id AND p.is_active=true
-      WHERE pi.summary_id=sm.id LIMIT 1
-    ) pkg ON true
-    WHERE sm.is_published=true AND sm.is_approved=true
-      AND (sm.available_from IS NULL OR sm.available_from<=now())
-      AND ((sm.available_until IS NULL OR sm.available_until>now()) OR EXISTS(
-        SELECT 1 FROM public.study_summary_entitlements e
-        WHERE e.student_id=v_student_id AND e.summary_id=sm.id AND e.revoked_at IS NULL
-          AND e.starts_at<=now() AND (e.expires_at IS NULL OR e.expires_at>now())
-      ))
-      AND public.study_summary_student_is_targeted(sm.id,v_student_id)
-      AND (pkg.package_id IS NULL OR sm.id=pkg.representative_id)
-  ) x;
+    ) THEN RAISE EXCEPTION 'لم تكتمل إتاحة جميع أجزاء الباقة؛ أُلغيت العملية بالكامل'; END IF;
+  ELSE
+    SELECT greatest(coalesce(sm.validity_days,30),1) INTO v_days
+    FROM public.study_summaries sm WHERE sm.id=v_order.summary_id;
 
-  INSERT INTO public.study_summary_activity(student_id,event_type,metadata)
-  VALUES(v_student_id,'list','{}'::jsonb);
-  RETURN jsonb_build_object('ok',true,'summaries',v_result);
+    SELECT e.id INTO v_ent_id FROM public.study_summary_entitlements e
+    WHERE e.student_id=v_order.student_id AND e.summary_id=v_order.summary_id
+    ORDER BY (e.revoked_at IS NULL) DESC,e.created_at DESC
+    LIMIT 1 FOR UPDATE;
+
+    IF v_ent_id IS NULL THEN
+      INSERT INTO public.study_summary_entitlements
+        (student_id,summary_id,order_id,starts_at,expires_at,created_at,revoked_at)
+      VALUES(v_order.student_id,v_order.summary_id, v_order.id,now(),
+        CASE WHEN v_days>=36500 THEN NULL ELSE now()+make_interval(days=>greatest(coalesce(v_days,30),1)) END,
+        now(),NULL);
+    ELSE
+      UPDATE public.study_summary_entitlements
+      SET order_id=v_order.id,starts_at=now(),
+          expires_at=CASE WHEN v_days>=36500 THEN NULL ELSE now()+make_interval(days=>greatest(coalesce(v_days,30),1)) END,
+          revoked_at=NULL
+      WHERE id=v_ent_id;
+    END IF;
+  END IF;
+
+  INSERT INTO public.study_summary_activity(student_id,summary_id,order_id,event_type,metadata)
+  VALUES(v_order.student_id,v_order.summary_id,v_order.id,'access_granted',
+    jsonb_build_object('status','paid','order_code',v_order.order_code,
+      'package_id',v_package_id,'granted_all_items',v_package_id IS NOT NULL));
 END;
-$function$
-
-CREATE OR REPLACE FUNCTION public.study_summary_student_is_targeted(p_summary_id uuid, p_student_id text)
- RETURNS boolean
- LANGUAGE sql
- STABLE
- SET search_path TO 'public'
-AS $function$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.study_summaries sm
-    JOIN public.students st ON st.id = p_student_id
-    WHERE sm.id = p_summary_id
-      AND st.deleted_at IS NULL
-      AND coalesce(st.student_status, 'active') = 'active'
-      AND (
-        EXISTS (
-          SELECT 1 FROM public.study_summary_target_students ts
-          WHERE ts.summary_id = sm.id AND ts.student_id = p_student_id
-        )
-        OR (
-          (nullif(btrim(sm.target_branch), '') IS NOT NULL
-           OR nullif(btrim(sm.target_system), '') IS NOT NULL
-           OR nullif(btrim(sm.target_batch), '') IS NOT NULL)
-          AND (nullif(btrim(sm.target_branch), '') IS NULL OR public.study_summary_target_matches(sm.target_branch, st.branch))
-          AND (nullif(btrim(sm.target_system), '') IS NULL OR public.study_summary_target_matches(sm.target_system, st.system_name))
-          AND (nullif(btrim(sm.target_batch), '') IS NULL OR public.study_summary_target_matches(sm.target_batch, st.program))
-        )
-        OR (
-          NOT EXISTS (SELECT 1 FROM public.study_summary_target_students ts WHERE ts.summary_id = sm.id)
-          AND nullif(btrim(sm.target_branch), '') IS NULL
-          AND nullif(btrim(sm.target_system), '') IS NULL
-          AND nullif(btrim(sm.target_batch), '') IS NULL
-          AND coalesce(sm.target_all, true)
-        )
-      )
-  );
 $function$
