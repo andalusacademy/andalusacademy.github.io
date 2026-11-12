@@ -15161,9 +15161,13 @@ async function loadNotificationsAdmin() {
 }
 
 async function showNotificationStats(notificationId) {
-  if (currentUser?.role !== 'admin') return;
+  // لا نوقف الزر اعتمادًا على قيمة role محلية قد تختلف بين جلسات لوحة الإدارة؛
+  // صلاحية RPC نفسها هي الحاجز الأمني النهائي.
+  try {
+  if (!notificationId) { showToast('رقم الإشعار غير موجود.','error'); return; }
   const {data,error}=await sb.rpc('get_notification_admin_stats',{p_notification_id:notificationId});
-  if(error || !data?.ok) { showToast('تعذر تحميل تفاصيل الاطلاع: '+(error?.message||'غير مصرح'), 'error'); return; }
+  if(error) { showToast('تعذر تحميل تفاصيل الاطلاع: '+(error.message||'خطأ في الاتصال'),'error'); console.error('notification stats RPC:',error); return; }
+  if(!data?.ok) { showToast('تعذر تحميل تفاصيل الاطلاع: '+(data?.error||'الطلب غير مصرح')) ; return; }
   const item=(data.items||[])[0];
   if(!item){showToast('لم يتم العثور على الإشعار.','error');return;}
   const unread=item.unread_students||[];
@@ -15176,7 +15180,12 @@ async function showNotificationStats(notificationId) {
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0;"><strong>المستهدفون: '+item.target_count+'</strong><strong style="color:#15803d;">اطلعوا: '+item.read_count+'</strong><strong style="color:#b91c1c;">لم يطلعوا: '+item.unread_count+'</strong></div>'+
     '<h4 style="margin:12px 0 6px;color:#b91c1c;">لم يطلعوا على الإشعار</h4><ul style="list-style:none;padding:0;margin:0;">'+names(unread)+'</ul>'+
     '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">عرض الطلاب الذين اطلعوا ('+read.length+')</summary><ul style="list-style:none;padding:8px 0 0;margin:0;">'+names(read)+'</ul></details></section>';
+  } catch (err) {
+    console.error('showNotificationStats failed:',err);
+    showToast('حدث خطأ أثناء فتح تفاصيل الاطلاع: '+(err?.message||'خطأ غير معروف'),'error');
+  }
 }
+window.showNotificationStats = showNotificationStats;
 
 async function saveNotification() {
   if (typeof currentUser === 'undefined' || currentUser?.role !== 'admin') { showToast('هذه العملية متاحة للمدير فقط.','error'); return; }
