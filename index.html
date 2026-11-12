@@ -15211,14 +15211,16 @@ async function showNotificationStats(notificationId) {
 }
 window.showNotificationStats = showNotificationStats;
 
-// Delegated capture handler survives table re-rendering and dynamically replaced admin views.
+// Capture notification detail clicks before any global modal/navigation handlers.
 if (!window.__andulusNotificationStatsClickBound) {
   window.__andulusNotificationStatsClickBound = true;
-  document.addEventListener('click', event => {
-    const button = event.target?.closest?.('[data-notification-stats]');
+  window.addEventListener('click', event => {
+    const path = typeof event.composedPath === 'function' ? event.composedPath() : [event.target];
+    const button = path.find(node => node && node.nodeType === 1 && node.matches?.('[data-notification-stats]'));
     if (!button) return;
     event.preventDefault();
     event.stopPropagation();
+    event.stopImmediatePropagation();
     const notificationId = button.getAttribute('data-notification-stats');
     if (!notificationId) {
       showToast('رقم الإشعار غير موجود. أعد تحميل صفحة الإدارة.','error');
@@ -15229,10 +15231,12 @@ if (!window.__andulusNotificationStatsClickBound) {
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = 'جاري تحميل التفاصيل...';
+    // The dialog is created synchronously before the network request starts.
     Promise.resolve(window.showNotificationStats(notificationId))
       .catch(error => {
         console.error('Notification details click failed:', error);
-        showToast('تعذر فتح تفاصيل الاطلاع: '+(error?.message || 'خطأ غير معروف'),'error');
+        const overlay = document.getElementById('notification-stats-overlay');
+        if (overlay) overlay.innerHTML = '<section style="background:#fff;color:#991b1b;padding:20px;border-radius:14px;direction:rtl;">تعذر فتح تفاصيل الاطلاع: ' + escapeHtml(error?.message || 'خطأ غير معروف') + '</section>';
       })
       .finally(() => {
         button.dataset.loading = '0';
