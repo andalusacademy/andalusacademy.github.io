@@ -181,9 +181,20 @@
     const students=[...studentStats.entries()].map(([id,s])=>({id,name:cache.students[id]||('طالب '+id),...s,average:s.max?s.score/s.max*100:0})).sort((a,b)=>a.average-b.average);
     return {rows,students,officialCount:official.length};
   }
-  function downloadCsv(filename, rows) {
-    const csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
-    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  function downloadCsv(filename, rows, sheetName) {
+    const XLSX=window.XLSX;
+    if(XLSX?.utils?.aoa_to_sheet && XLSX?.writeFile){
+      const wb=XLSX.utils.book_new();
+      const ws=XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb,ws,String(sheetName||'التقرير').slice(0,31));
+      XLSX.writeFile(wb,filename.replace(/\.csv$/i,'.xlsx'));
+      return;
+    }
+    const csv='\\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\\r\\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
   }
   function renderTableOnly(){
     const el=$('#ecc-attempt-table'); if(el)el.innerHTML=attemptRows(activeTab==='live'?cache.attempts.filter(a=>a.status==='in_progress'):activeTab==='alerts'?cache.attempts.filter(a=>a.flagged_cheating||Number(a.violation_count||0)>0):cache.attempts);
