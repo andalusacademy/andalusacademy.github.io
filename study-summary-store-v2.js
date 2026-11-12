@@ -194,7 +194,7 @@ async function refreshProducts(){
 }
 async function loadStudents(){
  if(students.length)return;
- const {data,error}=await db().from('students').select('id,name,enrollment_number,branch').is('deleted_at',null).eq('student_status','active').order('name').limit(1000);
+ const {data,error}=await db().from('students').select('id,name,enrollment_number,branch').is('deleted_at',null).or('student_status.eq.active,student_status.is.null').order('name').limit(1000);
  if(error)throw error;students=data||[];renderStudents();
 }
 function renderStudents(){
