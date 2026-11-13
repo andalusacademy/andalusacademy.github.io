@@ -12262,13 +12262,13 @@ function renderExamAdminStats() {
 
 function renderExamsTable() {
   const tbody = document.getElementById('exams-table');
-  const visibleExams = allExams.filter(e => !e.is_test);
+  const visibleExams = allExams;
   if (!visibleExams.length) {
     tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="emoji">💻</div><h4>لا توجد امتحانات إلكترونية بعد</h4></div></td></tr>';
     return;
   }
   tbody.innerHTML = visibleExams.map(e => {
-    const testExam = allExams.find(x => x.is_test === true && x.test_source_exam_id === e.id);
+    const testExam = e.is_test ? null : allExams.find(x => x.is_test === true && x.test_source_exam_id === e.id);
     const subj = allSubjects.find(s => s.id === e.subject_id);
     const progLabel = (e.program_combos && e.program_combos.length)
       ? e.program_combos.map(c => {
@@ -12281,7 +12281,7 @@ function renderExamsTable() {
     const until = e.available_until ? new Date(e.available_until).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
     return `<tr>
       <td class="no-print" onclick="event.stopPropagation()"><input type="checkbox" class="exam-row-cb" value="${e.id}"></td>
-      <td><strong>${escapeHtml(e.title)}</strong> <span class="badge badge-navy" style="font-size:10px">💻 إلكتروني</span> <span class="badge ${e.is_published ? 'badge-success' : 'badge-warning'}" style="font-size:10px">${e.is_published ? 'منشور للطلاب' : 'مسودة غير منشورة'}</span>${e.is_easy_retake ? ' <span class="badge badge-warning" style="font-size:10px">دور ثاني سهل</span>' : ''}${e.show_answers_after_submit ? ' <span class="badge badge-gold" style="font-size:10px">👁 عرض الإجابات</span>' : ''}${e.is_placement_test ? ' <span class="badge badge-success" style="font-size:10px">🎯 تحديد مستوى</span>' : ''}</td>
+      <td><strong>${escapeHtml(e.title)}</strong> <span class="badge badge-navy" style="font-size:10px">💻 إلكتروني</span> ${e.is_test ? '<span class="badge badge-warning" style="font-size:10px">🧪 نسخة تجريبية — الأكواد 0 و1 و2</span>' : ''} <span class="badge ${e.is_published ? 'badge-success' : 'badge-warning'}" style="font-size:10px">${e.is_published ? 'منشور للطلاب' : 'مسودة غير منشورة'}</span>${e.is_easy_retake ? ' <span class="badge badge-warning" style="font-size:10px">دور ثاني سهل</span>' : ''}${e.show_answers_after_submit ? ' <span class="badge badge-gold" style="font-size:10px">👁 عرض الإجابات</span>' : ''}${e.is_placement_test && !e.is_test ? ' <span class="badge badge-success" style="font-size:10px">🎯 تحديد مستوى</span>' : ''}</td>
       <td>${escapeHtml(subj?.name || '—')}</td>
       <td>${escapeHtml(progLabel)} — ${escapeHtml(e.branch)}</td>
       <td><span class="badge ${e.round === 1 ? 'badge-navy' : 'badge-warning'}">${e.round === 1 ? 'الأول' : 'الثاني'}</span></td>
@@ -12293,8 +12293,8 @@ function renderExamsTable() {
       </td>
       <td>
         <button class="btn btn-outline btn-sm" onclick="openExamQuestions('${e.id}')">📝 الأسئلة</button>
-        <button class="btn ${e.is_published ? 'btn-warning' : 'btn-success'} btn-sm" onclick="toggleExamPublication('${e.id}')">${e.is_published ? '⏸ إلغاء النشر' : '🚀 نشر للطلاب'}</button>
-        <button class="btn ${testExam?.is_published ? 'btn-warning' : 'btn-info'} btn-sm" onclick="publishExamTest('${e.id}')">${testExam?.is_published ? '⏸ إيقاف التجريبي' : '🧪 نشر تجريبي'}</button>
+        ${e.is_test ? '<span class="badge badge-warning">نسخة تجريبية</span>' : `<button class="btn ${e.is_published ? 'btn-warning' : 'btn-success'} btn-sm" onclick="toggleExamPublication('${e.id}')">${e.is_published ? '⏸ إلغاء النشر' : '🚀 نشر للطلاب'}</button>
+        <button class="btn ${testExam?.is_published ? 'btn-warning' : 'btn-info'} btn-sm" onclick="publishExamTest('${e.id}')">${testExam?.is_published ? '⏸ إيقاف التجريبي' : '🧪 نشر تجريبي'}</button>`}
         <button class="btn btn-outline btn-sm" onclick="openEasyRetake('${e.id}')">🔁 دور ثاني</button>
         <button class="btn btn-danger btn-sm del-action" onclick="deleteExam('${e.id}')">🗑</button>
       </td>
