@@ -4841,6 +4841,11 @@ function exitExamTestMode(){
 }
 function examShuffleArray(items){const out=[...items];for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;}
 
+function shuffleExamQuestionOptionsForStudent(question) {
+  const order=['a','b','c','d'].filter(letter=>String(question['option_'+letter]||'').trim());
+  for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+  return {...question,__optionOrder:order};
+}
 async function startExam(examId) {
   const { data: result, error } = await sb.rpc('student_exam_start_attempt', {
     p_exam_id: examId, p_student_id: examStudent?.id,
@@ -4867,7 +4872,7 @@ async function startExam(examId) {
   examCurrentExam = result.exam;
   examCurrentAttempt = result.attempt;
   // تم إلغاء إقرار السياسة من مسار بدء الامتحان بناءً على طلب الإدارة.
-  examQuestionsForStudent = result.questions || [];
+  examQuestionsForStudent = (result.questions || []).map(shuffleExamQuestionOptionsForStudent);
   examCurrentQuestionIndex = 0;
   examSkippedQuestions = new Set();
   renderExamQuestionsForStudent(examCurrentAttempt.answers || {});
@@ -4920,7 +4925,7 @@ async function resumeExam(examId) {
   examCurrentExam = exam;
   examCurrentAttempt = attempt;
   // لا يتطلب استكمال المحاولة إقرارًا مسبقًا بعد إلغاء شاشة الإقرار.
-  examQuestionsForStudent = result.questions || [];
+  examQuestionsForStudent = (result.questions || []).map(shuffleExamQuestionOptionsForStudent);
   examCurrentQuestionIndex = 0;
   examSkippedQuestions = new Set();
   renderExamQuestionsForStudent(attempt.answers || {});
@@ -4940,7 +4945,7 @@ function renderExamQuestionsForStudent(savedAnswers) {
     optionsHtml = `<label class="exam-option-label ${answer === 'true' ? 'selected' : ''}"><input type="radio" name="q_${q.id}" value="true" ${answer === 'true' ? 'checked' : ''} onchange="saveExamAnswer('${q.id}','true')"> صحيحة</label>
       <label class="exam-option-label ${answer === 'false' ? 'selected' : ''}"><input type="radio" name="q_${q.id}" value="false" ${answer === 'false' ? 'checked' : ''} onchange="saveExamAnswer('${q.id}','false')"> خاطئة</label>`;
   } else {
-    ['a','b','c','d'].forEach(letter => { const optionText=q['option_'+letter]; if(!optionText)return;
+    (q.__optionOrder || ['a','b','c','d']).forEach(letter => { const optionText=q['option_'+letter]; if(!optionText)return;
       optionsHtml += `<label class="exam-option-label ${answer===letter?'selected':''}"><input type="radio" name="q_${q.id}" value="${letter}" ${answer===letter?'checked':''} onchange="saveExamAnswer('${q.id}','${letter}')"> ${escapeHtml(optionText)}</label>`;
     });
   }
@@ -12240,8 +12245,8 @@ async function loadExams() {
   (questionRows || []).forEach(q => { questionCounts[q.exam_id] = (questionCounts[q.exam_id] || 0) + 1; });
   allExams = (data || []).map(e => {
     const question_count = questionCounts[e.id] || 0;
-    const duration_seconds = Math.min(question_count, 100) * 15;
-    return { ...e, question_count, duration_seconds, duration_minutes: Math.ceil(duration_seconds / 60) };
+    const duration_seconds = Math.max(1, Number(e.duration_minutes) || 30) * 60;
+    return { ...e, question_count, duration_seconds };
   });
   renderExamsTable();
   renderExamAdminStats();
