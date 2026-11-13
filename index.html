@@ -7854,7 +7854,7 @@ async function saveContactLog() {
 
   const { error } = await sb.from('contact_log').insert({
     student_id: currentProfileId, contact_type, subject, notes,
-    created_by: currentAuth?.id || null,
+    created_by: source.created_by || null,
     created_by_name: currentUser?.full_name || currentUser?.username || null
   });
   if (error) { showToast('❌ خطأ في الحفظ: ' + error.message, 'error'); return; }
@@ -12350,9 +12350,9 @@ async function publishExamTest(examId) {
   const examPayload = {
     title: '🧪 تجربة — ' + source.title,
     subject_id: source.subject_id,
-    program_id: source.program_id,
-    system_name: source.system_name || null,
-    branch: source.branch,
+    program_id: null,
+    system_name: null,
+    branch: 'الفرعين',
     round: source.round || 1,
     duration_minutes: source.duration_minutes || Math.max(1, Math.ceil(sourceQuestions.length * 0.75)),
     available_from: new Date(now.getTime() - 60000).toISOString(),
@@ -12360,10 +12360,10 @@ async function publishExamTest(examId) {
     is_easy_retake: source.is_easy_retake === true,
     total_score: source.total_score || sourceQuestions.reduce((n, q) => n + Number(q.points || 0), 0),
     show_answers_after_submit: source.show_answers_after_submit === true,
-    is_placement_test: false,
-    program_combos: source.program_combos || [],
+    is_placement_test: true,
+    program_combos: [],
     is_published: true,
-    question_mix: source.question_mix || {},
+    question_mix: source.question_mix || { easy: 20, medium: 60, hard: 20 },
     targeting_mode: true,
     question_type_mix: source.question_type_mix || {},
     is_test: true,
