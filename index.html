@@ -12250,10 +12250,11 @@ async function loadExams() {
 function renderExamAdminStats() {
   const box = document.getElementById('exam-admin-overview');
   if (!box) return;
-  const total = allExams.length;
-  const published = allExams.filter(e => e.is_published === true).length;
-  const questionTotal = allExams.reduce((n,e) => n + (e.question_count || 0), 0);
-  const noQuestions = allExams.filter(e => !e.question_count).length;
+  const visibleExams = allExams.filter(e => !e.is_test);
+  const total = visibleExams.length;
+  const published = visibleExams.filter(e => e.is_published === true).length;
+  const questionTotal = visibleExams.reduce((n,e) => n + (e.question_count || 0), 0);
+  const noQuestions = visibleExams.filter(e => !e.question_count).length;
   const drafts = total - published;
   const stat = (value,label,color) => '<div class="card" style="padding:14px;text-align:center"><div style="font-size:25px;font-weight:900;color:'+color+'">'+value+'</div><div style="font-size:12px;color:var(--muted)">'+label+'</div></div>';
   box.innerHTML = stat(total,'إجمالي الامتحانات','var(--navy)') + stat(published,'امتحانات منشورة','#15803d') + stat(drafts,'مسودات غير منشورة','#d97706') + stat(questionTotal,'إجمالي الأسئلة','#2563eb') + stat(noQuestions,'امتحانات بلا أسئلة','#b45309');
@@ -12261,11 +12262,13 @@ function renderExamAdminStats() {
 
 function renderExamsTable() {
   const tbody = document.getElementById('exams-table');
-  if (!allExams.length) {
+  const visibleExams = allExams.filter(e => !e.is_test);
+  if (!visibleExams.length) {
     tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="emoji">💻</div><h4>لا توجد امتحانات إلكترونية بعد</h4></div></td></tr>';
     return;
   }
-  tbody.innerHTML = allExams.map(e => {
+  tbody.innerHTML = visibleExams.map(e => {
+    const testExam = allExams.find(x => x.is_test === true && x.test_source_exam_id === e.id);
     const subj = allSubjects.find(s => s.id === e.subject_id);
     const progLabel = (e.program_combos && e.program_combos.length)
       ? e.program_combos.map(c => {
@@ -12291,6 +12294,7 @@ function renderExamsTable() {
       <td>
         <button class="btn btn-outline btn-sm" onclick="openExamQuestions('${e.id}')">📝 الأسئلة</button>
         <button class="btn ${e.is_published ? 'btn-warning' : 'btn-success'} btn-sm" onclick="toggleExamPublication('${e.id}')">${e.is_published ? '⏸ إلغاء النشر' : '🚀 نشر للطلاب'}</button>
+        <button class="btn ${testExam?.is_published ? 'btn-warning' : 'btn-info'} btn-sm" onclick="publishExamTest('${e.id}')">${testExam?.is_published ? '⏸ إيقاف التجريبي' : '🧪 نشر تجريبي'}</button>
         <button class="btn btn-outline btn-sm" onclick="openEasyRetake('${e.id}')">🔁 دور ثاني</button>
         <button class="btn btn-danger btn-sm del-action" onclick="deleteExam('${e.id}')">🗑</button>
       </td>
@@ -12312,6 +12316,115 @@ async function toggleExamPublication(examId){
   if(error){showToast('تعذر تحديث حالة النشر: '+error.message,'error');return;}
   await logActivity('edit',(publish?'نشر':'ألغى نشر')+' الامتحان الإلكتروني: '+exam.title);
   showToast(publish?'تم نشر الامتحان للطلاب.':'تم إلغاء نشر الامتحان.');
+  await loadExams();
+}
+
+// ينشئ نسخة تجريبية مستقلة لكل امتحان، ولا يسمح بدخولها إلا للأكواد 0 و1 و2.
+async function publishExamTest(examId) {
+  const source = allExams.find(e => e.id === examId && e.is_test !== true);
+  if (!source) { showToast('تعذر العثور على الامتحان الأصلي.', 'error'); return; }
+
+  let testExam = allExams.find(e => e.is_test === true && e.test_source_exam_id === examId);
+  if (testExam?.is_published) {
+    if (!confirm('إيقاف نشر النسخة التجريبية؟ سيظل الامتحان الأصلي منشورًا كما هو.')) return;
+    const { error } = await sb.from('exams').update({ is_published: false }).eq('id', testExam.id);
+    if (error) { showToast('تعذر إيقاف النشر التجريبي: ' + error.message, 'error'); return; }
+    await logActivity('edit', 'أوقف النشر التجريبي للامتحان: ' + source.title);
+    showToast('تم إيقاف النسخة التجريبية فقط، دون التأثير على الامتحان الأصلي.');
+    await loadExams();
+    return;
+  }
+
+  if (!(source.question_count > 0)) {
+    showToast('لا يمكن النشر التجريبي قبل إضافة أسئلة للامتحان.', 'error');
+    return;
+  }
+  if (!confirm('نشر نسخة تجريبية من «' + source.title + '» للأكواد 0 و1 و2 فقط؟ لن يتم إتاحتها لباقي الطلاب.')) return;
+
+  const { data: sourceQuestions, error: questionsError } = await sb
+    .from('exam_questions').select('*').eq('exam_id', examId).order('order_num', { ascending: true });
+  if (questionsError) { showToast('تعذر تحميل أسئلة الامتحان: ' + questionsError.message, 'error'); return; }
+  if (!sourceQuestions?.length) { showToast('الامتحان لا يحتوي على أسئلة قابلة للنسخ.', 'error'); return; }
+
+  const now = new Date();
+  const examPayload = {
+    title: '🧪 تجربة — ' + source.title,
+    subject_id: source.subject_id,
+    program_id: source.program_id,
+    system_name: source.system_name || null,
+    branch: source.branch,
+    round: source.round || 1,
+    duration_minutes: source.duration_minutes || Math.max(1, Math.ceil(sourceQuestions.length * 0.75)),
+    available_from: new Date(now.getTime() - 60000).toISOString(),
+    available_until: '2099-12-31T23:59:59.000Z',
+    is_easy_retake: source.is_easy_retake === true,
+    total_score: source.total_score || sourceQuestions.reduce((n, q) => n + Number(q.points || 0), 0),
+    show_answers_after_submit: source.show_answers_after_submit === true,
+    is_placement_test: false,
+    program_combos: source.program_combos || [],
+    is_published: true,
+    question_mix: source.question_mix || {},
+    targeting_mode: true,
+    question_type_mix: source.question_type_mix || {},
+    is_test: true,
+    test_source_exam_id: examId,
+    created_by: currentAuth?.id || null
+  };
+
+  let createdNow = false;
+  if (testExam) {
+    const { error: updateError } = await sb.from('exams').update({
+      ...examPayload,
+      created_by: testExam.created_by || currentAuth?.id || null
+    }).eq('id', testExam.id);
+    if (updateError) { showToast('تعذر تحديث النسخة التجريبية: ' + updateError.message, 'error'); return; }
+  } else {
+    const { data, error: insertError } = await sb.from('exams').insert(examPayload).select().single();
+    if (insertError) { showToast('تعذر إنشاء النسخة التجريبية: ' + insertError.message, 'error'); return; }
+    testExam = data;
+    createdNow = true;
+  }
+
+  const { data: existingQuestions, error: existingQuestionsError } = await sb
+    .from('exam_questions').select('id').eq('exam_id', testExam.id);
+  if (existingQuestionsError) { showToast('تعذر التحقق من أسئلة النسخة التجريبية: ' + existingQuestionsError.message, 'error'); return; }
+
+  if (!existingQuestions?.length) {
+    const clonedQuestions = sourceQuestions.map(q => ({
+      exam_id: testExam.id,
+      question_text: q.question_text,
+      question_type: q.question_type,
+      option_a: q.option_a,
+      option_b: q.option_b,
+      option_c: q.option_c,
+      option_d: q.option_d,
+      correct_answer: q.correct_answer,
+      points: q.points,
+      order_num: q.order_num,
+      source_exam_id: q.source_exam_id || examId,
+      source_group: q.source_group,
+      difficulty: q.difficulty,
+      source_question_bank_id: q.source_question_bank_id
+    }));
+    const { error: cloneError } = await sb.from('exam_questions').insert(clonedQuestions);
+    if (cloneError) {
+      if (createdNow) await sb.from('exams').delete().eq('id', testExam.id);
+      showToast('تعذر نسخ أسئلة الامتحان للنسخة التجريبية: ' + cloneError.message, 'error');
+      return;
+    }
+  }
+
+  const { error: clearTargetsError } = await sb.from('exam_student_targets').delete().eq('exam_id', testExam.id);
+  if (clearTargetsError) { showToast('تعذر ضبط قائمة طلاب التجربة: ' + clearTargetsError.message, 'error'); return; }
+  const { error: targetsError } = await sb.from('exam_student_targets').insert([
+    { exam_id: testExam.id, student_id: '0' },
+    { exam_id: testExam.id, student_id: '1' },
+    { exam_id: testExam.id, student_id: '2' }
+  ]);
+  if (targetsError) { showToast('تعذر قصر النسخة التجريبية على الأكواد 0 و1 و2: ' + targetsError.message, 'error'); return; }
+
+  await logActivity('edit', 'نشر نسخة تجريبية للامتحان: ' + source.title + ' — الأكواد 0 و1 و2');
+  showToast('تم نشر النسخة التجريبية بنجاح للأكواد 0 و1 و2 فقط.');
   await loadExams();
 }
 
