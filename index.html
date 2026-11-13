@@ -17251,8 +17251,20 @@ function renderStudySummaryAdminRows() {
   if (!studySummaryAdminRows.length) { body.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:18px">لم تتم إضافة ملخصات بعد.</td></tr>'; return; }
   body.innerHTML = studySummaryAdminRows.map(s => {
     const count = studySummaryQuestionCounts[s.id] ?? studySummaryQuestionRows.filter(q=>q.summary_id===s.id).length;
-    return '<tr><td><strong>'+ssEsc(s.title)+'</strong><div style="font-size:11px;color:var(--muted)">'+ssEsc(s.description||'')+'</div></td><td>'+ssEsc(s.subject_name||'—')+'</td><td>'+ssMoney(s.price)+'</td><td>'+ssEsc(s.validity_days)+' يوم</td><td>'+count+'</td><td><span class="badge '+(s.is_published?'badge-success':'badge-gray')+'">'+(s.is_published?'متاح للطلاب':'مسودة')+'</span></td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="editStudySummary(\''+s.id+'\')">تعديل</button><button class="btn btn-primary btn-sm" onclick="selectStudySummaryForQuestions(\''+s.id+'\')">الأسئلة</button><button class="btn btn-danger btn-sm" onclick="deleteStudySummary(\''+s.id+'\')">حذف</button></div></td></tr>';
+    return '<tr><td><strong>'+ssEsc(s.title)+'</strong><div style="font-size:11px;color:var(--muted)">'+ssEsc(s.description||'')+'</div></td><td>'+ssEsc(s.subject_name||'—')+'</td><td>'+ssMoney(s.price)+'</td><td>'+ssEsc(s.validity_days)+' يوم</td><td>'+count+'</td><td><span class="badge '+(s.is_published?'badge-success':'badge-gray')+'">'+(s.is_published?'متاح للطلاب':'مسودة')+'</span></td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="editStudySummary(\''+s.id+'\')">تعديل</button><button class="btn btn-primary btn-sm" onclick="selectStudySummaryForQuestions(\''+s.id+'\')">الأسئلة</button><button class="btn btn-outline btn-sm" onclick="downloadStudySummaryDeliveryPdf(\'+s.id+\')">تنزيل PDF</button><button class="btn btn-danger btn-sm" onclick="deleteStudySummary(\''+s.id+'\')">حذف</button></div></td></tr>';
   }).join('');
+}
+async function downloadStudySummaryDeliveryPdf(id) {
+  const summary=studySummaryAdminRows.find(x=>x.id===id);
+  if(!summary?.delivery_pdf_path){showToast('لا يوجد ملف PDF مرفق بهذا الملخص.','error');return;}
+  const {data,error}=await sb.storage.from('study-summary-pdfs').createSignedUrl(summary.delivery_pdf_path,300,{download:true});
+  if(error||!data?.signedUrl){showToast('تعذر تنزيل ملف الملخص: '+(error?.message||'الملف غير متاح'),'error');return;}
+  const link=document.createElement('a');
+  link.href=data.signedUrl;
+  link.download='study-summary.pdf';
+  link.rel='noopener';
+  document.body.appendChild(link);link.click();link.remove();
+  showToast('بدأ تنزيل ملف PDF الخاص بالملخص.','success');
 }
 function resetStudySummaryForm() {
   ['ss-edit-id','ss-title','ss-subject','ss-description'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
