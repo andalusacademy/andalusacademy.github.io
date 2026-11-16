@@ -66,11 +66,11 @@
  const digits=v=>String(v??'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
  const db=()=>window.sb||(typeof sb!=='undefined'?sb:null);
  const page=()=>$('#page-grades')||$('#page-exam-grades')||$('#page-grades-management')||$('#page-student-grades');
- let mode='paper',round=1,students=[],subjects=[],records=[],payments=[],branch='all',program='all',subjectId='',search='',resultFilter='all';
+ let mode='paper',round=1,students=[],subjects=[],records=[],payments=[],branch='all',program='all',subjectId='',search='',resultFilter='all',exportRows=[];
  function mount(){
   const p=page();if(!p||$('#andalus-unified-grades'))return;
   const box=document.createElement('section');box.id='andalus-unified-grades';box.className='card';box.style.cssText='margin:0 0 18px;padding:16px;border:1px solid var(--border);border-radius:14px';
-  box.innerHTML=String.raw`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><h3 style="margin:0">📚 سجل درجات الامتحانات</h3><div style="font-size:12px;color:var(--muted);margin-top:4px">سجل مستقل يحفظ كل محاولة وتحسين دون استبدال الدرجات السابقة</div></div><button type="button" class="btn btn-outline btn-sm" id="ug-refresh">↻ تحديث</button></div>
+  box.innerHTML=String.raw`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><h3 style="margin:0">📚 سجل درجات الامتحانات</h3><div style="font-size:12px;color:var(--muted);margin-top:4px">سجل مستقل يحفظ كل محاولة وتحسين دون استبدال الدرجات السابقة</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn btn-outline btn-sm" id="ug-refresh">↻ تحديث</button><button type="button" class="btn btn-success btn-sm" id="ug-export">📥 تصدير النتائج Excel</button><button type="button" class="btn btn-outline btn-sm" id="ug-export-missing">📥 تصدير من لا توجد لهم درجة</button></div></div>
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0"><button type="button" class="btn btn-primary" id="ug-paper">📝 امتحان ورقي</button><button type="button" class="btn btn-outline" id="ug-electronic">💻 امتحان إلكتروني</button></div>
    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px;margin-bottom:12px">
     <label style="font-size:12px">الفرع<select id="ug-branch" style="display:block;width:100%;padding:9px;margin-top:4px;border:1px solid var(--border);border-radius:8px"></select></label>
@@ -82,7 +82,7 @@
    <div style="overflow:auto"><table style="width:100%;min-width:980px;border-collapse:collapse"><thead><tr><th>رقم القيد</th><th>اسم الطالب</th><th>الفرع</th><th>المجموعة</th><th>السداد</th><th>المحاولات السابقة</th><th>حالة الطالب</th><th>درجة جديدة</th><th>إجراء</th></tr></thead><tbody id="ug-body"><tr><td colspan="9" style="text-align:center;padding:18px">اختر المادة لعرض كشف الطلاب.</td></tr></tbody></table></div>
    <div style="font-size:11px;color:var(--muted);margin-top:9px">كل رصد جديد يُضاف كمحاولة مستقلة. لا يتم حذف أو استبدال المحاولات السابقة. نتائج الامتحان الإلكتروني الرسمي تُسجل تلقائيًا، والامتحانات التجريبية مستبعدة.</div>`;
   p.insertBefore(box,p.firstChild);
-  $('#ug-paper').onclick=()=>setMode('paper');$('#ug-electronic').onclick=()=>setMode('electronic');$('#ug-refresh').onclick=loadAll;
+  $('#ug-paper').onclick=()=>setMode('paper');$('#ug-electronic').onclick=()=>setMode('electronic');$('#ug-refresh').onclick=loadAll;$('#ug-export').onclick=()=>downloadGradeCsv(exportRows,'exam-results');$('#ug-export-missing').onclick=()=>{if(mode!=='electronic'){alert('اختر الامتحان الإلكتروني أولًا.');return;}const missing=exportRows.filter(x=>x.status==='لم ترصد الدرجة'||x.status==='مستحق للدور الثاني — لم ترصد الدرجة');downloadGradeCsv(missing,'students-without-recorded-grade');};
   $('#ug-branch').onchange=e=>{branch=e.target.value;render();};$('#ug-program').onchange=e=>{program=e.target.value;render();};
   $('#ug-subject').onchange=e=>{subjectId=e.target.value;render();};$('#ug-round').onchange=e=>{round=Number(e.target.value);render();};
   $('#ug-search').oninput=e=>{search=e.target.value.trim().toLowerCase();render();};$('#ug-result-filter').onchange=e=>{resultFilter=e.target.value;render();};
@@ -100,6 +100,7 @@
   loadAll();
  }
  function setMode(v){mode=v;$('#ug-paper').className=v==='paper'?'btn btn-primary':'btn btn-outline';$('#ug-electronic').className=v==='electronic'?'btn btn-primary':'btn btn-outline';render();}
+ function downloadGradeCsv(rows,name){if(!rows?.length){alert('لا توجد بيانات للتصدير حسب الفلاتر الحالية.');return;}const cols=['رقم القيد','اسم الطالب','النتيجة','الدرجة النهائية','الحالة','الفرع','المجموعة'];const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv='\\uFEFF'+[cols,...rows.map(x=>[x.enrollment,x.name,x.score,x.max,x.status,x.branch,x.program])].map(row=>row.map(q).join(',')).join('\\r\\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name+'-'+(subjectId||'all')+'-round-'+round+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}
  async function loadAll(){
   const d=db();if(!d){$('#ug-body').innerHTML='<tr><td colspan="9">جلسة الإدارة غير متاحة. أعد تسجيل الدخول.</td></tr>';return;}
   $('#ug-body').innerHTML='<tr><td colspan="9" style="text-align:center;padding:18px">جارٍ تحميل السجل...</td></tr>';
@@ -130,7 +131,7 @@
   let filtered=students.filter(s=>(branch==='all'||s.branch===branch)&&(program==='all'||s.program===program)&&(!search||(String(s.name||'').toLowerCase().includes(search)||String(s.id).toLowerCase().includes(search)||String(s.enrollment_number||'').toLowerCase().includes(search))));
   if(round===2)filtered=filtered.filter(s=>eligibleIds.has(String(s.id)));
   const statusFor=sid=>{if(round===1)return firstStatus(sid);const list=byStudent.get(String(sid))||[],best=bestOnScale(list,max2);return best===null?'eligible':(best>=pass2?'passed':'failed');};
-  filtered=filtered.filter(s=>resultFilter==='all'||(resultFilter==='eligible'?(round===1?statusFor(s.id)==='failed':statusFor(s.id)==='eligible'):(statusFor(s.id)===resultFilter)));
+  filtered=filtered.filter(s=>resultFilter==='all'||(resultFilter==='eligible'?(round===1?statusFor(s.id)==='failed':statusFor(s.id)==='eligible'):(statusFor(s.id)===resultFilter)));\n  exportRows=filtered.map(s=>{const list=byStudent.get(String(s.id))||[],best=bestOnScale(list,round===1?max1:max2),max=round===1?max1:max2;return {enrollment:s.enrollment_number||s.id,name:s.name,score:best===null?'':Number(best.toFixed(2)),max:best===null?'':max,status:statusFor(s.id)==='passed'?'ناجح':statusFor(s.id)==='failed'?'راسب':statusFor(s.id)==='eligible'?'مستحق للدور الثاني — لم ترصد الدرجة':'لم ترصد الدرجة',branch:s.branch||'',program:s.program||s.system_name||''};});
   const counts={passed:filtered.filter(s=>statusFor(s.id)==='passed').length,failed:filtered.filter(s=>statusFor(s.id)==='failed').length,eligible:round===2?filtered.filter(s=>statusFor(s.id)==='eligible').length:eligibleIds.size,pending:round===1?students.filter(s=>firstStatus(s.id)==='pending').length:0};
   $('#ug-summary').textContent=(mode==='paper'?'امتحانات ورقية':'امتحانات إلكترونية')+' • '+(round===1?'الدور الأول':'الدور الثاني')+' • '+(subject?.name||'اختر المادة')+' • ناجح: '+counts.passed+' • راسب: '+counts.failed+' • مستحق للدور الثاني: '+counts.eligible+' • '+filtered.length+' طالب معروض';
   if(!subjectId){$('#ug-body').innerHTML='<tr><td colspan="9" style="text-align:center;padding:18px">اختر المادة لعرض كشف الدرجات.</td></tr>';return;}
