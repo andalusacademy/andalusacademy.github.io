@@ -64,11 +64,12 @@ function arabicVoice(){
  voiceCache=voices.filter(function(v){return /^ar([_-]|$)/i.test(v.lang||'')});
  return voiceCache.find(function(v){return /EG/i.test(v.lang||'')})||voiceCache[0]||null
 }
-function speak(parts){
+async function speak(parts){
  if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance)return false;
- var voice=arabicVoice();
- if(!voice){console.warn('Rafiq: no Arabic speech voice installed/available in this browser.');return false}
- var synth=window.speechSynthesis,chunks=parts.filter(Boolean).map(spokenText),i=0;
+ var synth=window.speechSynthesis,voice=arabicVoice(),tries=0;
+ while(!voice&&tries<18){await new Promise(function(resolve){setTimeout(resolve,150)});voice=arabicVoice();tries++}
+ if(!voice){console.warn('Rafiq: لا يوجد صوت عربي مثبت أو متاح في المتصفح. لن أستخدم صوتاً إنجليزياً حتى لا ينطق العربية بشكل خاطئ.');return false}
+ var chunks=parts.filter(Boolean).map(spokenText),i=0;
  function next(){if(i>=chunks.length){var root=document.getElementById(ID);if(root)root.classList.remove('talk');return}var u=new SpeechSynthesisUtterance(chunks[i++]);u.lang=voice.lang;u.voice=voice;u.rate=.88;u.pitch=.98;u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};u.onend=next;u.onerror=function(e){console.warn('Rafiq speech error:',e.error);next()};synth.speak(u)}
  try{synth.cancel();next();return true}catch(e){return false}
 }
@@ -80,7 +81,7 @@ async function play(replay){
   var details=[];try{details=await loadFacts()}catch(e){console.warn('Rafiq facts unavailable:',e);details=['تابع إشعاراتك وبياناتك من بوابة الطالب.']}
   var name=String(student.name||'يا بطل').trim().split(/\s+/).slice(0,2).join(' ');
   var lines=['أهلاً يا '+name+'.','أنا رفيق الأندلس، صاحبك في الأكاديمية. يلا نبدأ يومنا بنشاط.','افتكر تراجع دروسك وتتابع بوابتك باستمرار.'].concat(details).concat(['شد حيلك يا بطل، وإحنا دايماً معاك. بالتوفيق!']);
-  speak(lines);
+  await speak(lines);
  }finally{busy=false}
 }
 function install(){var original=window.renderStudentPortalMenu;if(typeof original!=='function'||original.__rafiqWrapped)return false;var wrapped=function(){var result=original.apply(this,arguments);if(getStudent()&&getStudent().id)setTimeout(function(){void play(false)},350);return result};wrapped.__rafiqWrapped=true;window.renderStudentPortalMenu=wrapped;return true}
