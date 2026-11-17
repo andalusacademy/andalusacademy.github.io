@@ -14,7 +14,7 @@
     if (typeof window.showToast === 'function') window.showToast(message, type || 'info');
     else alert(message);
   }
-  function supa() {
+  function isAdmin() { try { return typeof currentUser !== 'undefined' && currentUser?.role === 'admin'; } catch (_) { return false; } }\n  function videoSessionToken() { try { return typeof studentPortalFaceToken !== 'undefined' ? studentPortalFaceToken : null; } catch (_) { return null; } }\n  function studentDisplayName() { try { return typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.name || '' : ''; } catch (_) { return ''; } }\n  function studentEnrollment() { try { return typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.enrollment_number || '' : ''; } catch (_) { return ''; } }\n  function studentIdDisplay() { try { return typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.id || '' : ''; } catch (_) { return ''; } }\n  function supa() {
     if (typeof sb !== 'undefined' && sb) return sb;
     if (window.sb) return window.sb;
     throw new Error('اتصال قاعدة البيانات غير جاهز');
@@ -187,7 +187,7 @@
 
   async function loadAdmin() {
     ensureAdminPage();
-    if (window.currentUser?.role !== 'admin') return;
+    if (!isAdmin()) return;
     try {
       const base = await getGateway();
       if ($('av-gateway-url')) $('av-gateway-url').value = base;
@@ -225,7 +225,7 @@
     if (!box) return;
     box.innerHTML = '<div style="padding:20px;text-align:center">جاري تحميل مكتبة الفيديوهات...</div>';
     try {
-      const {data,error} = await supa().rpc('student_list_academy_videos',{p_session_token:window.studentPortalFaceToken});
+      const {data,error} = await supa().rpc('student_list_academy_videos',{p_session_token:videoSessionToken()});
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.reason==='session_expired'?'انتهت جلسة الطالب. سجّل الدخول مرة أخرى.':'تعذر تحميل المكتبة.');
       gatewayUrl = String(data.gateway_url||'').replace(/\/$/,'');
@@ -275,7 +275,7 @@
   }
 
   async function buy(id) {
-    const {data,error} = await supa().rpc('student_create_academy_video_order',{p_session_token:window.studentPortalFaceToken,p_video_id:id});
+    const {data,error} = await supa().rpc('student_create_academy_video_order',{p_session_token:videoSessionToken(),p_video_id:id});
     if (error) return toast(error.message,'error');
     if (!data?.ok) return toast(data?.reason==='already_has_access'?'لديك صلاحية مشاهدة بالفعل':'تعذر إنشاء الطلب: '+(data?.reason||''),'error');
     toast('تم إنشاء طلب الشراء. أكمل التحويل ثم أرسل رقم العملية.');
@@ -285,7 +285,7 @@
     const reference = String($('av-ref-'+id)?.value||'').trim();
     if (reference.length<3) return toast('اكتب رقم عملية التحويل الصحيح','error');
     const {data,error} = await supa().rpc('student_submit_academy_video_payment_reference',{
-      p_session_token:window.studentPortalFaceToken,p_order_id:id,p_payment_reference:reference
+      p_session_token:videoSessionToken(),p_order_id:id,p_payment_reference:reference
     });
     if (error) return toast(error.message,'error');
     if (!data?.ok) return toast('تعذر إرسال رقم التحويل: '+(data?.reason||''),'error');
@@ -294,7 +294,7 @@
   }
 
   function watch(id) {
-    if (!gatewayUrl || !window.studentPortalFaceToken) return toast('المشاهدة غير مهيأة أو انتهت جلسة الطالب','error');
+    if (!gatewayUrl || !videoSessionToken()) return toast('المشاهدة غير مهيأة أو انتهت جلسة الطالب','error');
     const video = studentVideos.find(v=>v.id===id);
     if (!video?.has_access) return toast('لا توجد صلاحية مشاهدة فعالة','error');
     const box = getContent();
@@ -305,7 +305,7 @@
       </div>
       <div style="position:relative;background:#0f172a;border-radius:12px;overflow:hidden">
         <video id="academy-video-player" controls playsinline preload="metadata" controlsList="nodownload noplaybackrate" disablePictureInPicture style="width:100%;max-height:72vh;display:block;background:#000" oncontextmenu="return false">
-          <source src="${gatewayUrl}/watch/${encodeURIComponent(id)}?session_token=${encodeURIComponent(window.studentPortalFaceToken)}" type="video/mp4">
+          <source src="${gatewayUrl}/watch/${encodeURIComponent(id)}?session_token=${encodeURIComponent(videoSessionToken())}" type="video/mp4">
           المتصفح لا يدعم تشغيل الفيديو.
         </video>
         <div style="pointer-events:none;position:absolute;right:12px;bottom:42px;color:#fff;background:#0007;padding:5px 9px;border-radius:5px;font-size:11px;opacity:.7">${watermark} · مركز الأندلس</div>
@@ -322,7 +322,7 @@
     if (typeof window.showPage === 'function') {
       const original = window.showPage;
       window.showPage = function(page) {
-        if (page === PAGE && window.currentUser?.role !== 'admin') {
+        if (page === PAGE && !isAdmin()) {
           toast('مكتبة الفيديوهات متاحة للإدارة فقط','error');
           return original('dashboard');
         }
