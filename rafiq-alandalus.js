@@ -106,26 +106,37 @@ function kungfuCombo(root){
  setTimeout(function(){runner.classList.remove('kungfu','karate');runner.classList.add('turn')},1550);
  setTimeout(function(){runner.classList.remove('turn')},2250);
 }
-async function speak(parts){
- if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance)return false;
- var synth=window.speechSynthesis,voice=arabicVoice(),tries=0;
- while(!voice&&tries<18){await new Promise(function(resolve){setTimeout(resolve,150)});voice=arabicVoice();tries++}
- if(!voice){var available=(window.speechSynthesis.getVoices()||[]).filter(function(v){return /^ar([_-]|$)/i.test(v.lang||'')}).map(function(v){return v.name+' ['+v.lang+']'});console.warn('Rafiq: محتاج صوت عربي مصري ar-EG. الأصوات العربية المتاحة حالياً:',available);return false}
- var chunks=parts.filter(Boolean).map(spokenText),i=0;
- function next(){if(i>=chunks.length){var root=document.getElementById(ID);if(root)root.classList.remove('talk');return}var u=new SpeechSynthesisUtterance(chunks[i++]);u.lang=voice.lang;u.voice=voice;u.rate=.94;u.pitch=1.03;u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};u.onend=next;u.onerror=function(e){console.warn('Rafiq speech error:',e.error);next()};synth.speak(u)}
- try{synth.cancel();next();return true}catch(e){return false}
+function speak(parts,append){
+ if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance){console.warn('Rafiq: SpeechSynthesis غير مدعوم في المتصفح');return false}
+ var synth=window.speechSynthesis,voice=arabicVoice();
+ var chunks=parts.filter(Boolean).map(spokenText);
+ if(!append){try{synth.cancel()}catch(e){}}
+ chunks.forEach(function(chunk,index){
+  var u=new SpeechSynthesisUtterance(chunk);
+  u.lang=voice&&voice.lang?voice.lang:'ar-EG';
+  if(voice)u.voice=voice;
+  u.rate=.91;u.pitch=1.02;
+  u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};
+  u.onend=function(){if(index===chunks.length-1){var root=document.getElementById(ID);if(root)root.classList.remove('talk')}};
+  u.onerror=function(e){console.warn('Rafiq speech error:',e.error,'lang:',u.lang)};
+  try{synth.speak(u)}catch(e){console.warn('Rafiq speak failed:',e)}
+ });
+ if(!voice)console.warn('Rafiq: لا يوجد صوت عربي ظاهر في قائمة الجهاز؛ جربنا طلب النطق ar-EG من محرك النظام.');
+ return true
 }
 async function play(replay){
  var student=getStudent();if(busy||!student||!student.id)return;busy=true;
  try{
   var root=mount();kungfuCombo(root);
+  var name=String(student.name||'يا بطل').trim().split(/\\s+/).slice(0,2).join(' ');
+  // Start speech synchronously inside the tap gesture before any network/database await.
+  speak(['إزيك يا '+name+'؟ عامل إيه يا بطل؟','أنا رفيق الأندلس، صاحبك في الأكاديمية. يلا بينا نفوق ونبدأ يومنا بنشاط!','خد بالك، أنا جاهز! واحد، اتنين، تلاتة... كونغ فو! هُوب! هاااي!','عاش يا وحش! افتكر تذاكر وتراجع دروسك، وتبص على إشعاراتك كل يوم.'],false);
   var details=[];try{details=await loadFacts()}catch(e){console.warn('Rafiq facts unavailable:',e);details=['تابع إشعاراتك وبياناتك من بوابة الطالب.']}
-  var name=String(student.name||'يا بطل').trim().split(/\s+/).slice(0,2).join(' ');
-  var lines=['إزيك يا '+name+'؟ عامل إيه يا بطل؟','أنا رفيق الأندلس، صاحبك في الأكاديمية. يلا بينا نفوق ونبدأ يومنا بنشاط!','خد بالك، أنا جاهز! واحد، اتنين، تلاتة... كونغ فو! هُوب! هاااي!','عاش يا وحش! افتكر تذاكر وتراجع دروسك، وتبص على إشعاراتك كل يوم.'].concat(details.map(function(x){return String(x).replace(/بص يا بطل/g,'بص يا نجم').replace(/خلي بالك/g,'خد بالك').replace(/لحد دلوقتي/g,'لغاية دلوقتي')})).concat(['شد حيلك يا بطل، إنت قدها وقدود! يلا سلام يا نجم.']);
-  await speak(lines);
+  if(details.length)speak(details.map(function(x){return String(x).replace(/بص يا بطل/g,'بص يا نجم').replace(/خلي بالك/g,'خد بالك').replace(/لحد دلوقتي/g,'لغاية دلوقتي')}),true);
+  speak(['شد حيلك يا بطل، إنت قدها وقدود! يلا سلام يا نجم.'],true);
  }finally{busy=false}
 }
-function install(){var original=window.renderStudentPortalMenu;if(typeof original!=='function'||original.__rafiqWrapped)return false;var wrapped=function(){var result=original.apply(this,arguments);if(getStudent()&&getStudent().id)setTimeout(function(){void play(false)},350);return result};wrapped.__rafiqWrapped=true;window.renderStudentPortalMenu=wrapped;return true}
+function install(){var original=window.renderStudentPortalMenu;if(typeof original!=='function'||original.__rafiqWrapped)return false;var wrapped=function(){var result=original.apply(this,arguments);if(getStudent()&&getStudent().id)mount();return result};wrapped.__rafiqWrapped=true;window.renderStudentPortalMenu=wrapped;return true}
 if(!install()){var attempts=0,t=setInterval(function(){attempts++;if(install()||attempts>80)clearInterval(t)},250)}
 document.addEventListener('visibilitychange',function(){if(document.hidden&&'speechSynthesis'in window)try{window.speechSynthesis.cancel()}catch(e){}});
 window.addEventListener('pagehide',function(){if('speechSynthesis'in window)try{window.speechSynthesis.cancel()}catch(e){}});
