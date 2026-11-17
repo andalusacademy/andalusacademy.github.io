@@ -309,8 +309,8 @@
         <h3 style="margin:0">${esc(video.title)}</h3><button class="btn btn-outline" onclick="academyVideoLibrary.openStudentLibrary()">رجوع للمكتبة</button>
       </div>
       <div style="position:relative;background:#0f172a;border-radius:12px;overflow:hidden">
-        <video id="academy-video-player" controls playsinline preload="metadata" controlsList="nodownload noplaybackrate" disablePictureInPicture style="width:100%;max-height:72vh;display:block;background:#000" oncontextmenu="return false">
-          <source src="${gatewayUrl}/watch/${encodeURIComponent(id)}?session_token=${encodeURIComponent(videoSessionToken())}" type="video/mp4">
+        <video id="academy-video-player" controls playsinline preload="metadata" controlsList="nodownload noplaybackrate" disablePictureInPicture referrerpolicy="no-referrer" style="width:100%;max-height:72vh;display:block;background:#000" oncontextmenu="return false">
+          <source src="${gatewayUrl}/watch/${encodeURIComponent(id)}?session_token=${encodeURIComponent(videoSessionToken())}" type="${esc(video.content_type||'video/mp4')}">
           المتصفح لا يدعم تشغيل الفيديو.
         </video>
         <div style="pointer-events:none;position:absolute;right:12px;bottom:42px;color:#fff;background:#0007;padding:5px 9px;border-radius:5px;font-size:11px;opacity:.7">${watermark} · مركز الأندلس</div>
