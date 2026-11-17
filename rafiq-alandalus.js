@@ -16,6 +16,8 @@ var css=[
 '#'+ID+' .mouth{transform-box:fill-box;transform-origin:center;animation:rafiqMouth .2s ease-in-out infinite alternate}',
 '#'+ID+'.talk .mouth{animation-duration:.13s}',
 '#'+ID+' .tap{position:absolute;inset:0;border:0;background:transparent;cursor:pointer}',
+'#'+ID+' .heart-pop{position:absolute;z-index:5;pointer-events:none;color:#f21f45;font-family:Arial,sans-serif;font-size:17px;line-height:1;text-shadow:0 2px 5px #b0003033;animation:rafiqHeartFloat 1.15s ease-out forwards}',
+'@keyframes rafiqHeartFloat{0%{opacity:0;transform:translate(0,8px) scale(.35) rotate(-12deg)}15%{opacity:1;transform:translate(0,0) scale(1.1) rotate(8deg)}100%{opacity:0;transform:translate(var(--dx),-76px) scale(.65) rotate(var(--rot))}}',
 '#'+ID+' .runner.turn svg{animation:rafiqSpin .65s ease-in-out}',
 '#'+ID+' .runner.karate .armL{animation:rafiqBlock .7s ease-in-out}',
 '#'+ID+' .runner.karate .armR{animation:rafiqPunch .7s ease-in-out}',
@@ -46,7 +48,8 @@ function robotSvg(){return '<svg viewBox="0 0 180 210" role="img" aria-label="ر
 
 function getStudent(){try{return typeof unifiedPortalStudent!=='undefined'?unifiedPortalStudent:null}catch(e){return null}}
 function getDb(){try{return typeof sb!=='undefined'?sb:null}catch(e){return null}}
-function mount(){addStyle();var old=document.getElementById(ID);if(old)return old;var r=document.createElement('div');r.id=ID;r.innerHTML='<div class="runner"><div class="stage">'+robotSvg()+'<button class="tap" type="button" aria-label="اضغط لسماع رفيق الأندلس"></button></div></div>';document.body.appendChild(r);r.querySelector('.tap').addEventListener('click',function(){void play(true)});return r}
+function mount(){addStyle();var old=document.getElementById(ID);if(old)return old;var r=document.createElement('div');r.id=ID;r.innerHTML='<div class="runner"><div class="stage">'+robotSvg()+'<button class="tap" type="button" aria-label="اضغط لسماع رفيق الأندلس"></button></div></div>';document.body.appendChild(r);r.querySelector('.tap').addEventListener('click',function(){spawnHearts(r);void play(true)});return r}
+function spawnHearts(root){var stage=root.querySelector('.stage');if(!stage)return;for(var i=0;i<7;i++){(function(index){var h=document.createElement('span');h.className='heart-pop';h.textContent='♥';h.style.left=(12+Math.random()*62)+'px';h.style.top=(20+Math.random()*38)+'px';h.style.setProperty('--dx',((Math.random()-.5)*55)+'px');h.style.setProperty('--rot',((Math.random()-.5)*55)+'deg');h.style.animationDelay=(index*45)+'ms';stage.appendChild(h);setTimeout(function(){h.remove()},1450)})(i)}}
 function safeText(x){return String(x||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,260)}
 function numberWords(value){var n=Math.max(0,Math.floor(Number(value)||0));var ones=['صفر','واحد','اثنان','ثلاثة','أربعة','خمسة','ستة','سبعة','ثمانية','تسعة','عشرة','أحد عشر','اثنا عشر','ثلاثة عشر','أربعة عشر','خمسة عشر','ستة عشر','سبعة عشر','ثمانية عشر','تسعة عشر'];var tens=['','','عشرون','ثلاثون','أربعون','خمسون','ستون','سبعون','ثمانون','تسعون'];function under100(x){if(x<20)return ones[x];var t=Math.floor(x/10),u=x%10;return u?ones[u]+' و'+tens[t]:tens[t]}if(n<100)return under100(n);if(n<1000){var h=Math.floor(n/100),r=n%100;var hw=['','مئة','مئتان','ثلاثمئة','أربعمئة','خمسمئة','ستمئة','سبعمئة','ثمانمئة','تسعمئة'][h];return hw+(r?' و'+under100(r):'')}if(n<1000000){var th=Math.floor(n/1000),r=n%1000;var tw=th===1?'ألف':th===2?'ألفان':under100(th)+' ألف';return tw+(r?' و'+numberWords(r):'')}return String(n)}
 function spokenText(s){return String(s||'').replace(/[٠-٩0-9]+/g,function(v){var n=parseInt(v.replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d)}),10);return numberWords(n)})}
@@ -111,48 +114,33 @@ function kungfuCombo(root){
  setTimeout(function(){runner.classList.remove('kungfu','karate');runner.classList.add('turn')},1550);
  setTimeout(function(){runner.classList.remove('turn')},2250);
 }
-var rafiqSpeechQueue=[],rafiqSpeechRunning=false;
-function runSpeechQueue(){
- if(rafiqSpeechRunning||!rafiqSpeechQueue.length)return;
- if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance){console.warn('Rafiq: SpeechSynthesis غير مدعوم في المتصفح');rafiqSpeechQueue=[];return}
- var synth=window.speechSynthesis,voice=arabicVoice(),chunk=rafiqSpeechQueue.shift();
- var u=new SpeechSynthesisUtterance(chunk);
- u.lang=voice&&voice.lang?voice.lang:'ar-EG';
- if(voice)u.voice=voice;
- u.rate=.94;u.pitch=.82;u.volume=1;
- rafiqSpeechRunning=true;
- var finished=false;
- function next(){if(finished)return;finished=true;rafiqSpeechRunning=false;var root=document.getElementById(ID);if(root)root.classList.remove('talk');setTimeout(runSpeechQueue,80)}
- u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};
- u.onend=next;
- u.onerror=function(e){console.warn('Rafiq speech error:',e.error,'lang:',u.lang);next()};
- try{
-  synth.resume();
-  synth.speak(u);
- }catch(e){console.warn('Rafiq speak failed:',e);next()}
-}
-function speak(parts,append){
- if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance){console.warn('Rafiq: SpeechSynthesis غير مدعوم في المتصفح');return false}
- var synth=window.speechSynthesis;
- var chunks=parts.filter(Boolean).map(spokenText);
- if(!append){rafiqSpeechQueue=[];rafiqSpeechRunning=false;try{synth.cancel()}catch(e){}}
- chunks.forEach(function(chunk){rafiqSpeechQueue.push(chunk)});
- // Resume and submit the first utterance immediately in the actual tap gesture.
- try{synth.resume()}catch(e){}
- runSpeechQueue();
- if(!arabicVoice())console.warn('Rafiq: لا توجد أصوات متاحة في محرك النطق.');
- return true
+function speakOnce(text){
+ return new Promise(function(resolve){
+  if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance){console.warn('Rafiq: SpeechSynthesis غير مدعوم في المتصفح');resolve(false);return}
+  var synth=window.speechSynthesis,voice=arabicVoice(),u=new SpeechSynthesisUtterance(spokenText(text)),finished=false;
+  u.lang=voice&&voice.lang?voice.lang:'ar-EG';if(voice)u.voice=voice;
+  u.rate=.94;u.pitch=.82;u.volume=1;
+  function done(ok){if(finished)return;finished=true;var root=document.getElementById(ID);if(root)root.classList.remove('talk');resolve(ok)}
+  u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};
+  u.onend=function(){done(true)};
+  u.onerror=function(e){console.warn('Rafiq speech error:',e.error,'lang:',u.lang);done(false)};
+  try{synth.resume();synth.speak(u)}catch(e){console.warn('Rafiq speak failed:',e);done(false)}
+ });
 }
 async function play(replay){
  var student=getStudent();if(busy||!student||!student.id)return;busy=true;
  try{
   var root=mount();kungfuCombo(root);
   var name=String(student.name||'يا بطل').trim().split(/\s+/).slice(0,2).join(' ');
-  // Start speech synchronously inside the tap gesture before any network/database await.
-  speak(['إزيك يا '+name+'؟ عامل إيه يا بطل؟','أنا رفيق الأندلس، صاحبك الصغير في الأكاديمية. هكون معاك وأفكرك بحاجاتك المهمة.','أنا بحب الحركة واللعب! واحد، اتنين، تلاتة... كونغ فو! هُوب! هاااي! كاراتيه! خد دي!','عاش يا بطل! افتكر تراجع دروسك، وتتابع إشعارات الأكاديمية، وتشوف درجاتك ومواعيدك أول بأول.'],false);
-  var details=[];try{details=await loadFacts()}catch(e){console.warn('Rafiq facts unavailable:',e);details=['تابع إشعاراتك وبياناتك من بوابة الطالب.']}
-  if(details.length)speak(details.map(function(x){return String(x).replace(/بص يا بطل/g,'بص يا نجم').replace(/خلي بالك/g,'خد بالك').replace(/لحد دلوقتي/g,'لغاية دلوقتي')}),true);
-  speak(['شد حيلك يا بطل، إنت قدها وقدود! يلا سلام يا نجم.'],true);
+  // Start speech directly in the tap gesture, then speak the remaining information as one utterance.
+  var intro='إزيك يا '+name+'؟ عامل إيه يا بطل؟ أنا رفيق الأندلس، صاحبك الصغير في الأكاديمية. هكون معاك وأفكرك بحاجاتك المهمة.';
+  var introFinished=speakOnce(intro);
+  var details=[];try{details=await loadFacts()}catch(e){console.warn('Rafiq facts unavailable:',e);details=['مش قادر أوصل لبياناتك دلوقتي، تابع إشعاراتك وبياناتك من بوابة الطالب.']}
+  await introFinished;
+  var rest=['أنا بحب الحركة واللعب! واحد، اتنين، تلاتة... كونغ فو! هُوب! هاااي! كاراتيه! خد دي!','عاش يا بطل! افتكر تراجع دروسك، وتتابع إشعارات الأكاديمية، وتشوف درجاتك ومواعيدك أول بأول.']
+   .concat(details.map(function(x){return String(x).replace(/بص يا بطل/g,'بص يا نجم').replace(/خلي بالك/g,'خد بالك').replace(/لحد دلوقتي/g,'لغاية دلوقتي')}))
+   .concat(['شد حيلك يا بطل، إنت قدها وقدود! يلا سلام يا نجم.']).join(' ');
+  await speakOnce(rest);
  }finally{busy=false}
 }
 function install(){var original=window.renderStudentPortalMenu;if(typeof original!=='function'||original.__rafiqWrapped)return false;var wrapped=function(){var result=original.apply(this,arguments);if(getStudent()&&getStudent().id)mount();return result};wrapped.__rafiqWrapped=true;window.renderStudentPortalMenu=wrapped;return true}
