@@ -332,7 +332,6 @@
   }
 
   function install() {
-    if (!document.querySelector('script[data-student-portal-services]')) { const s=document.createElement('script'); s.src='./student-portal-services.js?v=20261117-1'; s.dataset.studentPortalServices='1'; document.head.appendChild(s); }
     if (window.__academyVideoLibraryInstalled) return;
     window.__academyVideoLibraryInstalled = true;
     if (typeof ADMIN_ONLY_PAGES !== 'undefined' && ADMIN_ONLY_PAGES?.add) ADMIN_ONLY_PAGES.add(PAGE);
@@ -366,23 +365,6 @@
       };
     }
 
-    if (typeof window.renderStudentPortalMenu === 'function') {
-      const originalMenu = window.renderStudentPortalMenu;
-      window.renderStudentPortalMenu = function() {
-        const result = originalMenu.apply(this, arguments);
-        const grid = document.querySelector('#student-portal-content .student-portal-grid');
-        if (grid && !grid.querySelector('[data-academy-video-tile]')) {
-          const tile = document.createElement('button');
-          tile.className = 'btn student-portal-tile';
-          tile.dataset.academyVideoTile = '1';
-          tile.setAttribute('aria-label','مكتبة الفيديوهات التعليمية');
-          tile.innerHTML = '<span class="tile-icon">🎬</span><span class="tile-label">مكتبة الفيديوهات التعليمية</span><span class="tile-hint">شاهد المحاضرات والدروس</span>';
-          tile.addEventListener('click',openStudentLibrary);
-          grid.appendChild(tile);
-        }
-        return result;
-      };
-    }
   }
 
   window.academyVideoLibrary = {
