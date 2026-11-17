@@ -106,22 +106,36 @@ function kungfuCombo(root){
  setTimeout(function(){runner.classList.remove('kungfu','karate');runner.classList.add('turn')},1550);
  setTimeout(function(){runner.classList.remove('turn')},2250);
 }
+var rafiqSpeechQueue=[],rafiqSpeechRunning=false;
+function runSpeechQueue(){
+ if(rafiqSpeechRunning||!rafiqSpeechQueue.length)return;
+ if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance){console.warn('Rafiq: SpeechSynthesis غير مدعوم في المتصفح');rafiqSpeechQueue=[];return}
+ var synth=window.speechSynthesis,voice=arabicVoice(),chunk=rafiqSpeechQueue.shift();
+ var u=new SpeechSynthesisUtterance(chunk);
+ u.lang=voice&&voice.lang?voice.lang:'ar-EG';
+ if(voice)u.voice=voice;
+ u.rate=.88;u.pitch=1;u.volume=1;
+ rafiqSpeechRunning=true;
+ var finished=false;
+ function next(){if(finished)return;finished=true;rafiqSpeechRunning=false;var root=document.getElementById(ID);if(root)root.classList.remove('talk');setTimeout(runSpeechQueue,80)}
+ u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};
+ u.onend=next;
+ u.onerror=function(e){console.warn('Rafiq speech error:',e.error,'lang:',u.lang);next()};
+ try{
+  synth.resume();
+  synth.speak(u);
+ }catch(e){console.warn('Rafiq speak failed:',e);next()}
+}
 function speak(parts,append){
  if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance){console.warn('Rafiq: SpeechSynthesis غير مدعوم في المتصفح');return false}
- var synth=window.speechSynthesis,voice=arabicVoice();
+ var synth=window.speechSynthesis;
  var chunks=parts.filter(Boolean).map(spokenText);
- if(!append){try{synth.cancel()}catch(e){}}
- chunks.forEach(function(chunk,index){
-  var u=new SpeechSynthesisUtterance(chunk);
-  u.lang=voice&&voice.lang?voice.lang:'ar-EG';
-  if(voice)u.voice=voice;
-  u.rate=.91;u.pitch=1.02;
-  u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};
-  u.onend=function(){if(index===chunks.length-1){var root=document.getElementById(ID);if(root)root.classList.remove('talk')}};
-  u.onerror=function(e){console.warn('Rafiq speech error:',e.error,'lang:',u.lang)};
-  try{synth.speak(u)}catch(e){console.warn('Rafiq speak failed:',e)}
- });
- if(!voice)console.warn('Rafiq: لا يوجد صوت عربي ظاهر في قائمة الجهاز؛ جربنا طلب النطق ar-EG من محرك النظام.');
+ if(!append){rafiqSpeechQueue=[];rafiqSpeechRunning=false;try{synth.cancel()}catch(e){}}
+ chunks.forEach(function(chunk){rafiqSpeechQueue.push(chunk)});
+ // Resume and submit the first utterance immediately in the actual tap gesture.
+ try{synth.resume()}catch(e){}
+ runSpeechQueue();
+ if(!arabicVoice())console.warn('Rafiq: لا يوجد صوت عربي ظاهر في قائمة الجهاز؛ طلبنا من محرك النظام النطق بالعربية ar-EG.');
  return true
 }
 async function play(replay){
