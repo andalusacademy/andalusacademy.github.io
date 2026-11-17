@@ -1,3 +1,22 @@
+/* Expose the page's lexical doLogin function for legacy inline onclick="window.doLogin()" handlers. */
+(function bridgeLegacyWindowLogin(){
+  function expose(){
+    try{
+      if(typeof window.doLogin==='function')return true;
+      if(typeof doLogin==='function'){
+        window.doLogin=(...args)=>doLogin(...args);
+        return true;
+      }
+    }catch(e){console.warn('Andalus login bridge unavailable:',e);}
+    return false;
+  }
+  expose();
+  document.addEventListener('DOMContentLoaded',expose,{once:true});
+  document.addEventListener('click',function(event){
+    const target=event.target&&event.target.closest&&event.target.closest('[onclick*="window.doLogin"]');
+    if(target)expose();
+  },true);
+})();
 (function loadStudentPasskeyGate(){if(document.querySelector('script[data-andalus-student-passkey]'))return;const s=document.createElement('script');s.src='./student-passkey.js?v=1';s.async=false;s.dataset.andalusStudentPasskey='1';s.onload=()=>console.info('Andalus student passkey gate loaded.');document.head.appendChild(s);})();
 (function loadStagedExamGenerator(){if(document.querySelector('script[data-andalus-staged-exam]'))return;const s=document.createElement('script');s.src='./exam-generation-stages.js?v=2';s.async=false;s.dataset.andalusStagedExam='1';s.onload=()=>console.info('Andalus staged exam generation loaded.');document.head.appendChild(s);})();
 (function loadEssaySupport(){if(document.querySelector('script[data-andalus-essay-support]'))return;const s=document.createElement('script');s.src='./exam-essay-support.js?v=2';s.async=false;s.dataset.andalusEssaySupport='1';s.onload=()=>console.info('Andalus final essay support loaded.');s.onerror=()=>console.warn('Essay support could not be loaded.');document.head.appendChild(s);})();
