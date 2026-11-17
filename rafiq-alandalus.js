@@ -20,9 +20,16 @@ var css=[
 '@keyframes rafiqHeartFloat{0%{opacity:0;transform:translate(0,8px) scale(.35) rotate(-12deg)}15%{opacity:1;transform:translate(0,0) scale(1.1) rotate(8deg)}100%{opacity:0;transform:translate(var(--dx),-76px) scale(.65) rotate(var(--rot))}}',
 '#'+ID+' .runner.turn svg{animation:rafiqSpin .65s ease-in-out}',
 '#'+ID+' .runner.karate .armL{animation:rafiqBlock .7s ease-in-out}',
+'#'+ID+' .runner.karate .armL,#'+ID+' .runner.kungfu .armL{animation:rafiqBlock .48s ease-in-out 2 alternate}',
 '#'+ID+' .runner.karate .armR{animation:rafiqPunch .7s ease-in-out}',
 '#'+ID+' .runner.karate .legR{animation:rafiqKick .7s ease-in-out}',
 '#'+ID+' .runner.kungfu .armL{animation:rafiqBlock .48s ease-in-out 2 alternate}',
+'#'+ID+' .runner.kungfu .stage,#'+ID+' .runner.karate .stage{animation:rafiqFightBounce .42s ease-in-out 4 alternate}',
+'#'+ID+' .runner.karate .armR{animation:rafiqPunch .36s ease-in-out 3 alternate}',
+'#'+ID+' .runner.karate .legR{animation:rafiqKick .48s ease-in-out 2 alternate}',
+'#'+ID+' .runner.kungfu .armR{animation:rafiqPunch .36s ease-in-out 3 alternate}',
+'#'+ID+' .runner.kungfu .legR{animation:rafiqKick .48s ease-in-out 2 alternate}',
+'@keyframes rafiqFightBounce{0%{transform:translateY(0) rotate(-7deg)}50%{transform:translateY(-17px) rotate(8deg)}100%{transform:translateY(-3px) rotate(-5deg)}}'
 '#'+ID+' .runner.kungfu .armR{animation:rafiqPunch .48s ease-in-out 2 alternate}',
 '#'+ID+' .runner.kungfu .legR{animation:rafiqKick .62s ease-in-out 2 alternate}',
 '#'+ID+' .runner.kungfu svg{animation:rafiqHop .36s ease-in-out infinite}',
@@ -119,8 +126,10 @@ function speakOnce(text){
   if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance){console.warn('Rafiq: SpeechSynthesis غير مدعوم في المتصفح');resolve(false);return}
   var synth=window.speechSynthesis,voice=arabicVoice(),u=new SpeechSynthesisUtterance(spokenText(text)),finished=false;
   u.lang=voice&&voice.lang?voice.lang:'ar-EG';if(voice)u.voice=voice;
-  u.rate=.94;u.pitch=.82;u.volume=1;
-  function done(ok){if(finished)return;finished=true;var root=document.getElementById(ID);if(root)root.classList.remove('talk');resolve(ok)}
+  u.rate=.9;u.pitch=.58;u.volume=1;
+  function done(ok){if(finished)return;finished=true;clearTimeout(safety);var root=document.getElementById(ID);if(root)root.classList.remove('talk');resolve(ok)}
+  // Some mobile speech engines omit onend; release the queue after a safety timeout.
+  var safety=setTimeout(function(){if(!finished){try{synth.cancel()}catch(e){}done(false)}},12000);
   u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};
   u.onend=function(){done(true)};
   u.onerror=function(e){console.warn('Rafiq speech error:',e.error,'lang:',u.lang);done(false)};
@@ -133,11 +142,12 @@ async function play(replay){
   var root=mount();kungfuCombo(root);
   var name=String(student.name||'يا بطل').trim().split(/\s+/).slice(0,2).join(' ');
   // Start speech directly in the tap gesture, then speak the remaining information as one utterance.
-  var intro='إزيك يا '+name+'؟ عامل إيه يا بطل؟ أنا رفيق الأندلس، صاحبك الصغير في الأكاديمية. هكون معاك وأفكرك بحاجاتك المهمة.';
+  var intro='إزيك يا '+name+'؟ عامل إيه يا بطل؟ أنا رفيق الأندلس، صاحبك الصغير في الأكاديمية. هفكرك بإيه؟ هفكرك تتابع إشعارات الأكاديمية، ومواعيد الامتحانات، ودرجاتك، والملخصات والفيديوهات، وتراجع الغياب والرسوم. يعني مش هسيبك تنسى حاجة مهمة!';
   var introFinished=speakOnce(intro);
   var details=[];try{details=await loadFacts()}catch(e){console.warn('Rafiq facts unavailable:',e);details=['مش قادر أوصل لبياناتك دلوقتي، تابع إشعاراتك وبياناتك من بوابة الطالب.']}
-  await introFinished;
-  var rest=['أنا بحب الحركة واللعب! واحد، اتنين، تلاتة... كونغ فو! هُوب! هاااي! كاراتيه! خد دي!','عاش يا بطل! افتكر تراجع دروسك، وتتابع إشعارات الأكاديمية، وتشوف درجاتك ومواعيدك أول بأول.']
+  // Do not let a missing mobile onend event block the rest of Rafiq's message.
+  await Promise.race([introFinished,new Promise(function(resolve){setTimeout(resolve,12500)})]);
+  var rest=['وبالمناسبة، أنا كمان بحب أتحرك! استعدوا لحركات الكونغ فو والكاراتيه! هوب! هاا!','عاش يا بطل! تابع إشعارات الأكاديمية، ومواعيد امتحاناتك، ودرجاتك، والملخصات والفيديوهات المتاحة ليك.']
    .concat(details.map(function(x){return String(x).replace(/بص يا بطل/g,'بص يا نجم').replace(/خلي بالك/g,'خد بالك').replace(/لحد دلوقتي/g,'لغاية دلوقتي')}))
    .concat(['شد حيلك يا بطل، إنت قدها وقدود! يلا سلام يا نجم.']).join(' ');
   await speakOnce(rest);
