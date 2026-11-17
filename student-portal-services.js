@@ -1,7 +1,8 @@
 /* Student portal tiles: private video library + restored notifications. */
 (()=>{'use strict';
+const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));
+
 const sb=()=>window.sb||null;
 function portalMenu(){if(typeof window.renderStudentPortalMenu==='function')window.renderStudentPortalMenu();}
 async function openNotifications(){
@@ -17,9 +18,24 @@ async function openNotifications(){
  box.querySelectorAll('[data-read]').forEach(btn=>btn.addEventListener('click',async()=>{btn.disabled=true;try{const {data,error}=await sb().rpc('mark_portal_notification_read',{p_student_id:String(st.id),p_phone:String(phone),p_portal_type:'student',p_notification_id:btn.dataset.read});if(error)throw error;if(!data?.ok)throw new Error('تعذر تسجيل الاطلاع');await openNotifications();}catch(e){btn.disabled=false;if(window.showToast)window.showToast(e.message||'تعذر تحديث الإشعار','error');}}));
  }catch(e){box.innerHTML='<div class="card" style="padding:18px;color:#b91c1c">'+esc(e.message||'تعذر تحميل الإشعارات')+'</div><button class="btn btn-outline" id="student-notifications-back">رجوع للبوابة</button>';$('student-notifications-back')?.addEventListener('click',portalMenu);}
 }
-function addTiles(){const grid=document.querySelector('#student-portal-content .student-portal-grid');if(!grid)return;
- if(!grid.querySelector('[data-academy-video-tile]')){const b=document.createElement('button');b.type='button';b.className='btn student-portal-tile';b.dataset.academyVideoTile='1';b.innerHTML='<span class="tile-icon">🎬</span><span class="tile-label">مكتبة الفيديوهات التعليمية</span><span class="tile-hint">شاهد المحاضرات والدروس</span>';b.addEventListener('click',()=>window.academyVideoLibrary?.openStudentLibrary());grid.appendChild(b);}
- if(!grid.querySelector('[data-academy-notifications-tile]')){const b=document.createElement('button');b.type='button';b.className='btn student-portal-tile';b.dataset.academyNotificationsTile='1';b.innerHTML='<span class="tile-icon">🔔</span><span class="tile-label">التنبيهات والإشعارات</span><span class="tile-hint">تابع رسائل وإعلانات الأكاديمية</span>';b.addEventListener('click',openNotifications);grid.appendChild(b);}
+function addTiles(){
+ const host=$('student-portal-content'); if(!host)return;
+ let grid=host.querySelector('.student-portal-grid');
+ if(!grid){
+   const notification=[...host.querySelectorAll('button,a,[role="button"],.student-portal-tile')].find(el=>/التنبيهات|الإشعارات/.test(el.textContent||''));
+   grid=notification?.parentElement||host;
+ }
+ if(!grid.querySelector('[data-academy-video-tile]')){
+   const b=document.createElement('button');b.type='button';b.className='btn student-portal-tile';b.dataset.academyVideoTile='1';
+   b.innerHTML='<span class="tile-icon">🎬</span><span class="tile-label">مكتبة الفيديوهات التعليمية</span><span class="tile-hint">شاهد المحاضرات والدروس</span>';
+   b.addEventListener('click',()=>{if(window.academyVideoLibrary?.openStudentLibrary)window.academyVideoLibrary.openStudentLibrary();else if(window.showToast)window.showToast('جاري تجهيز مكتبة الفيديوهات، حدّث الصفحة','error');});
+   grid.appendChild(b);
+ }
+ if(!grid.querySelector('[data-academy-notifications-tile]')){
+   const b=document.createElement('button');b.type='button';b.className='btn student-portal-tile';b.dataset.academyNotificationsTile='1';
+   b.innerHTML='<span class="tile-icon">🔔</span><span class="tile-label">التنبيهات والإشعارات</span><span class="tile-hint">تابع رسائل وإعلانات الأكاديمية</span>';
+   b.addEventListener('click',openNotifications);grid.appendChild(b);
+ }
 }
 function hook(){if(typeof window.renderStudentPortalMenu==='function'&&!window.renderStudentPortalMenu.__studentServicesHook){const old=window.renderStudentPortalMenu;const fn=function(){const r=old.apply(this,arguments);setTimeout(addTiles,0);return r;};fn.__studentServicesHook=true;window.renderStudentPortalMenu=fn;}addTiles();}
 function start(){hook();if(!window.__studentServicesObserver){window.__studentServicesObserver=new MutationObserver(hook);window.__studentServicesObserver.observe(document.body,{childList:true,subtree:true});}setInterval(hook,1200);}
