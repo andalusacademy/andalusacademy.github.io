@@ -20,6 +20,10 @@ var css=[
 '#'+ID+' .runner.karate .armL{animation:rafiqBlock .7s ease-in-out}',
 '#'+ID+' .runner.karate .armR{animation:rafiqPunch .7s ease-in-out}',
 '#'+ID+' .runner.karate .legR{animation:rafiqKick .7s ease-in-out}',
+'#'+ID+' .runner.kungfu .armL{animation:rafiqBlock .48s ease-in-out 2 alternate}',
+'#'+ID+' .runner.kungfu .armR{animation:rafiqPunch .48s ease-in-out 2 alternate}',
+'#'+ID+' .runner.kungfu .legR{animation:rafiqKick .62s ease-in-out 2 alternate}',
+'#'+ID+' .runner.kungfu svg{animation:rafiqHop .36s ease-in-out infinite}',
 '@keyframes rafiqPatrol{0%{left:4px;transform:scaleX(1)}48%{left:calc(100% - 116px);transform:scaleX(1)}52%{left:calc(100% - 116px);transform:scaleX(-1)}100%{left:4px;transform:scaleX(-1)}}',
 '@keyframes rafiqHop{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-13px) rotate(-4deg)}50%{transform:translateY(0) rotate(0)}75%{transform:translateY(-8px) rotate(4deg)}}',
 '@keyframes rafiqNod{50%{transform:rotate(5deg)}}@keyframes rafiqSwing{to{transform:rotate(24deg)}}',
@@ -47,40 +51,73 @@ function money(x){return numberWords(Math.round(Number(x)||0))+' جنيه'}
 async function loadFacts(){
  var student=getStudent(),phone='';try{phone=typeof unifiedPortalPhone!=='undefined'?unifiedPortalPhone:''}catch(e){}
  var db=getDb();if(!student||!student.id||!phone||!db)throw new Error('student session unavailable');
- var res=await Promise.all([
- db.rpc('get_portal_notifications',{p_student_id:String(student.id),p_phone:String(phone),p_portal_type:'student'}),
- db.from('attendance').select('status').eq('student_id',student.id),
- db.from('payments').select('*').eq('student_id',student.id)
- ]);
- var out=[],n=res[0],a=res[1],p=res[2];
- if(!n.error&&n.data&&n.data.verified){var unread=(n.data.notifications||[]).filter(function(x){return x.show_on_login===true&&x.is_read!==true});if(unread.length){out.push('عندك '+numberWords(unread.length)+' إشعار جديد من الأكاديمية.');unread.slice(0,3).forEach(function(x){var title=safeText(x.title),body=safeText(x.body);if(title)out.push('تنبيه: '+title+(body?'. '+body:''))})}else out.push('مفيش إشعارات جديدة عندك دلوقتي.')}
- if(!a.error&&Array.isArray(a.data)){var absent=a.data.filter(function(x){var s=String(x.status||'').replace(/[أإآ]/g,'ا').trim();return s==='غائب'||s==='غائبة'}).length;out.push(absent?'عدد مرات الغياب المسجلة عليك '+numberWords(absent)+'.':'مفيش غياب مسجل عليك حتى الآن.')}
- if(!p.error&&Array.isArray(p.data)){var map={};p.data.forEach(function(x){map[x.payment_type]=x});var remaining=null,late=0;try{if(typeof getPaymentSchedule==='function'&&typeof getStudentPaymentSummary==='function'){var summary=getStudentPaymentSummary(student,getPaymentSchedule(student),map);remaining=Number(summary.remaining)||0;late=Number(summary.lateFeesDue)||0}}catch(e){}var extras=0;['شنطة_ادوات','فتح_ملف','كورس_انجليزى'].forEach(function(k){var x=map[k];if(x&&x.applicable!==false&&x.paid!==true)extras+=Math.max(0,Number(x.amount)||0)});if(remaining!==null)out.push(remaining?'المتبقي من رسوم البرنامج '+money(remaining)+'.':'رسوم البرنامج مسددة بالكامل حسب السجلات الحالية.');if(late)out.push('غرامات التأخير المسجلة '+money(late)+'.');if(extras)out.push('المصروفات المستقلة غير المسددة '+money(extras)+'.');if(remaining===null&&!extras)out.push('تعذر حساب رصيد الرسوم بدقة من سجلات النظام الحالية.')}
+ var result=await db.rpc('get_rafiq_student_facts',{p_student_id:String(student.id),p_phone:String(phone)});
+ if(result.error)throw result.error;
+ var facts=result.data||{};
+ if(facts.verified!==true)throw new Error('student identity not verified');
+ var out=[],attendance=Array.isArray(facts.attendance)?facts.attendance:[],payments=Array.isArray(facts.payments)?facts.payments:[];
+ var absent=attendance.filter(function(x){var st=String(x.status||'').replace(/[أإآ]/g,'ا').trim();return st==='غائب'||st==='غائبة'}).length;
+ out.push(absent?'بص يا بطل، متسجل عليك '+numberWords(absent)+' مرات غياب.':'تمام يا بطل، مفيش غياب متسجل عليك لحد دلوقتي.');
+ if(payments.length){
+  var map={};payments.forEach(function(x){if(x&&x.payment_type)map[x.payment_type]=x});
+  var remaining=null,late=0;
+  try{if(typeof getPaymentSchedule==='function'&&typeof getStudentPaymentSummary==='function'){var summary=getStudentPaymentSummary(student,getPaymentSchedule(student),map);remaining=Number(summary.remaining)||0;late=Number(summary.lateFeesDue)||0}}catch(e){console.warn('Rafiq payment calculation unavailable:',e)}
+  var extras=0;['شنطة_ادوات','فتح_ملف','كورس_انجليزى'].forEach(function(k){var x=map[k];if(x&&x.applicable!==false&&x.paid!==true)extras+=Math.max(0,Number(x.amount)||0)});
+  if(remaining!==null)out.push(remaining?'خلي بالك، باقي عليك '+money(remaining)+' من رسوم البرنامج.':'عاش، رسوم البرنامج مسددة بالكامل حسب السجلات.');
+  if(late)out.push('وفيه غرامات تأخير مسجلة '+money(late)+'.');
+  if(extras)out.push('وفيه مصروفات مستقلة لسه مستحقة '+money(extras)+'.');
+  if(remaining===null&&!extras)out.push('محتاجين نراجع حساب الرسوم من لوحة الإدارة عشان أقولك الرقم بدقة.');
+ }else out.push('مش ظاهر عندي سجل مصروفات ليك دلوقتي.');
  return out
 }
 function arabicVoice(){
  if(!('speechSynthesis'in window))return null;
  var voices=window.speechSynthesis.getVoices()||[];
  voiceCache=voices.filter(function(v){return /^ar([_-]|$)/i.test(v.lang||'')});
- return voiceCache.find(function(v){return /EG/i.test(v.lang||'')})||voiceCache[0]||null
+ var egypt=voiceCache.filter(function(v){return /^ar[-_]EG$/i.test(v.lang||'')});
+ return egypt.find(function(v){return /male|man|mascul|shakir|hesham|mohamed/i.test(v.name||'')})||egypt[0]||voiceCache.find(function(v){return /male|man|mascul/i.test(v.name||'')})||voiceCache[0]||null
+}
+function soundFx(kind){
+ try{
+  var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+  var ctx=window.__andalusRafiqAudio;if(!ctx){ctx=new AC();window.__andalusRafiqAudio=ctx}
+  if(ctx.state==='suspended')ctx.resume();
+  var now=ctx.currentTime,osc=ctx.createOscillator(),gain=ctx.createGain();
+  osc.type=kind==='hit'?'triangle':'sawtooth';
+  var start=kind==='hit'?145:(kind==='kick'?390:620),end=kind==='hit'?48:85;
+  osc.frequency.setValueAtTime(start,now);osc.frequency.exponentialRampToValueAtTime(end,now+.19);
+  gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(kind==='hit'?.18:.09,now+.018);gain.gain.exponentialRampToValueAtTime(.0001,now+.22);
+  osc.connect(gain);gain.connect(ctx.destination);osc.start(now);osc.stop(now+.23);
+ }catch(e){}
+}
+function kungfuCombo(root){
+ var runner=root.querySelector('.runner');if(!runner)return;
+ runner.classList.remove('karate','turn','kungfu');void runner.offsetWidth;runner.classList.add('kungfu');
+ soundFx('whoosh');
+ setTimeout(function(){soundFx('hit')},260);
+ setTimeout(function(){soundFx('kick')},570);
+ setTimeout(function(){soundFx('whoosh')},880);
+ setTimeout(function(){runner.classList.add('karate');soundFx('hit')},1120);
+ setTimeout(function(){runner.classList.remove('kungfu','karate');runner.classList.add('turn')},1550);
+ setTimeout(function(){runner.classList.remove('turn')},2250);
 }
 async function speak(parts){
  if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance)return false;
  var synth=window.speechSynthesis,voice=arabicVoice(),tries=0;
  while(!voice&&tries<18){await new Promise(function(resolve){setTimeout(resolve,150)});voice=arabicVoice();tries++}
- if(!voice){console.warn('Rafiq: لا يوجد صوت عربي مثبت أو متاح في المتصفح. لن أستخدم صوتاً إنجليزياً حتى لا ينطق العربية بشكل خاطئ.');return false}
+ if(!voice){console.warn('Rafiq: لا يوجد صوت عربي متاح. ثبّت صوت العربية (مصر) على الجهاز لتفعيل الكلام باللهجة المصرية.');return false}
+ if(!/^ar[-_]EG$/i.test(voice.lang||''))console.warn('Rafiq: الصوت العربي المصري ar-EG غير متاح؛ المستخدم الحالي صوت عربي بديل وقد يختلف نطقه عن اللهجة المصرية.');
  var chunks=parts.filter(Boolean).map(spokenText),i=0;
- function next(){if(i>=chunks.length){var root=document.getElementById(ID);if(root)root.classList.remove('talk');return}var u=new SpeechSynthesisUtterance(chunks[i++]);u.lang=voice.lang;u.voice=voice;u.rate=.88;u.pitch=.98;u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};u.onend=next;u.onerror=function(e){console.warn('Rafiq speech error:',e.error);next()};synth.speak(u)}
+ function next(){if(i>=chunks.length){var root=document.getElementById(ID);if(root)root.classList.remove('talk');return}var u=new SpeechSynthesisUtterance(chunks[i++]);u.lang=voice.lang;u.voice=voice;u.rate=.94;u.pitch=1.03;u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};u.onend=next;u.onerror=function(e){console.warn('Rafiq speech error:',e.error);next()};synth.speak(u)}
  try{synth.cancel();next();return true}catch(e){return false}
 }
 async function play(replay){
  var student=getStudent();if(busy||!student||!student.id)return;busy=true;
  try{
-  var root=mount(),runner=root.querySelector('.runner');
-  runner.classList.add('karate');setTimeout(function(){runner.classList.remove('karate');runner.classList.add('turn');setTimeout(function(){runner.classList.remove('turn')},700)},900);
+  var root=mount();kungfuCombo(root);
   var details=[];try{details=await loadFacts()}catch(e){console.warn('Rafiq facts unavailable:',e);details=['تابع إشعاراتك وبياناتك من بوابة الطالب.']}
   var name=String(student.name||'يا بطل').trim().split(/\s+/).slice(0,2).join(' ');
-  var lines=['أهلاً يا '+name+'.','أنا رفيق الأندلس، صاحبك في الأكاديمية. يلا نبدأ يومنا بنشاط.','افتكر تراجع دروسك وتتابع بوابتك باستمرار.'].concat(details).concat(['شد حيلك يا بطل، وإحنا دايماً معاك. بالتوفيق!']);
+  var lines=['إزيك يا '+name+'؟ عامل إيه يا بطل؟','أنا رفيق الأندلس، صاحبك في الأكاديمية! يلا نفوق كده ونبدأ يومنا بنشاط.','استعد للحركة! واحد... اتنين... كونغ فو! هُووب! هااا!','عاش يا وحش! افتكر تراجع دروسك وتتابع إشعاراتك أول بأول.'].concat(details).concat(['شد حيلك يا بطل، إنت قدها! أشوفك على خير يا نجم.']);
   await speak(lines);
  }finally{busy=false}
 }
