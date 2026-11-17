@@ -75,12 +75,17 @@ function arabicVoice(){
  var voices=window.speechSynthesis.getVoices()||[];
  var arabic=voices.filter(function(v){return /^ar([_-]|$)/i.test(v.lang||'')});
  var egyptian=arabic.filter(function(v){return /^ar[-_]EG$/i.test(v.lang||'')});
- var malePattern=/male|man|mascul|shakir|hesham|mohamed|طارق|حسام|محمد|عمر/i;
- voiceCache=egyptian.length?egyptian:arabic;
+ var malePattern=/male|man|mascul|boy|young|shakir|hesham|mohamed|طارق|حسام|محمد|عمر/i;
+ // Prefer an Arabic voice, but if none exists use the device's normal voice.
+ // Among available voices, prefer a masculine-sounding voice; age cannot be detected reliably.
+ voiceCache=voices;
  return egyptian.find(function(v){return malePattern.test(v.name||'')})||
         egyptian[0]||
         arabic.find(function(v){return malePattern.test(v.name||'')})||
-        arabic[0]||null
+        arabic[0]||
+        voices.find(function(v){return malePattern.test(v.name||'')})||
+        voices.find(function(v){return /en[-_]?(US|GB)/i.test(v.lang||'')})||
+        voices[0]||null
 }
 function soundFx(kind){
  try{
@@ -135,7 +140,7 @@ function speak(parts,append){
  // Resume and submit the first utterance immediately in the actual tap gesture.
  try{synth.resume()}catch(e){}
  runSpeechQueue();
- if(!arabicVoice())console.warn('Rafiq: لا يوجد صوت عربي ظاهر في قائمة الجهاز؛ طلبنا من محرك النظام النطق بالعربية ar-EG.');
+ if(!arabicVoice())console.warn('Rafiq: لا توجد أصوات متاحة في محرك النطق.');
  return true
 }
 async function play(replay){
