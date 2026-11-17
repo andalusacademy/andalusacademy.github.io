@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const H={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info, x-student-session-token','Access-Control-Allow-Methods':'POST, OPTIONS','Content-Type':'application/json; charset=utf-8'};
+const H={'Access-Control-Allow-Origin':"https://andalusacademy.github.io",'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info, x-student-session-token','Access-Control-Allow-Methods':'POST, OPTIONS','Content-Type':'application/json; charset=utf-8'};
 const OUT=(x:any,s=200)=>new Response(JSON.stringify(x),{status:s,headers:H});
 const clean=(x:any,n=4000)=>String(x??'').replace(/\s+/g,' ').trim().slice(0,n);
 const norm=(x:string)=>String(x||'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[^\p{L}\p{N}]+/gu,'');
