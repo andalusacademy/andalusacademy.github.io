@@ -5,7 +5,7 @@ const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'
 const sb=()=>window.sb||null;
 function portalMenu(){if(typeof window.renderStudentPortalMenu==='function')window.renderStudentPortalMenu();}
 async function openNotifications(){
- const box=$('student-portal-content'), st=window.unifiedPortalStudent, phone=window.unifiedPortalPhone;
+ const box=$('student-portal-content'); let st=null,phone=''; try{st=typeof unifiedPortalStudent!=='undefined'?unifiedPortalStudent:window.unifiedPortalStudent;phone=typeof unifiedPortalPhone!=='undefined'?unifiedPortalPhone:window.unifiedPortalPhone||'';}catch(_){}
  if(!box||!st?.id||!phone){if(window.showToast)window.showToast('سجّل الدخول إلى بوابة الطالب أولًا','error');return;}
  box.innerHTML='<div style="padding:20px;text-align:center">جاري تحميل التنبيهات والإشعارات...</div>';
  try{const {data,error}=await sb().rpc('get_portal_notifications',{p_student_id:String(st.id),p_phone:String(phone),p_portal_type:'student'});
