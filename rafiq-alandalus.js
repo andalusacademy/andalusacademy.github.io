@@ -4,9 +4,9 @@ if (window.__andalusRafiqInstalled) return;
 window.__andalusRafiqInstalled = true;
 var ID='andalus-rafiq-root',busy=false,voiceCache=null;
 var css=[
-'#'+ID+'{position:fixed;z-index:2147483000;left:0;right:0;bottom:0;height:142px;pointer-events:none;overflow:visible;direction:ltr}',
-'#'+ID+' .runner{position:absolute;left:0;bottom:3px;width:112px;height:132px;pointer-events:auto;animation:rafiqPatrol 13s ease-in-out infinite alternate}',
-'#'+ID+' .stage{width:112px;height:132px;position:relative;cursor:pointer;filter:drop-shadow(0 7px 5px #183d5830)}',
+'#'+ID+'{position:fixed;z-index:2147483000;left:0;right:0;bottom:0;height:98px;pointer-events:none;overflow:visible;direction:ltr}',
+'#'+ID+' .runner{position:absolute;left:0;bottom:3px;width:78px;height:92px;pointer-events:auto;animation:rafiqPatrol 13s ease-in-out infinite alternate}',
+'#'+ID+' .stage{width:78px;height:92px;position:relative;cursor:pointer;filter:drop-shadow(0 7px 5px #183d5830)}',
 '#'+ID+' svg{width:100%;height:100%;overflow:visible;animation:rafiqHop .78s ease-in-out infinite}',
 '#'+ID+' .head{transform-box:fill-box;transform-origin:center bottom;animation:rafiqNod 2s ease-in-out infinite}',
 '#'+ID+' .armL,#'+ID+' .armR{transform-box:fill-box;transform-origin:top center;animation:rafiqSwing .65s ease-in-out infinite alternate}',
@@ -24,7 +24,7 @@ var css=[
 '#'+ID+' .runner.kungfu .armR{animation:rafiqPunch .48s ease-in-out 2 alternate}',
 '#'+ID+' .runner.kungfu .legR{animation:rafiqKick .62s ease-in-out 2 alternate}',
 '#'+ID+' .runner.kungfu svg{animation:rafiqHop .36s ease-in-out infinite}',
-'@keyframes rafiqPatrol{0%{left:4px;transform:scaleX(1)}48%{left:calc(100% - 116px);transform:scaleX(1)}52%{left:calc(100% - 116px);transform:scaleX(-1)}100%{left:4px;transform:scaleX(-1)}}',
+'@keyframes rafiqPatrol{0%{left:4px;transform:scaleX(1)}48%{left:calc(100% - 82px);transform:scaleX(1)}52%{left:calc(100% - 82px);transform:scaleX(-1)}100%{left:4px;transform:scaleX(-1)}}',
 '@keyframes rafiqHop{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-13px) rotate(-4deg)}50%{transform:translateY(0) rotate(0)}75%{transform:translateY(-8px) rotate(4deg)}}',
 '@keyframes rafiqNod{50%{transform:rotate(5deg)}}@keyframes rafiqSwing{to{transform:rotate(24deg)}}',
 '@keyframes rafiqRun{to{transform:rotate(28deg)}}@keyframes rafiqMouth{to{transform:scaleY(1.7)}}',
@@ -33,14 +33,17 @@ var css=[
 '@media(prefers-reduced-motion:reduce){#'+ID+' .runner{animation:none;left:10px}#'+ID+' svg,#'+ID+' *{animation:none!important}}'
 ].join('');
 function addStyle(){if(document.getElementById('andalus-rafiq-style'))return;var s=document.createElement('style');s.id='andalus-rafiq-style';s.textContent=css;document.head.appendChild(s)}
-function robotSvg(){return '<svg viewBox="0 0 180 210" role="img" aria-label="روبوت رفيق الأندلس">'+
-'<defs><linearGradient id="rMetal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset=".48" stop-color="#b8c9d5"/><stop offset="1" stop-color="#718b9e"/></linearGradient><linearGradient id="rBlue" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#36c9f2"/><stop offset="1" stop-color="#0875b2"/></linearGradient></defs>'+
-'<g class="legL"><rect x="54" y="151" width="22" height="36" rx="9" fill="url(#rMetal)" stroke="#405c70" stroke-width="4"/><rect x="43" y="181" width="42" height="17" rx="8" fill="#234a68" stroke="#102f48" stroke-width="3"/><circle cx="64" cy="189" r="4" fill="#5dd8ff"/></g>'+
-'<g class="legR"><rect x="104" y="151" width="22" height="36" rx="9" fill="url(#rMetal)" stroke="#405c70" stroke-width="4"/><rect x="95" y="181" width="42" height="17" rx="8" fill="#234a68" stroke="#102f48" stroke-width="3"/><circle cx="116" cy="189" r="4" fill="#5dd8ff"/></g>'+
-'<rect x="48" y="88" width="84" height="73" rx="22" fill="url(#rMetal)" stroke="#405c70" stroke-width="5"/><rect x="61" y="101" width="58" height="38" rx="12" fill="#163d59"/><path d="M75 119h30" stroke="#39c8f4" stroke-width="5" stroke-linecap="round"/><circle cx="90" cy="149" r="5" fill="#e8b94e"/>'+
-'<g class="armL"><path d="M49 103L31 129" stroke="#536f82" stroke-width="13" stroke-linecap="round"/><path d="M31 129l-7 14" stroke="url(#rMetal)" stroke-width="13" stroke-linecap="round"/><circle cx="22" cy="147" r="11" fill="url(#rBlue)" stroke="#31566d" stroke-width="3"/></g>'+
-'<g class="armR"><path d="M131 103l18 26" stroke="#536f82" stroke-width="13" stroke-linecap="round"/><path d="M149 129l7 14" stroke="url(#rMetal)" stroke-width="13" stroke-linecap="round"/><circle cx="158" cy="147" r="11" fill="url(#rBlue)" stroke="#31566d" stroke-width="3"/></g>'+
-'<g class="head"><rect x="38" y="17" width="104" height="78" rx="27" fill="url(#rMetal)" stroke="#405c70" stroke-width="5"/><rect x="48" y="30" width="84" height="48" rx="17" fill="#153b57"/><ellipse cx="70" cy="52" rx="9" ry="12" fill="#54d8ff"/><ellipse cx="110" cy="52" rx="9" ry="12" fill="#54d8ff"/><circle cx="73" cy="48" r="3" fill="#fff"/><circle cx="113" cy="48" r="3" fill="#fff"/><path class="mouth" d="M77 66q13 12 26 0" fill="none" stroke="#8beaff" stroke-width="4" stroke-linecap="round"/><path d="M90 17V7" stroke="#526e82" stroke-width="5"/><circle cx="90" cy="6" r="7" fill="#f5c34f" stroke="#526e82" stroke-width="3"/><circle cx="36" cy="54" r="8" fill="#36b9e5" stroke="#405c70" stroke-width="3"/><circle cx="144" cy="54" r="8" fill="#36b9e5" stroke="#405c70" stroke-width="3"/></g></svg>'}
+function robotSvg(){return '<svg viewBox="0 0 180 210" role="img" aria-label="روبوت رفيق الأندلس الكيوت">'+
+'<defs><linearGradient id="rCuteBody" x1="0" y1="0" x2="0.9" y2="1"><stop stop-color="#fff"/><stop offset=".65" stop-color="#eaf7ff"/><stop offset="1" stop-color="#b8d9ed"/></linearGradient><linearGradient id="rCuteBlue" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#65dcff"/><stop offset="1" stop-color="#159bd4"/></linearGradient></defs>'+
+'<ellipse cx="90" cy="198" rx="48" ry="7" fill="#163e5a" opacity=".13"/>'+
+'<g class="legL"><path d="M67 157l-3 22q-1 9 9 10h8q9-2 7-11l-3-21" fill="url(#rCuteBody)" stroke="#4d7893" stroke-width="4"/><path d="M61 184q-3 11 9 13h15q10-2 7-12l-5-5H67z" fill="#168fc6" stroke="#28617f" stroke-width="3"/><path d="M69 189q8 4 16 0" fill="none" stroke="#b9f2ff" stroke-width="3" stroke-linecap="round"/></g>'+
+'<g class="legR"><path d="M99 157l-3 22q-1 9 9 10h8q9-2 7-11l-3-21" fill="url(#rCuteBody)" stroke="#4d7893" stroke-width="4"/><path d="M93 184q-3 11 9 13h15q10-2 7-12l-5-5H99z" fill="#168fc6" stroke="#28617f" stroke-width="3"/><path d="M101 189q8 4 16 0" fill="none" stroke="#b9f2ff" stroke-width="3" stroke-linecap="round"/></g>'+
+'<path d="M90 89v-12" stroke="#4d7893" stroke-width="6" stroke-linecap="round"/><circle cx="90" cy="72" r="9" fill="#ffd35c" stroke="#4d7893" stroke-width="3"/>'+
+'<rect x="42" y="88" width="96" height="78" rx="30" fill="url(#rCuteBody)" stroke="#4d7893" stroke-width="5"/><rect x="74" y="113" width="32" height="31" rx="13" fill="#2aa8d8" opacity=".9"/><path d="M82 127h16" stroke="#eaffff" stroke-width="4" stroke-linecap="round"/><circle cx="90" cy="153" r="5" fill="#ffd35c"/>'+
+'<g class="armL"><path d="M47 111Q31 119 26 137" fill="none" stroke="#4d7893" stroke-width="13" stroke-linecap="round"/><path d="M26 137l-3 9" stroke="#bde8f8" stroke-width="13" stroke-linecap="round"/><circle cx="21" cy="150" r="11" fill="url(#rCuteBlue)" stroke="#4d7893" stroke-width="3"/><path d="M17 150h8" stroke="#eaffff" stroke-width="3" stroke-linecap="round"/></g>'+
+'<g class="armR"><path d="M133 111q16 8 21 26" fill="none" stroke="#4d7893" stroke-width="13" stroke-linecap="round"/><path d="M154 137l3 9" stroke="#bde8f8" stroke-width="13" stroke-linecap="round"/><circle cx="159" cy="150" r="11" fill="url(#rCuteBlue)" stroke="#4d7893" stroke-width="3"/><path d="M155 150h8" stroke="#eaffff" stroke-width="3" stroke-linecap="round"/></g>'+
+'<g class="head"><rect x="28" y="12" width="124" height="91" rx="37" fill="url(#rCuteBody)" stroke="#4d7893" stroke-width="5"/><rect x="39" y="25" width="102" height="62" rx="25" fill="#16435f"/><ellipse cx="68" cy="53" rx="11" ry="14" fill="#76e5ff"/><ellipse cx="112" cy="53" rx="11" ry="14" fill="#76e5ff"/><circle cx="72" cy="48" r="4" fill="#fff"/><circle cx="116" cy="48" r="4" fill="#fff"/><ellipse cx="51" cy="69" rx="8" ry="4" fill="#ff9fb1" opacity=".8"/><ellipse cx="129" cy="69" rx="8" ry="4" fill="#ff9fb1" opacity=".8"/><path class="mouth" d="M75 68q15 18 30 0" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="25" cy="58" r="9" fill="#55c9ed" stroke="#4d7893" stroke-width="3"/><circle cx="155" cy="58" r="9" fill="#55c9ed" stroke="#4d7893" stroke-width="3"/></g></svg>'}
+
 function getStudent(){try{return typeof unifiedPortalStudent!=='undefined'?unifiedPortalStudent:null}catch(e){return null}}
 function getDb(){try{return typeof sb!=='undefined'?sb:null}catch(e){return null}}
 function mount(){addStyle();var old=document.getElementById(ID);if(old)return old;var r=document.createElement('div');r.id=ID;r.innerHTML='<div class="runner"><div class="stage">'+robotSvg()+'<button class="tap" type="button" aria-label="اضغط لسماع رفيق الأندلس"></button></div></div>';document.body.appendChild(r);r.querySelector('.tap').addEventListener('click',function(){void play(true)});return r}
@@ -73,19 +76,16 @@ async function loadFacts(){
 function arabicVoice(){
  if(!('speechSynthesis'in window))return null;
  var voices=window.speechSynthesis.getVoices()||[];
+ var malePattern=/male|man|mascul|boy|young|shakir|hesham|mohamed|ahmed|omar|khaled|tarek|طارق|حسام|محمد|عمر|أحمد|خالد|مصطفى|محمود/i;
+ var femalePattern=/female|woman|girl|zira|samantha|victoria|karen|susan|female|هند|ليلى|منى|سارة/i;
+ voiceCache=voices;
  var arabic=voices.filter(function(v){return /^ar([_-]|$)/i.test(v.lang||'')});
  var egyptian=arabic.filter(function(v){return /^ar[-_]EG$/i.test(v.lang||'')});
- var malePattern=/male|man|mascul|boy|young|shakir|hesham|mohamed|طارق|حسام|محمد|عمر/i;
- // Prefer an Arabic voice, but if none exists use the device's normal voice.
- // Among available voices, prefer a masculine-sounding voice; age cannot be detected reliably.
- voiceCache=voices;
- return egyptian.find(function(v){return malePattern.test(v.name||'')})||
-        egyptian[0]||
-        arabic.find(function(v){return malePattern.test(v.name||'')})||
-        arabic[0]||
-        voices.find(function(v){return malePattern.test(v.name||'')})||
-        voices.find(function(v){return /en[-_]?(US|GB)/i.test(v.lang||'')})||
-        voices[0]||null
+ // Prefer a voice explicitly identifiable as masculine; device voice metadata cannot guarantee gender or age.
+ return egyptian.find(function(v){return malePattern.test(v.name||'')&&!femalePattern.test(v.name||'')})||
+        arabic.find(function(v){return malePattern.test(v.name||'')&&!femalePattern.test(v.name||'')})||
+        voices.find(function(v){return malePattern.test(v.name||'')&&!femalePattern.test(v.name||'')})||
+        egyptian[0]||arabic[0]||voices[0]||null
 }
 function soundFx(kind){
  try{
@@ -119,7 +119,7 @@ function runSpeechQueue(){
  var u=new SpeechSynthesisUtterance(chunk);
  u.lang=voice&&voice.lang?voice.lang:'ar-EG';
  if(voice)u.voice=voice;
- u.rate=.88;u.pitch=1;u.volume=1;
+ u.rate=.94;u.pitch=.82;u.volume=1;
  rafiqSpeechRunning=true;
  var finished=false;
  function next(){if(finished)return;finished=true;rafiqSpeechRunning=false;var root=document.getElementById(ID);if(root)root.classList.remove('talk');setTimeout(runSpeechQueue,80)}
@@ -147,9 +147,9 @@ async function play(replay){
  var student=getStudent();if(busy||!student||!student.id)return;busy=true;
  try{
   var root=mount();kungfuCombo(root);
-  var name=String(student.name||'يا بطل').trim().split(/\\s+/).slice(0,2).join(' ');
+  var name=String(student.name||'يا بطل').trim().split(/\s+/).slice(0,2).join(' ');
   // Start speech synchronously inside the tap gesture before any network/database await.
-  speak(['إزيك يا '+name+'؟ عامل إيه يا بطل؟','أنا رفيق الأندلس، صاحبك في الأكاديمية. يلا بينا نفوق ونبدأ يومنا بنشاط!','خد بالك، أنا جاهز! واحد، اتنين، تلاتة... كونغ فو! هُوب! هاااي!','عاش يا وحش! افتكر تذاكر وتراجع دروسك، وتبص على إشعاراتك كل يوم.'],false);
+  speak(['إزيك يا '+name+'؟ عامل إيه يا بطل؟','أنا رفيق الأندلس، صاحبك الصغير في الأكاديمية. هكون معاك وأفكرك بحاجاتك المهمة.','أنا بحب الحركة واللعب! واحد، اتنين، تلاتة... كونغ فو! هُوب! هاااي! كاراتيه! خد دي!','عاش يا بطل! افتكر تراجع دروسك، وتتابع إشعارات الأكاديمية، وتشوف درجاتك ومواعيدك أول بأول.'],false);
   var details=[];try{details=await loadFacts()}catch(e){console.warn('Rafiq facts unavailable:',e);details=['تابع إشعاراتك وبياناتك من بوابة الطالب.']}
   if(details.length)speak(details.map(function(x){return String(x).replace(/بص يا بطل/g,'بص يا نجم').replace(/خلي بالك/g,'خد بالك').replace(/لحد دلوقتي/g,'لغاية دلوقتي')}),true);
   speak(['شد حيلك يا بطل، إنت قدها وقدود! يلا سلام يا نجم.'],true);
