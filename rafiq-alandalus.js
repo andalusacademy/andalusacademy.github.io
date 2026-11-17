@@ -117,22 +117,37 @@ function soundFx(kind){
  }catch(e){}
 }
 function kungfuCombo(root){
- var runner=root.querySelector('.runner');if(!runner)return;
+ var runner=root.querySelector('.runner'),stage=root.querySelector('.stage');
+ if(!runner||!stage)return;
  runner.classList.remove('karate','turn','kungfu');void runner.offsetWidth;runner.classList.add('kungfu');
+ // Use the Web Animations API on the actual SVG limbs so the moves remain visible
+ // even when a device applies reduced-motion CSS or other stylesheet overrides.
+ function move(el,frames,duration,delay){
+  if(!el||typeof el.animate!=='function')return;
+  try{el.style.transformBox='fill-box';el.style.transformOrigin='center top';
+   var a=el.animate(frames,{duration:duration,delay:delay||0,easing:'ease-in-out',fill:'both'});
+   setTimeout(function(){try{a.cancel()}catch(e){}},duration+(delay||0)+180);
+  }catch(e){console.warn('Rafiq motion unavailable:',e)}
+ }
+ var left=root.querySelector('.armL'),right=root.querySelector('.armR'),leg=root.querySelector('.legR');
+ move(stage,[{transform:'translateY(0) rotate(0) scale(1)'},{transform:'translateY(-25px) rotate(-13deg) scale(1.13)'},{transform:'translateY(-4px) rotate(12deg) scale(1.08)'},{transform:'translateY(-20px) rotate(-9deg) scale(1.12)'},{transform:'translateY(0) rotate(0) scale(1)'}],2300,0);
+ move(left,[{transform:'rotate(0)'},{transform:'rotate(-115deg)'},{transform:'rotate(12deg)'},{transform:'rotate(-105deg)'},{transform:'rotate(0)'}],1900,0);
+ move(right,[{transform:'rotate(0)'},{transform:'rotate(105deg)'},{transform:'rotate(0)'},{transform:'rotate(120deg)'},{transform:'rotate(0)'}],1800,180);
+ move(leg,[{transform:'rotate(0)'},{transform:'rotate(95deg) translateX(13px)'},{transform:'rotate(-12deg)'},{transform:'rotate(85deg) translateX(12px)'},{transform:'rotate(0)'}],1800,350);
  soundFx('whoosh');
- setTimeout(function(){soundFx('hit')},260);
- setTimeout(function(){soundFx('kick')},570);
- setTimeout(function(){soundFx('whoosh')},880);
- setTimeout(function(){runner.classList.remove('kungfu');runner.classList.add('karate');soundFx('hit')},1120);
- setTimeout(function(){runner.classList.remove('kungfu','karate');runner.classList.add('turn')},1550);
- setTimeout(function(){runner.classList.remove('turn')},2250);
+ setTimeout(function(){soundFx('hit')},300);
+ setTimeout(function(){soundFx('kick')},650);
+ setTimeout(function(){soundFx('whoosh')},1050);
+ setTimeout(function(){runner.classList.remove('kungfu');runner.classList.add('karate');soundFx('hit')},1150);
+ setTimeout(function(){runner.classList.remove('kungfu','karate');runner.classList.add('turn')},1850);
+ setTimeout(function(){runner.classList.remove('turn')},2550);
 }
 function speakOnce(text){
  return new Promise(function(resolve){
   if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance){console.warn('Rafiq: SpeechSynthesis غير مدعوم في المتصفح');resolve(false);return}
   var synth=window.speechSynthesis,voice=arabicVoice(),u=new SpeechSynthesisUtterance(spokenText(text)),finished=false;
   u.lang=voice&&voice.lang?voice.lang:'ar-EG';if(voice)u.voice=voice;
-  u.rate=.88;u.pitch=.95;u.volume=1;
+  u.rate=.94;u.pitch=1;u.volume=1;
   function done(ok){if(finished)return;finished=true;clearTimeout(safety);var root=document.getElementById(ID);if(root)root.classList.remove('talk');resolve(ok)}
   // Some mobile speech engines omit onend; release the queue after a safety timeout.
   var safety=setTimeout(function(){if(!finished){try{synth.cancel()}catch(e){}done(false)}},Math.max(20000,spokenText(text).length*180));
