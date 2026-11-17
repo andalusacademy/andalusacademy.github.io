@@ -336,10 +336,21 @@
     window.__academyVideoLibraryInstalled = true;
     if (typeof ADMIN_ONLY_PAGES !== 'undefined' && ADMIN_ONLY_PAGES?.add) ADMIN_ONLY_PAGES.add(PAGE);
     ensureAdminPage();
+    ensureAdminNav();
+
+    // The administration shell/sidebar may be rendered only after login.
+    // Watch for that late render and attach the page/link as soon as it exists.
+    if (!window.__academyVideoLibraryObserver && document.body) {
+      window.__academyVideoLibraryObserver = new MutationObserver(() => {
+        ensureAdminPage();
+      });
+      window.__academyVideoLibraryObserver.observe(document.body, { childList: true, subtree: true });
+    }
 
     if (typeof window.showPage === 'function') {
       const original = window.showPage;
       window.showPage = function(page) {
+        ensureAdminPage();
         if (page === PAGE && !isAdmin()) {
           toast('مكتبة الفيديوهات متاحة للإدارة فقط','error');
           return original('dashboard');
@@ -347,7 +358,7 @@
         const result = original.apply(this, arguments);
         if (page === PAGE) {
           const title = $('page-title'); if (title) title.textContent = 'مكتبة الفيديوهات التعليمية';
-          document.querySelectorAll('.sidebar-nav .nav-item').forEach(n=>n.classList.toggle('active',!!n.dataset.academyVideoNav));
+          document.querySelectorAll('.nav-item').forEach(n=>{ if (n.dataset.academyVideoNav) n.classList.add('active'); });
           void loadAdmin();
         }
         return result;
