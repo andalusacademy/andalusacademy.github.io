@@ -29,7 +29,7 @@ var css=[
 '#'+ID+' .runner.karate .legR{animation:rafiqKick .48s ease-in-out 2 alternate}',
 '#'+ID+' .runner.kungfu .armR{animation:rafiqPunch .36s ease-in-out 3 alternate}',
 '#'+ID+' .runner.kungfu .legR{animation:rafiqKick .48s ease-in-out 2 alternate}',
-'@keyframes rafiqFightBounce{0%{transform:translateY(0) rotate(-7deg)}50%{transform:translateY(-17px) rotate(8deg)}100%{transform:translateY(-3px) rotate(-5deg)}}'
+'@keyframes rafiqFightBounce{0%{transform:translateY(0) rotate(-7deg)}50%{transform:translateY(-17px) rotate(8deg)}100%{transform:translateY(-3px) rotate(-5deg)}}',
 '#'+ID+' .runner.kungfu .armR{animation:rafiqPunch .48s ease-in-out 2 alternate}',
 '#'+ID+' .runner.kungfu .legR{animation:rafiqKick .62s ease-in-out 2 alternate}',
 '#'+ID+' .runner.kungfu svg{animation:rafiqHop .36s ease-in-out infinite}',
