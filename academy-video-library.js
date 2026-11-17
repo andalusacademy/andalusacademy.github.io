@@ -234,6 +234,21 @@
     }
     await loadAdmin();
   }
+  async function saveVideoPrice(id) {
+    if (!isAdmin()) return toast('الإدارة فقط', 'error');
+    const input = $('av-price-' + id);
+    const raw = String(input?.value ?? '').trim();
+    const price = Number(raw);
+    if (!raw || !Number.isFinite(price) || price < 0) return toast('أدخل سعرًا صحيحًا لا يقل عن صفر', 'error');
+    const {data,error} = await supa().from('academy_videos')
+      .update({price,updated_at:new Date().toISOString()})
+      .eq('id',id).select('id,price').single();
+    if (error) return toast('تعذر حفظ السعر: ' + error.message, 'error');
+    if (input) input.value = Number(data.price || 0);
+    toast('تم تحديث سعر الفيديو إلى ' + money(data.price));
+    await loadAdmin();
+  }
+
   async function archiveVideo(id) {
     if (!confirm('إخفاء الفيديو من المكتبة؟ لن يتم حذف الملف من R2.')) return;
     const {error} = await supa().from('academy_videos').update({is_published:false,deleted_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',id);
@@ -261,7 +276,9 @@
         <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-bottom:1px solid var(--border);padding:12px 0">
           <div><b>${esc(v.title)}</b><div style="font-size:12px;color:var(--muted)">${esc(v.category||'بدون تصنيف')} · ${money(v.price)} · ${v.validity_days>=36500?'بدون انتهاء':esc(v.validity_days)+' يوم'}</div>
           <div style="font-size:11px;color:var(--muted)">${v.is_published?'منشور':'مسودة'} · ${Number(v.size_bytes||0).toLocaleString('en-US')} بايت</div></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <input id="av-price-${v.id}" type="number" min="0" step="0.01" value="${Number(v.price||0)}" aria-label="سعر الفيديو بالجنيه" class="search-input" style="width:105px;max-width:105px;padding:7px" title="السعر بالجنيه">
+            <button class="btn btn-sm btn-outline" onclick="academyVideoLibrary.saveVideoPrice('${v.id}')">حفظ السعر</button>
             <button class="btn btn-sm ${v.is_published?'btn-outline':'btn-primary'}" onclick="academyVideoLibrary.togglePublish('${v.id}',${!v.is_published})">${v.is_published?'إلغاء النشر':'نشر'}</button>
             <button class="btn btn-sm btn-outline" onclick="academyVideoLibrary.archiveVideo('${v.id}')">إخفاء</button>
           </div>
@@ -447,7 +464,7 @@
   }
 
   window.academyVideoLibrary = {
-    loadAdmin, saveGateway, uploadVideo, togglePublish, archiveVideo, reviewOrder,
+    loadAdmin, saveGateway, uploadVideo, saveVideoPrice, togglePublish, archiveVideo, reviewOrder,
     openStudentLibrary, buy, submitReference, watch
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',install,{once:true});
