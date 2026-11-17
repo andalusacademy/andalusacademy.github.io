@@ -45,6 +45,14 @@
     nav.appendChild(item);
   }
 
+  function hideStudentGatewayOverlay() {
+    if (!isAdmin()) return;
+    const overlay = $('andalus-student-gateway-page');
+    if (!overlay) return;
+    overlay.style.display = 'none';
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
   function ensureAdminPage() {
     if (!$('page-' + PAGE)) {
       const host = document.querySelector('#app-screen .content') ||
@@ -390,8 +398,10 @@
           toast('مكتبة الفيديوهات متاحة للإدارة فقط','error');
           return original('dashboard');
         }
+        if (page === PAGE) hideStudentGatewayOverlay();
         const result = original.apply(this, arguments);
         if (page === PAGE) {
+          hideStudentGatewayOverlay();
           const title = $('page-title'); if (title) title.textContent = 'مكتبة الفيديوهات التعليمية';
           document.querySelectorAll('.nav-item').forEach(n=>{ if (n.dataset.academyVideoNav) n.classList.add('active'); });
           void loadAdmin();
