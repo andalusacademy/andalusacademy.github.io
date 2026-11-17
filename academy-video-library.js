@@ -47,9 +47,14 @@
 
   function hideStudentGatewayOverlay() {
     if (!isAdmin()) return;
+    // The standalone gateway stylesheet forces the overlay to display:block!important
+    // even after its inline display is set to none. Remove the standalone mode itself.
+    document.body.classList.remove('and-alus-gateway-standalone');
+    const standaloneStyle = $('andalus-gateway-standalone-style');
+    if (standaloneStyle) standaloneStyle.remove();
     const overlay = $('andalus-student-gateway-page');
     if (!overlay) return;
-    overlay.style.display = 'none';
+    overlay.style.setProperty('display', 'none', 'important');
     overlay.setAttribute('aria-hidden', 'true');
   }
 
