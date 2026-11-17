@@ -39,7 +39,7 @@ var css=[
 '@keyframes rafiqRun{to{transform:rotate(28deg)}}@keyframes rafiqMouth{to{transform:scaleY(1.7)}}',
 '@keyframes rafiqSpin{to{transform:rotate(360deg)}}@keyframes rafiqBlock{50%{transform:rotate(-85deg)}}',
 '@keyframes rafiqPunch{50%{transform:rotate(95deg)}}@keyframes rafiqKick{50%{transform:rotate(72deg) translateX(10px)}}',
-'@media(prefers-reduced-motion:reduce){#'+ID+' .runner{animation:none;left:10px}#'+ID+' svg,#'+ID+' *{animation:none!important}}'
+'@media(prefers-reduced-motion:reduce){#'+ID+' .runner{animation:none;left:10px}#'+ID+' .runner:not(.kungfu):not(.karate):not(.turn) svg,#'+ID+' .runner:not(.kungfu):not(.karate):not(.turn) *{animation:none!important}}'
 ].join('');
 function addStyle(){if(document.getElementById('andalus-rafiq-style'))return;var s=document.createElement('style');s.id='andalus-rafiq-style';s.textContent=css;document.head.appendChild(s)}
 function robotSvg(){return '<svg viewBox="0 0 180 210" role="img" aria-label="روبوت رفيق الأندلس الكيوت">'+
