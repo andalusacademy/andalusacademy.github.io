@@ -1,6 +1,6 @@
 /* Student portal tiles: private video library + restored notifications. */
 (()=>{'use strict';
-const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));
 const sb=()=>window.sb||null;
 function portalMenu(){if(typeof window.renderStudentPortalMenu==='function')window.renderStudentPortalMenu();}
