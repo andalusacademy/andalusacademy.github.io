@@ -332,6 +332,7 @@
   }
 
   function install() {
+    if (!document.querySelector('script[data-student-portal-services]')) { const s=document.createElement('script'); s.src='./student-portal-services.js?v=20261117-1'; s.dataset.studentPortalServices='1'; document.head.appendChild(s); }
     if (window.__academyVideoLibraryInstalled) return;
     window.__academyVideoLibraryInstalled = true;
     if (typeof ADMIN_ONLY_PAGES !== 'undefined' && ADMIN_ONLY_PAGES?.add) ADMIN_ONLY_PAGES.add(PAGE);
