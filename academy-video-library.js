@@ -202,8 +202,37 @@
   }
 
   async function togglePublish(id, published) {
-    const {error} = await supa().from('academy_videos').update({is_published:!!published,updated_at:new Date().toISOString()}).eq('id',id);
-    if (error) toast(error.message,'error'); else await loadAdmin();
+    const {data:video,error} = await supa().from('academy_videos')
+      .update({is_published:!!published,updated_at:new Date().toISOString()})
+      .eq('id',id).select('id,title').single();
+    if (error) return toast('تعذر تحديث حالة النشر: '+error.message,'error');
+    if (published) {
+      try {
+        const {data:existing,error:lookupError} = await supa().from('notifications')
+          .select('id').eq('metadata->>academy_video_id',id).limit(1);
+        if (lookupError) throw lookupError;
+        if (!existing?.length) {
+          const {error:notificationError} = await supa().from('notifications').insert({
+            title:'فيديو جديد متاح: '+video.title,
+            body:'تم نشر فيديو جديد في مكتبة الفيديوهات التعليمية. افتح المكتبة من بوابة الطالب للاطلاع عليه.',
+            notification_type:'system',
+            priority:'normal',
+            audience:'all',
+            is_published:true,
+            published_at:new Date().toISOString(),
+            show_on_login:true,
+            metadata:{academy_video_id:id,source:'academy_video_library'}
+          });
+          if (notificationError) throw notificationError;
+        }
+        toast('تم نشر الفيديو وإرسال إشعار لجميع الطلاب');
+      } catch (notificationError) {
+        toast('تم نشر الفيديو، لكن تعذر إنشاء الإشعار: '+(notificationError?.message||'خطأ غير معروف'),'error');
+      }
+    } else {
+      toast('تم إلغاء نشر الفيديو');
+    }
+    await loadAdmin();
   }
   async function archiveVideo(id) {
     if (!confirm('إخفاء الفيديو من المكتبة؟ لن يتم حذف الملف من R2.')) return;
