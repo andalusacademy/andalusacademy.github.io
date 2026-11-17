@@ -119,6 +119,9 @@
           <button type="button" id="gateway-ai" style="border:1px solid var(--border);border-radius:20px;padding:30px 24px;background:linear-gradient(145deg,#f5f3ff,#fff);cursor:pointer;text-align:right;box-shadow:0 10px 30px #0f172a12">
             <div style="font-size:52px;margin-bottom:12px">👨‍🏫</div><h2 style="margin:0 0 8px">المدرس الخصوصي AI</h2><p style="margin:0;color:var(--muted);line-height:1.8">التجارب، الاشتراكات، الاستخدام الفعلي، الدقائق المستهلكة، الطلبات، والإتاحة لكل طالب.</p><div style="margin-top:16px;font-weight:700">إدارة المدرس الخصوصي ←</div>
           </button>
+          <button type="button" id="gateway-video-library" style="border:1px solid var(--border);border-radius:20px;padding:30px 24px;background:linear-gradient(145deg,#ecfeff,#fff);cursor:pointer;text-align:right;box-shadow:0 10px 30px #0f172a12">
+            <div style="font-size:52px;margin-bottom:12px">🎬</div><h2 style="margin:0 0 8px">مكتبة الفيديوهات</h2><p style="margin:0;color:var(--muted);line-height:1.8">إضافة الفيديوهات التعليمية ورفعها، تنظيم التصنيفات والأسعار، النشر، ومراجعة طلبات الشراء والتحويلات.</p><div style="margin-top:16px;font-weight:700">إدارة مكتبة الفيديوهات ←</div>
+          </button>
         </div>
       </div>`;
   }
@@ -158,6 +161,15 @@
     const notificationsButton=host.querySelector('#gateway-notifications');
     if(notificationsButton) notificationsButton.onclick=openExistingNotifications;
     host.querySelector('#gateway-ai').onclick=openAiDashboard;
+    const videoLibraryButton=host.querySelector('#gateway-video-library');
+    if(videoLibraryButton) videoLibraryButton.onclick=()=>{
+      closeGateway();
+      if(!window.academyVideoLibrary || typeof window.showPage!=='function'){
+        alert('مكتبة الفيديوهات غير جاهزة. حدّث الصفحة وحاول مرة أخرى.');
+        return;
+      }
+      window.showPage('academy-videos');
+    };
     window.scrollTo({top:0,behavior:'smooth'});
   }
   function openGateway() { showGatewayHome(); }
