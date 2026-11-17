@@ -15,8 +15,9 @@
     else alert(message);
   }
   function supa() {
-    if (!window.sb) throw new Error('اتصال قاعدة البيانات غير جاهز');
-    return window.sb;
+    if (typeof sb !== 'undefined' && sb) return sb;
+    if (window.sb) return window.sb;
+    throw new Error('اتصال قاعدة البيانات غير جاهز');
   }
   function getContent() {
     return $('student-portal-content');
@@ -91,7 +92,7 @@
   }
 
   async function saveGateway() {
-    if (window.currentUser?.role !== 'admin') return toast('الإدارة فقط', 'error');
+    if (!(typeof currentUser !== 'undefined' && currentUser?.role === 'admin')) return toast('الإدارة فقط', 'error');
     const value = String($('av-gateway-url')?.value || '').trim().replace(/\/$/, '');
     if (value && !/^https:\/\//i.test(value)) return toast('أدخل رابط HTTPS صحيحًا', 'error');
     const {error} = await supa().from('academy_video_settings').upsert({
@@ -103,7 +104,7 @@
   }
 
   async function uploadVideo() {
-    if (window.currentUser?.role !== 'admin') return toast('الإدارة فقط', 'error');
+    if (!(typeof currentUser !== 'undefined' && currentUser?.role === 'admin')) return toast('الإدارة فقط', 'error');
     const title = String($('av-title')?.value || '').trim();
     const file = $('av-file')?.files?.[0];
     const price = Number($('av-price')?.value);
@@ -219,7 +220,7 @@
   }
 
   async function openStudentLibrary() {
-    if (!window.studentPortalFaceToken) return toast('انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.','error');
+    if (!(typeof studentPortalFaceToken !== 'undefined' ? studentPortalFaceToken : null)) return toast('انتهت جلسة التحقق؛ سجّل الدخول مرة أخرى.','error');
     const box = getContent();
     if (!box) return;
     box.innerHTML = '<div style="padding:20px;text-align:center">جاري تحميل مكتبة الفيديوهات...</div>';
@@ -297,7 +298,7 @@
     const video = studentVideos.find(v=>v.id===id);
     if (!video?.has_access) return toast('لا توجد صلاحية مشاهدة فعالة','error');
     const box = getContent();
-    const watermark = esc((window.unifiedPortalStudent?.name||'طالب')+' · قيد '+(window.unifiedPortalStudent?.enrollment_number||window.unifiedPortalStudent?.id||''));
+    const watermark = esc(((typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.name : '')||'طالب')+' · قيد '+((typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.enrollment_number : '')||(typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.id : '')||''));
     box.innerHTML = `
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
         <h3 style="margin:0">${esc(video.title)}</h3><button class="btn btn-outline" onclick="academyVideoLibrary.openStudentLibrary()">رجوع للمكتبة</button>
@@ -315,7 +316,7 @@
   function install() {
     if (window.__academyVideoLibraryInstalled) return;
     window.__academyVideoLibraryInstalled = true;
-    if (window.ADMIN_ONLY_PAGES?.add) window.ADMIN_ONLY_PAGES.add(PAGE);
+    if (typeof ADMIN_ONLY_PAGES !== 'undefined' && ADMIN_ONLY_PAGES?.add) ADMIN_ONLY_PAGES.add(PAGE);
     ensureAdminPage();
 
     if (typeof window.showPage === 'function') {
