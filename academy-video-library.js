@@ -30,7 +30,7 @@
 
   function ensureAdminPage() {
     if (!$('page-' + PAGE)) {
-      const host = document.querySelector('.content') || document.body;
+      const host = document.querySelector('#app-screen .content') || document.querySelector('#app-screen .main .content') || document.body;
       const page = document.createElement('div');
       page.id = 'page-' + PAGE;
       page.className = 'page';
