@@ -6,7 +6,7 @@
 
   const STYLE_ID = 'andalus-3d-icons-style';
   const ICON_SELECTOR = '.nav-icon,.nav-card-icon,.gs-result-icon';
-  const EMOJI_RE = /\\p{Extended_Pictographic}(?:\\uFE0F|\\uFE0E)?(?:\\u200D\\p{Extended_Pictographic}(?:\\uFE0F|\\uFE0E)?)*|[0-9#*]\\uFE0F?\\u20E3/gu;
+  const EMOJI_RE = /\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?)*|[0-9#*]\uFE0F?\u20E3/gu;
 
   function installStyles() {
     if (document.getElementById(STYLE_ID)) return;
