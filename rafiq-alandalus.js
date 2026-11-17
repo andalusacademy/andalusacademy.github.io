@@ -73,8 +73,14 @@ async function loadFacts(){
 function arabicVoice(){
  if(!('speechSynthesis'in window))return null;
  var voices=window.speechSynthesis.getVoices()||[];
- voiceCache=voices.filter(function(v){return /^ar[-_]EG$/i.test(v.lang||'')});
- return voiceCache.find(function(v){return /male|man|mascul|shakir|hesham|mohamed/i.test(v.name||'')})||voiceCache[0]||null
+ var arabic=voices.filter(function(v){return /^ar([_-]|$)/i.test(v.lang||'')});
+ var egyptian=arabic.filter(function(v){return /^ar[-_]EG$/i.test(v.lang||'')});
+ var malePattern=/male|man|mascul|shakir|hesham|mohamed|طارق|حسام|محمد|عمر/i;
+ voiceCache=egyptian.length?egyptian:arabic;
+ return egyptian.find(function(v){return malePattern.test(v.name||'')})||
+        egyptian[0]||
+        arabic.find(function(v){return malePattern.test(v.name||'')})||
+        arabic[0]||null
 }
 function soundFx(kind){
  try{
