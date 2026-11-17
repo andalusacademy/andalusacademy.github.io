@@ -331,6 +331,39 @@
       <p style="font-size:12px;color:var(--muted)">المشاهدة متاحة للحساب صاحب الصلاحية فقط. قد لا تمنع هذه الحماية تصوير الشاشة بوسائل خارجية.</p>`;
   }
 
+  function installStudentLibraryTile() {
+    const host = getContent();
+    if (!host || !videoSessionToken()) return;
+    if (host.querySelector('[data-academy-video-student-tile]')) return;
+
+    const existingTile = [...host.querySelectorAll('button,a,[role="button"],.student-portal-tile')]
+      .find(el => !el.closest('[data-academy-video-student-tile]') && (el.textContent || '').trim().length > 2);
+    const grid = host.querySelector('.student-portal-grid') || existingTile?.parentElement || host;
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'btn student-portal-tile';
+    tile.dataset.academyVideoStudentTile = '1';
+    tile.setAttribute('aria-label', 'مكتبة الفيديوهات التعليمية');
+    tile.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;width:100%;min-height:132px;padding:18px;border:1px solid #bae6fd;border-radius:16px;background:linear-gradient(145deg,#ecfeff,#fff);color:inherit;cursor:pointer;text-align:center;box-shadow:0 8px 22px #0f172a10;';
+    tile.innerHTML = '<span style="font-size:38px;line-height:1">🎬</span><strong>مكتبة الفيديوهات التعليمية</strong><span style="font-size:12px;color:var(--muted)">شاهد المحاضرات والدروس</span>';
+    tile.addEventListener('click', openStudentLibrary);
+    grid.appendChild(tile);
+  }
+
+  function hookStudentLibraryTile() {
+    if (typeof window.renderStudentPortalMenu === 'function' && !window.renderStudentPortalMenu.__academyVideoTileHook) {
+      const original = window.renderStudentPortalMenu;
+      const wrapped = function() {
+        const result = original.apply(this, arguments);
+        Promise.resolve().then(installStudentLibraryTile);
+        return result;
+      };
+      wrapped.__academyVideoTileHook = true;
+      window.renderStudentPortalMenu = wrapped;
+    }
+    installStudentLibraryTile();
+  }
+
   function install() {
     if (window.__academyVideoLibraryInstalled) return;
     window.__academyVideoLibraryInstalled = true;
@@ -343,9 +376,11 @@
     if (!window.__academyVideoLibraryObserver && document.body) {
       window.__academyVideoLibraryObserver = new MutationObserver(() => {
         ensureAdminPage();
+        hookStudentLibraryTile();
       });
       window.__academyVideoLibraryObserver.observe(document.body, { childList: true, subtree: true });
     }
+    hookStudentLibraryTile();
 
     if (typeof window.showPage === 'function') {
       const original = window.showPage;
