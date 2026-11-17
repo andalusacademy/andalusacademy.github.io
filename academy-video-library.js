@@ -14,7 +14,12 @@
     if (typeof window.showToast === 'function') window.showToast(message, type || 'info');
     else alert(message);
   }
-  function isAdmin() { try { return typeof currentUser !== 'undefined' && currentUser?.role === 'admin'; } catch (_) { return false; } }\n  function videoSessionToken() { try { return typeof studentPortalFaceToken !== 'undefined' ? studentPortalFaceToken : null; } catch (_) { return null; } }\n  function studentDisplayName() { try { return typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.name || '' : ''; } catch (_) { return ''; } }\n  function studentEnrollment() { try { return typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.enrollment_number || '' : ''; } catch (_) { return ''; } }\n  function studentIdDisplay() { try { return typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.id || '' : ''; } catch (_) { return ''; } }\n  function supa() {
+  function isAdmin() { try { return typeof currentUser !== 'undefined' && currentUser?.role === 'admin'; } catch (_) { return false; } }
+  function videoSessionToken() { try { return typeof studentPortalFaceToken !== 'undefined' ? studentPortalFaceToken : null; } catch (_) { return null; } }
+  function studentDisplayName() { try { return typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.name || '' : ''; } catch (_) { return ''; } }
+  function studentEnrollment() { try { return typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.enrollment_number || '' : ''; } catch (_) { return ''; } }
+  function studentIdDisplay() { try { return typeof unifiedPortalStudent !== 'undefined' ? unifiedPortalStudent?.id || '' : ''; } catch (_) { return ''; } }
+  function supa() {
     if (typeof sb !== 'undefined' && sb) return sb;
     if (window.sb) return window.sb;
     throw new Error('اتصال قاعدة البيانات غير جاهز');
