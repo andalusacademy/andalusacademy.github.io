@@ -180,7 +180,7 @@ begin
   if v_student_id is null then return jsonb_build_object('ok',false,'reason','session_expired'); end if;
   select gateway_url into v_gateway from public.academy_video_settings where singleton=true;
   select coalesce(jsonb_agg(jsonb_build_object('id',v.id,'title',v.title,'description',v.description,'category',v.category,
-    'price',v.price,'validity_days',v.validity_days,'created_at',v.created_at,
+    'price',v.price,'validity_days',v.validity_days,'content_type',v.content_type,'created_at',v.created_at,
     'has_access',exists(select 1 from public.academy_video_entitlements e where e.student_id=v_student_id and e.video_id=v.id
       and e.revoked_at is null and e.starts_at<=now() and (e.expires_at is null or e.expires_at>now())),
     'access_expires_at',(select max(e.expires_at) from public.academy_video_entitlements e where e.student_id=v_student_id and e.video_id=v.id
