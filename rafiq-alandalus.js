@@ -73,9 +73,8 @@ async function loadFacts(){
 function arabicVoice(){
  if(!('speechSynthesis'in window))return null;
  var voices=window.speechSynthesis.getVoices()||[];
- voiceCache=voices.filter(function(v){return /^ar([_-]|$)/i.test(v.lang||'')});
- var egypt=voiceCache.filter(function(v){return /^ar[-_]EG$/i.test(v.lang||'')});
- return egypt.find(function(v){return /male|man|mascul|shakir|hesham|mohamed/i.test(v.name||'')})||egypt[0]||voiceCache.find(function(v){return /male|man|mascul/i.test(v.name||'')})||voiceCache[0]||null
+ voiceCache=voices.filter(function(v){return /^ar[-_]EG$/i.test(v.lang||'')});
+ return voiceCache.find(function(v){return /male|man|mascul|shakir|hesham|mohamed/i.test(v.name||'')})||voiceCache[0]||null
 }
 function soundFx(kind){
  try{
@@ -105,8 +104,7 @@ async function speak(parts){
  if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance)return false;
  var synth=window.speechSynthesis,voice=arabicVoice(),tries=0;
  while(!voice&&tries<18){await new Promise(function(resolve){setTimeout(resolve,150)});voice=arabicVoice();tries++}
- if(!voice){console.warn('Rafiq: لا يوجد صوت عربي متاح. ثبّت صوت العربية (مصر) على الجهاز لتفعيل الكلام باللهجة المصرية.');return false}
- if(!/^ar[-_]EG$/i.test(voice.lang||''))console.warn('Rafiq: الصوت العربي المصري ar-EG غير متاح؛ المستخدم الحالي صوت عربي بديل وقد يختلف نطقه عن اللهجة المصرية.');
+ if(!voice){var available=(window.speechSynthesis.getVoices()||[]).filter(function(v){return /^ar([_-]|$)/i.test(v.lang||'')}).map(function(v){return v.name+' ['+v.lang+']'});console.warn('Rafiq: محتاج صوت عربي مصري ar-EG. الأصوات العربية المتاحة حالياً:',available);return false}
  var chunks=parts.filter(Boolean).map(spokenText),i=0;
  function next(){if(i>=chunks.length){var root=document.getElementById(ID);if(root)root.classList.remove('talk');return}var u=new SpeechSynthesisUtterance(chunks[i++]);u.lang=voice.lang;u.voice=voice;u.rate=.94;u.pitch=1.03;u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};u.onend=next;u.onerror=function(e){console.warn('Rafiq speech error:',e.error);next()};synth.speak(u)}
  try{synth.cancel();next();return true}catch(e){return false}
@@ -117,7 +115,7 @@ async function play(replay){
   var root=mount();kungfuCombo(root);
   var details=[];try{details=await loadFacts()}catch(e){console.warn('Rafiq facts unavailable:',e);details=['تابع إشعاراتك وبياناتك من بوابة الطالب.']}
   var name=String(student.name||'يا بطل').trim().split(/\s+/).slice(0,2).join(' ');
-  var lines=['إزيك يا '+name+'؟ عامل إيه يا بطل؟','أنا رفيق الأندلس، صاحبك في الأكاديمية! يلا نفوق كده ونبدأ يومنا بنشاط.','استعد للحركة! واحد... اتنين... كونغ فو! هُووب! هااا!','عاش يا وحش! افتكر تراجع دروسك وتتابع إشعاراتك أول بأول.'].concat(details).concat(['شد حيلك يا بطل، إنت قدها! أشوفك على خير يا نجم.']);
+  var lines=['إزيك يا '+name+'؟ عامل إيه يا بطل؟','أنا رفيق الأندلس، صاحبك في الأكاديمية. يلا بينا نفوق ونبدأ يومنا بنشاط!','خد بالك، أنا جاهز! واحد، اتنين، تلاتة... كونغ فو! هُوب! هاااي!','عاش يا وحش! افتكر تذاكر وتراجع دروسك، وتبص على إشعاراتك كل يوم.'].concat(details.map(function(x){return String(x).replace(/بص يا بطل/g,'بص يا نجم').replace(/خلي بالك/g,'خد بالك').replace(/لحد دلوقتي/g,'لغاية دلوقتي')})).concat(['شد حيلك يا بطل، إنت قدها وقدود! يلا سلام يا نجم.']);
   await speak(lines);
  }finally{busy=false}
 }
