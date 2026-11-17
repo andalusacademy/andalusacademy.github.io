@@ -28,13 +28,35 @@
     return $('student-portal-content');
   }
 
+  function ensureAdminNav() {
+    if (!isAdmin() || document.querySelector('[data-academy-video-nav]')) return;
+    const nav = document.querySelector(
+      '.sidebar-nav, #sidebar-nav, .sidebar-menu, .sidebar .nav, #sidebar .nav, .sidebar'
+    ) || (() => {
+      const existing = document.querySelector('.sidebar .nav-item, #sidebar .nav-item, .sidebar-menu .nav-item, .sidebar-nav .nav-item');
+      return existing?.parentElement || null;
+    })();
+    if (!nav) return;
+    const item = document.createElement('div');
+    item.className = 'nav-item';
+    item.dataset.academyVideoNav = '1';
+    item.innerHTML = '<span class="nav-icon">🎬</span><span>مكتبة الفيديوهات</span>';
+    item.addEventListener('click', () => window.showPage && window.showPage(PAGE));
+    nav.appendChild(item);
+  }
+
   function ensureAdminPage() {
     if (!$('page-' + PAGE)) {
-      const host = document.querySelector('#app-screen .content') || document.querySelector('#app-screen .main .content') || document.body;
-      const page = document.createElement('div');
-      page.id = 'page-' + PAGE;
-      page.className = 'page';
-      page.innerHTML = `
+      const host = document.querySelector('#app-screen .content') ||
+        document.querySelector('#app-screen .main .content') ||
+        document.querySelector('#app-screen .main') ||
+        document.querySelector('#app-screen') ||
+        document.querySelector('.app-screen .content');
+      if (host) {
+        const page = document.createElement('div');
+        page.id = 'page-' + PAGE;
+        page.className = 'page';
+        page.innerHTML = `
         <div class="card" style="padding:18px;margin-bottom:16px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
             <div><h3 style="margin:0;color:var(--navy)">🎬 مكتبة الفيديوهات التعليمية</h3>
@@ -74,19 +96,10 @@
         <div class="card" style="padding:18px">
           <h3 style="margin:0 0 12px">طلبات الشراء ومراجعة التحويلات</h3><div id="av-admin-orders">جاري التحميل...</div>
         </div>`;
-      host.appendChild(page);
-    }
-    if (!document.querySelector('.sidebar-nav [data-academy-video-nav]')) {
-      const nav = document.querySelector('.sidebar-nav');
-      if (nav) {
-        const item = document.createElement('div');
-        item.className = 'nav-item';
-        item.dataset.academyVideoNav = '1';
-        item.innerHTML = '<span class="nav-icon">🎬</span><span>مكتبة الفيديوهات</span>';
-        item.addEventListener('click', () => window.showPage && window.showPage(PAGE));
-        nav.appendChild(item);
+        host.appendChild(page);
       }
     }
+    ensureAdminNav();
   }
 
   async function getGateway() {
@@ -323,10 +336,21 @@
     window.__academyVideoLibraryInstalled = true;
     if (typeof ADMIN_ONLY_PAGES !== 'undefined' && ADMIN_ONLY_PAGES?.add) ADMIN_ONLY_PAGES.add(PAGE);
     ensureAdminPage();
+    ensureAdminNav();
+
+    // The administration shell/sidebar may be rendered only after login.
+    // Watch for that late render and attach the page/link as soon as it exists.
+    if (!window.__academyVideoLibraryObserver && document.body) {
+      window.__academyVideoLibraryObserver = new MutationObserver(() => {
+        ensureAdminPage();
+      });
+      window.__academyVideoLibraryObserver.observe(document.body, { childList: true, subtree: true });
+    }
 
     if (typeof window.showPage === 'function') {
       const original = window.showPage;
       window.showPage = function(page) {
+        ensureAdminPage();
         if (page === PAGE && !isAdmin()) {
           toast('مكتبة الفيديوهات متاحة للإدارة فقط','error');
           return original('dashboard');
@@ -334,7 +358,7 @@
         const result = original.apply(this, arguments);
         if (page === PAGE) {
           const title = $('page-title'); if (title) title.textContent = 'مكتبة الفيديوهات التعليمية';
-          document.querySelectorAll('.sidebar-nav .nav-item').forEach(n=>n.classList.toggle('active',!!n.dataset.academyVideoNav));
+          document.querySelectorAll('.nav-item').forEach(n=>{ if (n.dataset.academyVideoNav) n.classList.add('active'); });
           void loadAdmin();
         }
         return result;
