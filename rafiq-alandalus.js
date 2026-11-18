@@ -87,6 +87,22 @@ async function loadFacts(){
   if(extras)out.push('وفيه مصروفات مستقلة لسه مستحقة '+money(extras)+'.');
   if(remaining===null&&!extras)out.push('محتاجين نراجع حساب الرسوم من لوحة الإدارة عشان أقولك الرقم بدقة.');
  }else out.push('مش ظاهر عندي سجل مصروفات ليك دلوقتي.');
+ try{
+  var grades=Array.isArray(facts.exam_grades)?facts.exam_grades:[];
+  if(grades.length){
+   var gl=grades.slice(0,3).map(function(g){return 'في '+(g.subject||'الامتحان')+' جبت '+numberWords(Math.round(Number(g.score)||0))+(g.max_score?' من '+numberWords(Math.round(Number(g.max_score)||0)):'')}).join('، ');
+   out.push('وفيه درجات امتحانات اتضافت جديد: '+gl+'.');
+  }
+ }catch(e){}
+ try{
+  var nres=await db.rpc('get_portal_notifications',{p_student_id:String(student.id),p_phone:String(phone),p_portal_type:'student'});
+  var nlist=nres&&nres.data&&nres.data.verified===true&&Array.isArray(nres.data.notifications)?nres.data.notifications:[];
+  var unread=nlist.filter(function(n){return !n.is_read});
+  if(unread.length){
+   var titles=unread.slice(0,2).map(function(n){return String(n.title||'').trim()}).filter(Boolean).join('، وكمان ');
+   out.push('عندك '+numberWords(unread.length)+(unread.length>2?' إشعارات':unread.length===2?' إشعارين':' إشعار')+' جداد'+(titles?'، أولهم: '+titles:'')+'.');
+  }else out.push('مفيش إشعارات جديدة دلوقتي.');
+ }catch(e){}
  return out
 }
 function arabicVoice(){
@@ -142,7 +158,7 @@ function kungfuCombo(root){
  setTimeout(function(){runner.classList.remove('kungfu','karate');runner.classList.add('turn')},1850);
  setTimeout(function(){runner.classList.remove('turn')},2550);
 }
-function speakOnce(text){
+function deviceSpeak(text){
  return new Promise(function(resolve){
   if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance){console.warn('Rafiq: SpeechSynthesis غير مدعوم في المتصفح');resolve(false);return}
   var synth=window.speechSynthesis,voice=arabicVoice(),u=new SpeechSynthesisUtterance(spokenText(text)),finished=false;
@@ -156,6 +172,28 @@ function speakOnce(text){
   u.onerror=function(e){console.warn('Rafiq speech error:',e.error,'lang:',u.lang);done(false)};
   try{synth.resume();synth.speak(u)}catch(e){console.warn('Rafiq speak failed:',e);done(false)}
  });
+}
+var ttsAudio=null;
+function chunkText(t){var out=[],cur='';String(t).split(/(?<=[.!؟?،])\s+/).forEach(function(p){if((cur+' '+p).length>1400&&cur){out.push(cur);cur=p}else cur=cur?cur+' '+p:p});if(cur)out.push(cur);return out}
+function remoteSpeak(text){
+ return new Promise(function(resolve){
+  var base=window.ANDALUS_RAFIQ_TTS_URL;if(!base){resolve(null);return}
+  var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},9000),root=document.getElementById(ID);
+  fetch(String(base).replace(/\/$/,'')+'/speak',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text}),signal:ctl.signal})
+  .then(function(r){clearTimeout(to);if(!r.ok)throw new Error('tts '+r.status);return r.blob()})
+  .then(function(b){
+   var u=URL.createObjectURL(b),a=new Audio(u),fin=false;ttsAudio=a;
+   function end(ok){if(fin)return;fin=true;if(root)root.classList.remove('talk');try{URL.revokeObjectURL(u)}catch(e){}resolve(ok?true:null)}
+   a.onplay=function(){if(root)root.classList.add('talk')};a.onended=function(){end(true)};a.onerror=function(){end(false)};
+   var pr=a.play();if(pr&&pr.catch)pr.catch(function(){end(false)});
+  }).catch(function(){clearTimeout(to);resolve(null)});
+ });
+}
+async function speakOnce(text){
+ if(!window.ANDALUS_RAFIQ_TTS_URL)return deviceSpeak(text);
+ var parts=chunkText(spokenText(text));
+ for(var i=0;i<parts.length;i++){var r=await remoteSpeak(parts[i]);if(!r){if(i===0)return deviceSpeak(text);return false}}
+ return true;
 }
 async function play(replay){
  var student=getStudent();if(busy||!student||!student.id)return;busy=true;
@@ -176,7 +214,7 @@ async function play(replay){
 }
 function install(){var original=window.renderStudentPortalMenu;if(typeof original!=='function'||original.__rafiqWrapped)return false;var wrapped=function(){var result=original.apply(this,arguments);if(getStudent()&&getStudent().id)mount();return result};wrapped.__rafiqWrapped=true;window.renderStudentPortalMenu=wrapped;return true}
 if(!install()){var attempts=0,t=setInterval(function(){attempts++;if(install()||attempts>80)clearInterval(t)},250)}
-document.addEventListener('visibilitychange',function(){if(document.hidden&&'speechSynthesis'in window)try{window.speechSynthesis.cancel()}catch(e){}});
+document.addEventListener('visibilitychange',function(){if(document.hidden){try{if(ttsAudio)ttsAudio.pause()}catch(e){}if('speechSynthesis'in window)try{window.speechSynthesis.cancel()}catch(e){}}});
 window.addEventListener('pagehide',function(){if('speechSynthesis'in window)try{window.speechSynthesis.cancel()}catch(e){}});
 if('speechSynthesis'in window)window.speechSynthesis.onvoiceschanged=function(){arabicVoice()};
 })();
