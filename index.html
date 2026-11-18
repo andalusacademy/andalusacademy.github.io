@@ -8,7 +8,7 @@
 </script>
 <meta name="theme-color" content="#1a2a4a">
 <meta name="description" content="نظام إدارة مركز الاندلس للتدريب">
-<meta name="andalus-build" content="direct-portal-v32-portal-cache-sync">
+<meta name="andalus-build" content="direct-portal-v33-admin-student-scope-fix">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a2a4a'/><text x='50' y='65' font-size='60' text-anchor='middle' fill='%23c9a84c' font-family='Arial'>A</text></svg>">
 <title>نظام مركز الاندلس للتدريب</title>
@@ -5752,7 +5752,7 @@ function renderRiskSection() {
   }).join('') + (atRisk.length > 8 ? `<div style="text-align:center;padding:10px;font-size:12px;color:var(--muted);">و ${atRisk.length - 8} طالب آخر معرّض للخطر...</div>` : '');
 }
 
-function dashboardScopedStudents(){const students=getCountedStudents().filter(s=>s.program_id);return dashboardBranch?students.filter(s=>normalizeStudentsBranch(s.branch)===normalizeStudentsBranch(dashboardBranch)):students;}
+function dashboardScopedStudents(){const students=getCountedStudents();return dashboardBranch?students.filter(s=>normalizeStudentsBranch(s.branch)===normalizeStudentsBranch(dashboardBranch)):students;}
 function dashboardStudentLine(student,detail,color){const safeId=String(student.id).replace(/[^a-zA-Z0-9_-]/g,'');return '<div onclick="openProfile(\''+safeId+'\')" style="padding:9px 13px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center;"><div style="min-width:0;"><strong style="font-size:12px;">'+escapeHtml(student.name)+'</strong><div style="font-size:10px;color:var(--muted);">'+escapeHtml(student.id)+' · '+escapeHtml(student.branch||'—')+'</div></div><span style="font-size:11px;font-weight:800;color:'+(color||'#475569')+';text-align:left;white-space:nowrap;">'+escapeHtml(detail||'')+'</span></div>';}
 function getStudentAcademicRisk(student){
  const rows=(allGradesGlobal||[]).filter(g=>g.student_id===student.id);let secondRound=0,failed=0,passed=0;
@@ -5897,7 +5897,7 @@ function renderCenterMood() {
   const bf = dashboardBranch;
   const countedStudents = getCountedStudents();
   const studentsInScope = bf ? countedStudents.filter(s => normalizeStudentsBranch(s.branch) === normalizeStudentsBranch(bf)) : countedStudents;
-  const activeStudents = studentsInScope.filter(s => s.program_id);
+  const activeStudents = studentsInScope;
 
   if (!activeStudents.length) {
     bar.style.background = '#94a3b8';
@@ -6048,7 +6048,7 @@ function updateDashboard() {
   document.getElementById('stat-programs').textContent = programsInScope.length;
 
   // متأخرين في الدفع (حالة حمراء = تجاوز فترة السماح)
-  const lateCount = studentsInScope.filter(s => s.program_id && getStudentPayStatus(s).status === 'red').length;
+  const lateCount = studentsInScope.filter(s => getStudentPayStatus(s).status === 'red').length;
   document.getElementById('stat-late-pay').textContent = lateCount;
 
   // حجوزات قيد الانتظار (حالة "جديد" لم يتم التواصل بعد)
