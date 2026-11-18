@@ -52,19 +52,36 @@
    if(total)total.textContent='المتأخرون حسب مستهدف الدفعة: '+late.length+' · إجمالي النقص المستحق: '+money(late.reduce((s,x)=>s+x.shortfall,0))+' · إجمالي المتبقي على رسوم الكورس: '+money(rows.reduce((s,x)=>s+x.courseRemaining,0));
    if(list)list.innerHTML=late.length?late.map(x=>dashboardStudentLine(x.student,'دفعة '+x.batch+' · '+x.type+' · نقص '+money(x.shortfall),'#dc2626')).join(''):'<div style="padding:12px;color:#15803a;font-size:12px;">لا يوجد متأخرون؛ كل الطلاب المصنفين بلغوا المستهدف الحالي أو تجاوزوه.</div>';
  }
+ const openBatches=new Set();
+ function toggleCohortOverdue(batch){
+   const panel=document.getElementById('cohort-overdue-names-'+batch);
+   const card=document.getElementById('cohort-overdue-card-'+batch);
+   if(!panel||!card)return;
+   const opening=panel.style.display==='none';
+   panel.style.display=opening?'block':'none';
+   card.setAttribute('aria-expanded',opening?'true':'false');
+   const hint=card.querySelector('.cohort-card-hint');
+   if(hint)hint.textContent=opening?'اضغط لإخفاء الأسماء':'اضغط لعرض أسماء الطلاب';
+   if(opening)openBatches.add(batch);else openBatches.delete(batch);
+ }
+ window.toggleCohortOverdue=toggleCohortOverdue;
+ function cohortNamesPanel(batch,list){
+   return '<div id="cohort-overdue-names-'+batch+'" style="display:'+(openBatches.has(batch)?'block':'none')+';padding:10px 12px 14px;border-top:1px solid var(--border);background:var(--surface, #fff);">'+
+   (list.length?list.map(x=>'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border);flex-wrap:wrap"><div style="min-width:0"><strong style="font-size:13px">'+esc(x.student.name)+'</strong><div style="font-size:11px;color:var(--muted)">قيد '+esc(x.student.id)+' · '+esc(x.type)+' · '+esc(x.branch)+'</div></div><div style="text-align:left;font-size:11px"><div>دفع: '+money(x.paid)+'</div><strong style="color:#dc2626">ناقص: '+money(x.shortfall)+'</strong></div></div>').join(''):'<div style="padding:12px;color:#15803a">لا يوجد طلاب متأخرون في هذه الدفعة.</div>')+
+   '</div>';
+ }
  function renderUnifiedCards(){
    const rows=dueRows(),groups=[8,10].map(batch=>{
      const list=rows.filter(x=>x.batch===batch),target=targetFor(batch);
-     return '<div class="stat-card" style="border-top:4px solid '+(batch===8?'#2563eb':'#d97706')+'"><div class="stat-label">دفعة '+batch+' — المستهدف '+money(target)+'</div><div class="stat-value" style="color:#dc2626">'+list.length+'</div><div class="stat-sub">إجمالي النقص '+money(list.reduce((s,x)=>s+x.shortfall,0))+'</div></div>';
+     return '<div id="cohort-overdue-card-'+batch+'" role="button" tabindex="0" aria-expanded="'+(openBatches.has(batch)?'true':'false')+'" onclick="toggleCohortOverdue('+batch+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleCohortOverdue('+batch+')}" class="stat-card" style="border-top:4px solid '+(batch===8?'#2563eb':'#d97706')+';cursor:pointer;transition:transform .15s,box-shadow .15s" title="اضغط لعرض أسماء الطلاب المتأخرين"><div class="stat-label">دفعة '+batch+' — المستهدف '+money(target)+'</div><div class="stat-value" style="color:#dc2626">'+list.length+'</div><div class="stat-sub">إجمالي النقص '+money(list.reduce((s,x)=>s+x.shortfall,0))+'</div><div class="cohort-card-hint" style="font-size:11px;color:var(--primary,#2563eb);font-weight:700;margin-top:7px">اضغط لعرض أسماء الطلاب</div>'+cohortNamesPanel(batch,list)+'</div>';
    });
-   const html='<div class="card" id="cohort-overdue-dashboard" style="margin-bottom:18px"><div class="card-header"><h3>📌 متابعة التحصيل الموحدة حسب الدفعة</h3><span style="font-size:11px;color:var(--muted)">يزيد المستهدف 750 جنيه مع بداية كل شهر</span></div><div class="stats-grid" style="padding:14px;margin:0">'+groups.join('')+'</div><div style="padding:0 14px 12px;font-size:11px;color:var(--muted)">المتأخر فقط من دفع أقل من المستهدف. هذه متابعة عرض فقط؛ لا تعديل على التسجيلات أو الإيصالات.</div></div>';
+   const html='<div class="card" id="cohort-overdue-dashboard" style="margin-bottom:18px"><div class="card-header"><h3>📌 متابعة التحصيل الموحدة حسب الدفعة</h3><span style="font-size:11px;color:var(--muted)">يزيد المستهدف 750 جنيه مع بداية كل شهر</span></div><div class="stats-grid" style="padding:14px;margin:0">'+groups.join('')+'</div><div style="padding:0 14px 12px;font-size:11px;color:var(--muted)">اضغط على كارت الدفعة لعرض أسماء المتأخرين. المتأخر فقط من دفع أقل من المستهدف.</div></div>';
    const dash=document.getElementById('page-dashboard');
    if(dash){const anchor=document.getElementById('dashboard-finance-summary');let card=document.getElementById('cohort-overdue-dashboard');if(!card){const w=document.createElement('div');w.innerHTML=html;card=w.firstElementChild;if(anchor)anchor.parentElement.insertBefore(card,anchor);else dash.prepend(card);}else card.outerHTML=html;}
    const pay=document.getElementById('page-payments');
-   if(pay){let card=document.getElementById('cohort-overdue-details');const detail='<div class="card" id="cohort-overdue-details" style="margin-bottom:18px"><div class="card-header"><h3>🚨 كشف المتأخرين الموحد — حسب الدفعة</h3><span style="font-size:11px;color:var(--muted)">المستهدف الحالي +750 شهريًا</span></div>'+[8,10].map(batch=>{
+   if(pay){let card=document.getElementById('cohort-overdue-details');const detail='<div class="card" id="cohort-overdue-details" style="margin-bottom:18px"><div class="card-header"><h3>🚨 كشف المتأخرين الموحد — حسب الدفعة</h3><span style="font-size:11px;color:var(--muted)">اضغط على الدفعة لعرض الأسماء</span></div>'+[8,10].map(batch=>{
      const list=rows.filter(x=>x.batch===batch);
-     return '<section style="padding:12px 14px;border-bottom:1px solid var(--border)"><strong>دفعة '+batch+'</strong> <span style="color:#b91c1c;font-weight:800">المستهدف '+money(targetFor(batch))+' · '+list.length+' متأخر</span>'+
-     (list.length?'<div style="overflow:auto"><table style="min-width:760px"><thead><tr><th>الطالب</th><th>رقم القيد</th><th>النظام</th><th>الفرع</th><th>المستهدف</th><th>المدفوع الفعلي</th><th>الناقص</th></tr></thead><tbody>'+list.map(x=>'<tr><td>'+esc(x.student.name)+'</td><td>'+esc(x.student.id)+'</td><td>'+esc(x.type)+'</td><td>'+esc(x.branch)+'</td><td>'+money(x.target)+'</td><td>'+money(x.paid)+'</td><td style="color:#dc2626;font-weight:800">'+money(x.shortfall)+'</td></tr>').join('')+'</tbody></table></div>':'<p style="color:#15803d">لا يوجد متأخرون في هذه الدفعة.</p>')+'</section>';
+     return '<section style="padding:12px 14px;border-bottom:1px solid var(--border)"><button type="button" onclick="toggleCohortOverdue('+batch+')" style="width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--card-bg,transparent);color:inherit;font:inherit;cursor:pointer"><strong>دفعة '+batch+' — '+list.length+' متأخر</strong><span style="color:#b91c1c;font-weight:800">المستهدف '+money(targetFor(batch))+' · نقص '+money(list.reduce((a,x)=>a+x.shortfall,0))+'</span></button>'+cohortNamesPanel(batch,list)+'</section>';
    }).join('')+'</div>';
    if(!card){const w=document.createElement('div');w.innerHTML=detail;const anchor=pay.querySelector('.stats-grid');if(anchor)pay.insertBefore(w.firstElementChild,anchor);else pay.prepend(w.firstElementChild);}else card.outerHTML=detail;
    }
