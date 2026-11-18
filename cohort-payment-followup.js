@@ -15,12 +15,12 @@
  function rows(){
    if(typeof getCountedStudents!=='function'||typeof getStudentCohort!=='function'||typeof getStudentPaymentSummary!=='function')return [];
    return getCountedStudents().map(student=>{
-     const cohort=getStudentCohort(student),batch=Number(cohort?.batch);
+     const cohort=getStudentCohort(student),linked=(allPrograms||[]).find(p=>p.id===student?.program_id),meta=[student?.system_name,student?.program,linked?.name].filter(Boolean).join(' ').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))),match=meta.match(/دفعة\\s*(8|10)/),batch=Number(cohort?.batch)||(match?Number(match[1]):null);
      if(![8,10].includes(batch))return null;
      const pay=getStudentPaymentSummary(student);
      const target=targetFor(batch),paid=Number(pay?.totalPaid)||0,remaining=Math.max(0,target-paid);
      if(!(paid<target))return null;
-     return {student,batch,target,paid,remaining,system:cohort.type==='professional'?'احترافي':cohort.type==='basic'?'أساسي':'غير محدد'};
+     return {student,batch,target,paid,remaining,system:typeof getStudentPaymentSystem==='function'?(getStudentPaymentSystem(student)==='النظام الاحترافي'?'احترافي':getStudentPaymentSystem(student)==='النظام الأساسي'?'أساسي':'غير محدد'):(cohort.type==='professional'?'احترافي':cohort.type==='basic'?'أساسي':'غير محدد')};
    }).filter(Boolean).sort((a,b)=>b.remaining-a.remaining||String(a.student.name||'').localeCompare(String(b.student.name||''),'ar'));
  }
  function summaryHtml(){
