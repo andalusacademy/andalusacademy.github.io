@@ -15,7 +15,7 @@
  function rows(){
    if(typeof getCountedStudents!=='function'||typeof getStudentCohort!=='function'||typeof getStudentPaymentSummary!=='function')return [];
    return getCountedStudents().map(student=>{
-     const cohort=getStudentCohort(student),linked=(allPrograms||[]).find(p=>p.id===student?.program_id),meta=[student?.system_name,student?.program,linked?.name].filter(Boolean).join(' ').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))),match=meta.match(/دفعة\\s*(8|10)/),batch=Number(cohort?.batch)||(match?Number(match[1]):null);
+     const cohort=getStudentCohort(student),linked=(allPrograms||[]).find(p=>p.id===student?.program_id),meta=[student?.system_name,student?.program,linked?.name].filter(Boolean).join(' ').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))),match=meta.match(/دفعة\s*(8|10)/),batch=Number(cohort?.batch)||(match?Number(match[1]):null);
      if(![8,10].includes(batch))return null;
      const pay=getStudentPaymentSummary(student);
      const target=targetFor(batch),paid=Number(pay?.totalPaid)||0,remaining=Math.max(0,target-paid);
