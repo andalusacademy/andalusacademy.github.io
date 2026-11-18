@@ -4,15 +4,16 @@ if (window.__andalusRafiqInstalled) return;
 window.__andalusRafiqInstalled = true;
 var ID='andalus-rafiq-root',busy=false,voiceCache=null;
 var css=[
-'#'+ID+'{position:fixed;z-index:2147483000;left:0;right:0;bottom:0;height:98px;pointer-events:none;overflow:visible;direction:ltr}',
-'#'+ID+' .runner{position:absolute;left:0;bottom:3px;width:78px;height:92px;pointer-events:auto;animation:rafiqPatrol 13s ease-in-out infinite alternate}',
-'#'+ID+' .stage{width:78px;height:92px;position:relative;cursor:pointer;filter:drop-shadow(0 7px 5px #183d5830)}',
+'#'+ID+'{position:fixed;z-index:2147483000;left:0;right:0;bottom:0;height:118px;pointer-events:none;overflow:visible;direction:ltr}',
+'#'+ID+' .runner{position:absolute;left:0;bottom:3px;width:96px;height:112px;pointer-events:auto;animation:rafiqPatrol 13s ease-in-out infinite alternate}',
+'#'+ID+' .stage{width:96px;height:112px;position:relative;cursor:pointer;filter:drop-shadow(0 7px 5px #183d5830)}',
 '#'+ID+' svg{width:100%;height:100%;overflow:visible;animation:rafiqHop .78s ease-in-out infinite}',
 '#'+ID+' .head{transform-box:fill-box;transform-origin:center bottom;animation:rafiqNod 2s ease-in-out infinite}',
 '#'+ID+' .armL,#'+ID+' .armR{transform-box:fill-box;transform-origin:top center;animation:rafiqSwing .65s ease-in-out infinite alternate}',
 '#'+ID+' .armR{animation-delay:-.32s}',
 '#'+ID+' .legL,#'+ID+' .legR{transform-box:fill-box;transform-origin:top center;animation:rafiqRun .42s ease-in-out infinite alternate}',
 '#'+ID+' .legR{animation-delay:-.21s}',
+'#'+ID+' .tail{transform-box:fill-box;transform-origin:left center;animation:rafiqTail .5s ease-in-out infinite alternate}@keyframes rafiqTail{to{transform:rotate(14deg)}}',
 '#'+ID+' .mouth{transform-box:fill-box;transform-origin:center;animation:rafiqMouth .2s ease-in-out infinite alternate}',
 '#'+ID+'.talk .mouth{animation-duration:.13s}',
 '#'+ID+' .tap{position:absolute;inset:0;border:0;background:transparent;cursor:pointer}',
@@ -39,7 +40,7 @@ var css=[
 '#'+ID+' .runner.kungfu .legR{animation:rafiqKick .48s ease-in-out 2 alternate}',
 '#'+ID+' .runner.karate .legR{animation:rafiqKick .48s ease-in-out 2 alternate}',
 '#'+ID+' .runner.kungfu svg{animation:rafiqHop .36s ease-in-out infinite}',
-'@keyframes rafiqPatrol{0%{left:4px;transform:scaleX(1)}48%{left:calc(100% - 82px);transform:scaleX(1)}52%{left:calc(100% - 82px);transform:scaleX(-1)}100%{left:4px;transform:scaleX(-1)}}',
+'@keyframes rafiqPatrol{0%{left:4px;transform:scaleX(1)}48%{left:calc(100% - 100px);transform:scaleX(1)}52%{left:calc(100% - 100px);transform:scaleX(-1)}100%{left:4px;transform:scaleX(-1)}}',
 '@keyframes rafiqHop{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-13px) rotate(-4deg)}50%{transform:translateY(0) rotate(0)}75%{transform:translateY(-8px) rotate(4deg)}}',
 '@keyframes rafiqNod{50%{transform:rotate(5deg)}}@keyframes rafiqSwing{to{transform:rotate(24deg)}}',
 '@keyframes rafiqRun{to{transform:rotate(28deg)}}@keyframes rafiqMouth{to{transform:scaleY(1.7)}}',
@@ -48,16 +49,26 @@ var css=[
 '@media(prefers-reduced-motion:reduce){#'+ID+' .runner{animation:none;left:10px}#'+ID+' .runner:not(.kungfu):not(.karate):not(.turn) svg,#'+ID+' .runner:not(.kungfu):not(.karate):not(.turn) *{animation:none!important}}'
 ].join('');
 function addStyle(){if(document.getElementById('andalus-rafiq-style'))return;var s=document.createElement('style');s.id='andalus-rafiq-style';s.textContent=css;document.head.appendChild(s)}
-function robotSvg(){return '<svg viewBox="0 0 180 210" role="img" aria-label="روبوت رفيق الأندلس الكيوت">'+
-'<defs><linearGradient id="rCuteBody" x1="0" y1="0" x2="0.9" y2="1"><stop stop-color="#fff"/><stop offset=".65" stop-color="#eaf7ff"/><stop offset="1" stop-color="#b8d9ed"/></linearGradient><linearGradient id="rCuteBlue" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#65dcff"/><stop offset="1" stop-color="#159bd4"/></linearGradient></defs>'+
-'<ellipse cx="90" cy="198" rx="48" ry="7" fill="#163e5a" opacity=".13"/>'+
-'<g class="legL"><path d="M67 157l-3 22q-1 9 9 10h8q9-2 7-11l-3-21" fill="url(#rCuteBody)" stroke="#4d7893" stroke-width="4"/><path d="M61 184q-3 11 9 13h15q10-2 7-12l-5-5H67z" fill="#168fc6" stroke="#28617f" stroke-width="3"/><path d="M69 189q8 4 16 0" fill="none" stroke="#b9f2ff" stroke-width="3" stroke-linecap="round"/></g>'+
-'<g class="legR"><path d="M99 157l-3 22q-1 9 9 10h8q9-2 7-11l-3-21" fill="url(#rCuteBody)" stroke="#4d7893" stroke-width="4"/><path d="M93 184q-3 11 9 13h15q10-2 7-12l-5-5H99z" fill="#168fc6" stroke="#28617f" stroke-width="3"/><path d="M101 189q8 4 16 0" fill="none" stroke="#b9f2ff" stroke-width="3" stroke-linecap="round"/></g>'+
-'<path d="M90 89v-12" stroke="#4d7893" stroke-width="6" stroke-linecap="round"/><circle cx="90" cy="72" r="9" fill="#ffd35c" stroke="#4d7893" stroke-width="3"/>'+
-'<rect x="42" y="88" width="96" height="78" rx="30" fill="url(#rCuteBody)" stroke="#4d7893" stroke-width="5"/><rect x="74" y="113" width="32" height="31" rx="13" fill="#2aa8d8" opacity=".9"/><path d="M82 127h16" stroke="#eaffff" stroke-width="4" stroke-linecap="round"/><circle cx="90" cy="153" r="5" fill="#ffd35c"/>'+
-'<g class="armL"><path d="M47 111Q31 119 26 137" fill="none" stroke="#4d7893" stroke-width="13" stroke-linecap="round"/><path d="M26 137l-3 9" stroke="#bde8f8" stroke-width="13" stroke-linecap="round"/><circle cx="21" cy="150" r="11" fill="url(#rCuteBlue)" stroke="#4d7893" stroke-width="3"/><path d="M17 150h8" stroke="#eaffff" stroke-width="3" stroke-linecap="round"/></g>'+
-'<g class="armR"><path d="M133 111q16 8 21 26" fill="none" stroke="#4d7893" stroke-width="13" stroke-linecap="round"/><path d="M154 137l3 9" stroke="#bde8f8" stroke-width="13" stroke-linecap="round"/><circle cx="159" cy="150" r="11" fill="url(#rCuteBlue)" stroke="#4d7893" stroke-width="3"/><path d="M155 150h8" stroke="#eaffff" stroke-width="3" stroke-linecap="round"/></g>'+
-'<g class="head"><rect x="28" y="12" width="124" height="91" rx="37" fill="url(#rCuteBody)" stroke="#4d7893" stroke-width="5"/><rect x="39" y="25" width="102" height="62" rx="25" fill="#16435f"/><ellipse cx="68" cy="53" rx="11" ry="14" fill="#76e5ff"/><ellipse cx="112" cy="53" rx="11" ry="14" fill="#76e5ff"/><circle cx="72" cy="48" r="4" fill="#fff"/><circle cx="116" cy="48" r="4" fill="#fff"/><ellipse cx="51" cy="69" rx="8" ry="4" fill="#ff9fb1" opacity=".8"/><ellipse cx="129" cy="69" rx="8" ry="4" fill="#ff9fb1" opacity=".8"/><path class="mouth" d="M75 68q15 18 30 0" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="25" cy="58" r="9" fill="#55c9ed" stroke="#4d7893" stroke-width="3"/><circle cx="155" cy="58" r="9" fill="#55c9ed" stroke="#4d7893" stroke-width="3"/></g></svg>'}
+function robotSvg(){return '<svg viewBox="0 0 180 210" role="img" aria-label="رفيق الأندلس بطل الكاراتيه">'+
+'<defs><linearGradient id="rGi" x1="0" y1="0" x2="0.8" y2="1"><stop stop-color="#fff"/><stop offset=".7" stop-color="#f1f6fb"/><stop offset="1" stop-color="#cfdbe8"/></linearGradient><linearGradient id="rHelm" x1="0" y1="0" x2="0.9" y2="1"><stop stop-color="#fff"/><stop offset=".6" stop-color="#e6f4ff"/><stop offset="1" stop-color="#a9d2ea"/></linearGradient><linearGradient id="rFist" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffb347"/><stop offset="1" stop-color="#f07b16"/></linearGradient></defs>'+
+'<ellipse cx="90" cy="201" rx="50" ry="7" fill="#163e5a" opacity=".16"/>'+
+'<g class="legL"><path d="M65 156l-5 26q-1 8 8 9h13q8-1 7-9l-3-26z" fill="url(#rGi)" stroke="#6d86a3" stroke-width="4" stroke-linejoin="round"/><path d="M57 190q-2 12 11 13h17q10-2 6-12l-6-3H62z" fill="#243b55" stroke="#14243a" stroke-width="3"/><path d="M64 197q8 3 15 0" fill="none" stroke="#6f9bc4" stroke-width="3" stroke-linecap="round"/></g>'+
+'<g class="legR"><path d="M97 156l-3 26q-1 8 7 9h13q9-1 8-9l-5-26z" fill="url(#rGi)" stroke="#6d86a3" stroke-width="4" stroke-linejoin="round"/><path d="M92 190q-2 12 11 13h17q10-2 6-12l-6-3H97z" fill="#243b55" stroke="#14243a" stroke-width="3"/><path d="M99 197q8 3 15 0" fill="none" stroke="#6f9bc4" stroke-width="3" stroke-linecap="round"/></g>'+
+'<rect x="40" y="88" width="100" height="80" rx="30" fill="url(#rGi)" stroke="#6d86a3" stroke-width="5"/>'+
+'<path d="M68 91L92 134" fill="none" stroke="#9db2c7" stroke-width="5" stroke-linecap="round"/><path d="M112 91L84 136" fill="none" stroke="#9db2c7" stroke-width="5" stroke-linecap="round"/>'+
+'<circle cx="118" cy="114" r="9" fill="#ffd35c" stroke="#a67c00" stroke-width="2.5"/><path d="M118 108l2.6 4.8 5.4.9-3.9 3.8.9 5.4-5-2.5-5 2.5.9-5.4-3.9-3.8 5.4-.9z" fill="#c98f00"/>'+
+'<rect x="40" y="139" width="100" height="15" rx="6" fill="#1b1b24" stroke="#000" stroke-width="2"/><circle cx="90" cy="146" r="8" fill="#26263a" stroke="#000" stroke-width="2"/><path d="M86 152l-9 14M94 152l9 14" stroke="#1b1b24" stroke-width="6" stroke-linecap="round"/><path d="M52 144h22" stroke="#4a4a63" stroke-width="2" stroke-linecap="round"/>'+
+'<g class="armL"><path d="M46 110Q29 120 24 141" fill="none" stroke="#6d86a3" stroke-width="20" stroke-linecap="round"/><path d="M46 110Q29 120 24 141" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round"/><circle cx="22" cy="152" r="12" fill="url(#rFist)" stroke="#8a4308" stroke-width="3"/><path d="M16 150h12M16 155h12" stroke="#ffd9a0" stroke-width="2" stroke-linecap="round"/></g>'+
+'<g class="armR"><path d="M134 110Q151 120 156 141" fill="none" stroke="#6d86a3" stroke-width="20" stroke-linecap="round"/><path d="M134 110Q151 120 156 141" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round"/><circle cx="158" cy="152" r="12" fill="url(#rFist)" stroke="#8a4308" stroke-width="3"/><path d="M152 150h12M152 155h12" stroke="#ffd9a0" stroke-width="2" stroke-linecap="round"/></g>'+
+'<g class="head"><path d="M90 14V7" stroke="#6d86a3" stroke-width="5" stroke-linecap="round"/><circle cx="90" cy="6" r="6" fill="#ffd35c" stroke="#a67c00" stroke-width="2.5"/>'+
+'<rect x="28" y="12" width="124" height="92" rx="38" fill="url(#rHelm)" stroke="#6d86a3" stroke-width="5"/><rect x="38" y="30" width="104" height="60" rx="26" fill="#16435f"/>'+
+'<path d="M30 33Q90 9 150 33" fill="none" stroke="#d62839" stroke-width="7"/><path d="M30 39.5Q90 15.5 150 39.5" fill="none" stroke="#fff" stroke-width="7"/><path d="M30 46Q90 22 150 46" fill="none" stroke="#14141c" stroke-width="7"/><circle cx="90" cy="28" r="6" fill="#ffd35c" stroke="#a67c00" stroke-width="2"/>'+
+'<g class="tail"><path d="M148 40q18-2 28 9" fill="none" stroke="#d62839" stroke-width="7" stroke-linecap="round"/><path d="M148 45q18 6 26 19" fill="none" stroke="#14141c" stroke-width="7" stroke-linecap="round"/></g>'+
+'<ellipse cx="67" cy="62" rx="12" ry="15" fill="#7fe9ff"/><ellipse cx="113" cy="62" rx="12" ry="15" fill="#7fe9ff"/><circle cx="71" cy="56" r="5" fill="#fff"/><circle cx="117" cy="56" r="5" fill="#fff"/><circle cx="63" cy="68" r="2.5" fill="#fff" opacity=".8"/><circle cx="109" cy="68" r="2.5" fill="#fff" opacity=".8"/>'+
+'<path d="M52 46l22 5" stroke="#bff4ff" stroke-width="4" stroke-linecap="round"/><path d="M128 46l-22 5" stroke="#bff4ff" stroke-width="4" stroke-linecap="round"/>'+
+'<ellipse cx="50" cy="78" rx="8" ry="4.5" fill="#ff9fb1" opacity=".85"/><ellipse cx="130" cy="78" rx="8" ry="4.5" fill="#ff9fb1" opacity=".85"/>'+
+'<g class="mouth"><path d="M74 76q16 20 32 0z" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><path d="M82 82q8 6 16 0q-8-3-16 0z" fill="#ff6b81"/></g>'+
+'<circle cx="24" cy="62" r="9" fill="#55c9ed" stroke="#6d86a3" stroke-width="3"/><circle cx="156" cy="62" r="9" fill="#55c9ed" stroke="#6d86a3" stroke-width="3"/></g></svg>'}
 
 function getStudent(){try{return typeof unifiedPortalStudent!=='undefined'?unifiedPortalStudent:null}catch(e){return null}}
 function getDb(){try{return typeof sb!=='undefined'?sb:null}catch(e){return null}}
