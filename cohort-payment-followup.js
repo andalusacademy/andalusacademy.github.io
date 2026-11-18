@@ -74,7 +74,7 @@
  const oldUpdate=window.updateDashboard;
  if(typeof oldUpdate==='function'&&!oldUpdate.__andalusUnified){const f=function(){const r=oldUpdate.apply(this,arguments);const rows=dueRows(scope());const el=document.getElementById('stat-late-pay');if(el)el.textContent=rows.length;return r;};f.__andalusUnified=true;window.updateDashboard=f;}
  const oldDaily=window.renderDailySummary;
- if(typeof oldDaily==='function'&&!oldDaily.__andalusUnified){const f=function(){const r=oldDaily.apply(this,arguments);const el=document.getElementById('daily-summary-content');if(el){const count=dueRows().length;el.innerHTML=el.innerHTML.replace(/<strong>\\d+ طالب<\\/strong> متأخرين فى دفع المصروفات[^<]*/g,'<strong>'+count+' طالب</strong> متأخرين حسب مستهدف الدفعة');if(!count)el.innerHTML=el.innerHTML.replace(/<div[^>]*>💸[\s\S]*?<\/div>/g,'');}return r;};f.__andalusUnified=true;window.renderDailySummary=f;}
+ if(typeof oldDaily==='function'&&!oldDaily.__andalusUnified){const f=function(){const r=oldDaily.apply(this,arguments);const el=document.getElementById('daily-summary-content');if(el){const count=dueRows().length;el.innerHTML=el.innerHTML.replace(/<strong>\d+ طالب<\/strong> متأخرين فى دفع المصروفات[^<]*/g,'<strong>'+count+' طالب</strong> متأخرين حسب مستهدف الدفعة');if(!count)el.innerHTML=el.innerHTML.replace(/<div[^>]*>💸[\s\S]*?<\/div>/g,'');}return r;};f.__andalusUnified=true;window.renderDailySummary=f;}
  function refresh(){try{renderUnifiedCards();refreshFinanceRisk();const stat=document.getElementById('stat-late-pay');if(stat)stat.textContent=dueRows(scope()).length;}catch(e){console.warn('Unified collection view:',e);}}
  document.addEventListener('DOMContentLoaded',refresh);setTimeout(refresh,0);
  const oldPayments=window.renderPayments;
