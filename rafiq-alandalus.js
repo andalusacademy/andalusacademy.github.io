@@ -184,36 +184,41 @@ function deviceSpeak(text){
   try{synth.resume();synth.speak(u)}catch(e){console.warn('Rafiq speak failed:',e);done(false)}
  });
 }
-var ttsAudio=null;
-function chunkText(t){var out=[],cur='';String(t).split(/(?<=[.!؟?،])\s+/).forEach(function(p){if((cur+' '+p).length>1400&&cur){out.push(cur);cur=p}else cur=cur?cur+' '+p:p});if(cur)out.push(cur);return out}
-function remoteSpeak(text){
- return new Promise(function(resolve){
-  var base=window.ANDALUS_RAFIQ_TTS_URL;if(!base){resolve(null);return}
-  var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},9000),root=document.getElementById(ID);
-  fetch(String(base).replace(/\/$/,'')+'/speak',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text}),signal:ctl.signal})
-  .then(function(r){clearTimeout(to);if(!r.ok)throw new Error('tts '+r.status);return r.blob()})
-  .then(function(b){
-   var u=URL.createObjectURL(b),a=new Audio(u),fin=false;ttsAudio=a;
-   function end(ok){if(fin)return;fin=true;if(root)root.classList.remove('talk');try{URL.revokeObjectURL(u)}catch(e){}resolve(ok?true:null)}
-   a.onplay=function(){if(root)root.classList.add('talk')};a.onended=function(){end(true)};a.onerror=function(){end(false)};
-   var pr=a.play();if(pr&&pr.catch)pr.catch(function(){end(false)});
-  }).catch(function(){clearTimeout(to);resolve(null)});
- });
+var ttsEl=null,TTS_CACHE='rafiq-tts-v1';
+function primeAudio(){try{if(!window.ANDALUS_RAFIQ_TTS_URL)return;if(!ttsEl)ttsEl=new Audio();ttsEl.src='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';var p=ttsEl.play();if(p&&p.catch)p.catch(function(){})}catch(e){}}
+async function fetchClip(text){
+ var base=String(window.ANDALUS_RAFIQ_TTS_URL).replace(/\/$/,''),key=new Request(base+'/clip?t='+encodeURIComponent(text)),store=null;
+ try{store=await caches.open(TTS_CACHE);var hit=await store.match(key);if(hit)return await hit.blob()}catch(e){}
+ var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},9000);
+ try{
+  var r=await fetch(base+'/speak',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text}),signal:ctl.signal});
+  if(!r.ok)throw new Error('tts '+r.status);
+  var b=await r.blob();
+  if(store)try{await store.put(key,new Response(b,{headers:{'Content-Type':'audio/mpeg'}}))}catch(e){}
+  return b;
+ }finally{clearTimeout(to)}
 }
-async function speakOnce(text){
- if(!window.ANDALUS_RAFIQ_TTS_URL)return deviceSpeak(text);
- var parts=chunkText(spokenText(text));
- for(var i=0;i<parts.length;i++){var r=await remoteSpeak(parts[i]);if(!r){if(i===0)return deviceSpeak(text);return false}}
+function playBlob(b){return new Promise(function(resolve){var u=URL.createObjectURL(b),a=ttsEl||(ttsEl=new Audio()),fin=false;function end(ok){if(fin)return;fin=true;a.onended=a.onerror=null;try{URL.revokeObjectURL(u)}catch(e){}resolve(ok)}a.onended=function(){end(true)};a.onerror=function(){end(false)};a.src=u;var pr=a.play();if(pr&&pr.catch)pr.catch(function(){end(false)})})}
+async function speakGreeting(parts,fallbackText){
+ if(!window.ANDALUS_RAFIQ_TTS_URL)return deviceSpeak(fallbackText);
+ var root=document.getElementById(ID),blobs;
+ try{blobs=await Promise.all(parts.map(fetchClip))}catch(e){return deviceSpeak(fallbackText)}
+ if(root)root.classList.add('talk');
+ try{for(var i=0;i<blobs.length;i++){var ok=await playBlob(blobs[i]);if(!ok){if(i===0){if(root)root.classList.remove('talk');return deviceSpeak(fallbackText)}break}}}
+ finally{if(root)root.classList.remove('talk')}
  return true;
 }
+function speakOnce(text){return deviceSpeak(text)}
 async function play(replay){
  var student=getStudent();if(busy||!student||!student.id)return;busy=true;
  try{
   var root=mount();kungfuCombo(root);
   var name=String(student.name||'يا بطل').trim().split(/\s+/).slice(0,2).join(' ');
   // Start speech directly in the tap gesture, then speak the remaining information as one utterance.
-  var intro='إزيك يا '+name+'؟ عامل إيه يا بطل؟ أنا رفيق الأندلس، صاحبك الصغير في الأكاديمية. هفكرك بإيه؟ هفكرك تتابع إشعارات الأكاديمية، ومواعيد الامتحانات، ودرجاتك، والملخصات والفيديوهات، وتراجع الغياب والرسوم. يعني مش هسيبك تنسى حاجة مهمة!';
-  var introFinished=speakOnce(intro);
+  var greetHead='إزيك يا',greetTail='عامل إيه النهارده؟ مستر إسلام بيمسّي عليك. اضغط على قلبي وشوف!';
+  var intro=greetHead+' '+name+'، '+greetTail;
+  primeAudio();
+  var introFinished=speakGreeting([greetHead,name,greetTail],intro);
   var details=[];try{details=await Promise.race([loadFacts(),new Promise(function(_,reject){setTimeout(function(){reject(new Error('student facts timeout'))},8000)})])}catch(e){console.warn('Rafiq facts unavailable:',e);details=['مش قادر أوصل لبياناتك دلوقتي، تابع إشعاراتك وبياناتك من بوابة الطالب.']}
   // Do not let a missing mobile onend event block the rest of Rafiq's message.
   await introFinished;
@@ -225,7 +230,7 @@ async function play(replay){
 }
 function install(){var original=window.renderStudentPortalMenu;if(typeof original!=='function'||original.__rafiqWrapped)return false;var wrapped=function(){var result=original.apply(this,arguments);if(getStudent()&&getStudent().id)mount();return result};wrapped.__rafiqWrapped=true;window.renderStudentPortalMenu=wrapped;return true}
 if(!install()){var attempts=0,t=setInterval(function(){attempts++;if(install()||attempts>80)clearInterval(t)},250)}
-document.addEventListener('visibilitychange',function(){if(document.hidden){try{if(ttsAudio)ttsAudio.pause()}catch(e){}if('speechSynthesis'in window)try{window.speechSynthesis.cancel()}catch(e){}}});
+document.addEventListener('visibilitychange',function(){if(document.hidden){try{if(ttsEl)ttsEl.pause()}catch(e){}if('speechSynthesis'in window)try{window.speechSynthesis.cancel()}catch(e){}}});
 window.addEventListener('pagehide',function(){if('speechSynthesis'in window)try{window.speechSynthesis.cancel()}catch(e){}});
 if('speechSynthesis'in window)window.speechSynthesis.onvoiceschanged=function(){arabicVoice()};
 })();
