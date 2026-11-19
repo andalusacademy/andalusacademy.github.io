@@ -18,13 +18,11 @@ async function openNotifications(){
  box.querySelectorAll('[data-read]').forEach(btn=>btn.addEventListener('click',async()=>{btn.disabled=true;try{const {data,error}=await sb().rpc('mark_portal_notification_read',{p_student_id:String(st.id),p_phone:String(phone),p_portal_type:'student',p_notification_id:btn.dataset.read});if(error)throw error;if(!data?.ok)throw new Error('تعذر تسجيل الاطلاع');await openNotifications();}catch(e){btn.disabled=false;if(window.showToast)window.showToast(e.message||'تعذر تحديث الإشعار','error');}}));
  }catch(e){box.innerHTML='<div class="card" style="padding:18px;color:#b91c1c">'+esc(e.message||'تعذر تحميل الإشعارات')+'</div><button class="btn btn-outline" id="student-notifications-back">رجوع للبوابة</button>';$('student-notifications-back')?.addEventListener('click',portalMenu);}
 }
+function portalLoggedIn(){try{return !!(typeof unifiedPortalStudent!=='undefined'&&unifiedPortalStudent&&unifiedPortalStudent.id&&typeof studentPortalFaceToken!=='undefined'&&studentPortalFaceToken)}catch(_){return false}}
 function addTiles(){
  const host=$('student-portal-content'); if(!host)return;
- let grid=host.querySelector('.student-portal-grid');
- if(!grid){
-   const notification=[...host.querySelectorAll('button,a,[role="button"],.student-portal-tile')].find(el=>/التنبيهات|الإشعارات/.test(el.textContent||''));
-   grid=notification?.parentElement||host;
- }
+ if(!portalLoggedIn()){host.querySelectorAll('[data-academy-video-tile],[data-academy-notifications-tile]').forEach(el=>el.remove());return;}
+ const grid=host.querySelector('.student-portal-grid'); if(!grid)return;
  if(!grid.querySelector('[data-academy-video-tile]')){
    const b=document.createElement('button');b.type='button';b.className='btn student-portal-tile';b.dataset.academyVideoTile='1';
    b.innerHTML='<span class="tile-icon">🎬</span><span class="tile-label">مكتبة الفيديوهات التعليمية</span><span class="tile-hint">شاهد المحاضرات والدروس</span>';

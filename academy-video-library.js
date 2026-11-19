@@ -392,12 +392,14 @@
 
   function installStudentLibraryTile() {
     const host = getContent();
-    if (!host || !videoSessionToken()) return;
+    const loggedIn = (() => { try { return typeof unifiedPortalStudent !== 'undefined' && !!unifiedPortalStudent?.id; } catch (_) { return false; } })();
+    if (!host || !videoSessionToken() || !loggedIn) { host?.querySelectorAll('[data-academy-video-student-tile]').forEach(el => el.remove()); return; }
     if (host.querySelector('[data-academy-video-student-tile]')) return;
 
     const existingTile = [...host.querySelectorAll('button,a,[role="button"],.student-portal-tile')]
       .find(el => !el.closest('[data-academy-video-student-tile]') && (el.textContent || '').trim().length > 2);
-    const grid = host.querySelector('.student-portal-grid') || existingTile?.parentElement || host;
+    const grid = host.querySelector('.student-portal-grid');
+    if (!grid) return;
     const tile = document.createElement('button');
     tile.type = 'button';
     tile.className = 'btn student-portal-tile';
