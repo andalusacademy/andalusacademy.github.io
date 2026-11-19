@@ -89,7 +89,9 @@
     const root=document.getElementById('student-portal-screen');
     if(!root || root.__andalusTutorTileWatcher) return;
     root.__andalusTutorTileWatcher=true;
-    new MutationObserver(function(){syncTutorTile()}).observe(root,{childList:true,subtree:true});
+    // Watch only direct portal layout changes; deep content mutations (e.g. exam lists)
+    // do not affect the tutor tile and should not trigger repeated synchronization.
+    new MutationObserver(function(){syncTutorTile()}).observe(root,{childList:true,subtree:false});
   }
 
   window.goToPortalExams = async function () {
