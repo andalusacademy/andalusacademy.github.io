@@ -1,17 +1,13 @@
-# رفيق الأندلس — خدمة الصوت المصري
+# رفيق الأندلس — صوت التحية المصري (ElevenLabs)
 
-هذا Worker مستقل عن بوابة الفيديو ولا يغيّر مسارات الفيديو أو أسراره.
+الصوت مخصص للتحية فقط، وباقي كلام رفيق (المصروفات والدرجات والإشعارات) بصوت الجهاز.
+التحية تتقسم 3 أجزاء (مقدمة ثابتة + اسم الطالب + خاتمة ثابتة) وكل جزء بيتخزّن، فالرصيد بيستهلك حروف الاسم بس عند أول مرة.
 
 ## إعداد Cloudflare
-1. أنشئ Worker جديدًا باسم مثل andalus-rafiq-tts والصق محتوى cloudflare/andalus-rafiq-tts-worker.js.
-2. في Settings > Variables and Secrets أضف Secret باسم SPEECH_KEY لمفتاح Azure Speech، وVariable باسم SPEECH_REGION لمنطقة مورد Speech كما تظهر في Azure.
-3. انشر Worker واختبر GET /health. يجب أن يرجع ok: true و ar-EG-ShakirNeural.
-4. عنوان النشر يكون عادةً https://<worker-name>.<account-subdomain>.workers.dev. لا تضع مفتاح Azure في ملفات الموقع أو ترسله في المحادثة.
+1. أنشئ Worker باسم andalus-rafiq-tts والصق محتوى cloudflare/andalus-rafiq-tts-worker.js ثم Deploy.
+2. Storage & Databases > KV > Create namespace باسم RAFIQ_CACHE. من Worker > Settings > Bindings > Add > KV namespace: الاسم RAFIQ_CACHE واختر الـ namespace.
+3. Settings > Variables and Secrets: Secret باسم ELEVEN_API_KEY (مفتاح ElevenLabs). اختياري: ELEVEN_VOICE_ID و MONTHLY_CAP (الافتراضي 9000 حرف).
+4. اختبر GET /health: لازم configured:true و cache:true.
+5. أضف في index.html قبل سكربت رفيق: window.ANDALUS_RAFIQ_TTS_URL = "https://<worker>.<subdomain>.workers.dev";
 
-## واجهة الخدمة
-أرسل POST /speak مع Content-Type: application/json وبيانات {"text":"إزيك يا بطل؟"}. الاستجابة الناجحة ملف MP3.
-
-الصوت المثبت هو Azure Neural المصري الرجالي ar-EG-ShakirNeural. الخدمة تقبل طلبات من نطاق الأكاديمية فقط. قد يحتاج المتصفح على الهاتف إلى لمسة أولى للسماح بتشغيل الصوت.
-
-## ملاحظة الدمج
-بعد نشر Worker، يجب ضبط عنوانه في كود رفيق الأندلس وربط تشغيل MP3 به. لم يتم تعديل بوابة الفيديو أو بيانات الطلاب أو جداول Supabase.
+لا تضع مفتاح ElevenLabs في الموقع أو المحادثة. لو الخدمة وقفت أو وصلت للحد الشهري، رفيق يرجع تلقائيًا لصوت الجهاز.
