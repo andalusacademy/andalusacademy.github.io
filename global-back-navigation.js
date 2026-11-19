@@ -102,7 +102,8 @@
       const student = document.getElementById('student-portal-screen');
       const parent = document.getElementById('parent-portal-screen');
       portalVisible = visible(app) || visible(exam) || visible(student) || visible(parent);
-      btn.style.display = portalVisible && !(visible(login) && !portalVisible) ? 'flex' : 'none';
+      const nextDisplay = portalVisible && !(visible(login) && !portalVisible) ? 'flex' : 'none';
+      if (btn.style.display !== nextDisplay) btn.style.display = nextDisplay;
       if (portalVisible) ensureHistoryGuard();
     };
 
@@ -121,8 +122,18 @@
       }
     }
 
+    // Observe only the top-level screens whose visibility controls the back button.
+    // Watching the entire body caused every content/style mutation to retrigger refresh.
     const observer = new MutationObserver(refresh);
-    observer.observe(document.body, {subtree:true, childList:true, attributes:true, attributeFilter:['style','class']});
+    [
+      document.getElementById('login-screen'),
+      document.getElementById('app-screen'),
+      document.getElementById('exam-portal-screen'),
+      document.getElementById('student-portal-screen'),
+      document.getElementById('parent-portal-screen')
+    ].filter(Boolean).forEach(node => {
+      observer.observe(node, { attributes:true, attributeFilter:['style','class'] });
+    });
     refresh();
     window.andalusGoBack = goBack;
 
