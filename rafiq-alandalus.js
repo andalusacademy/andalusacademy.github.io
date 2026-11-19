@@ -2,7 +2,7 @@
 'use strict';
 if (window.__andalusRafiqInstalled) return;
 window.__andalusRafiqInstalled = true;
-var ID='andalus-rafiq-root',busy=false,voiceCache=null;
+var ID='andalus-rafiq-root',busy=false;
 var css=[
 '#'+ID+'{position:fixed;z-index:2147483000;left:0;right:0;bottom:0;height:118px;pointer-events:none;overflow:visible;direction:ltr}',
 '#'+ID+' .runner{position:absolute;left:0;bottom:3px;width:96px;height:112px;pointer-events:auto;animation:rafiqPatrol 13s ease-in-out infinite alternate}',
@@ -16,6 +16,16 @@ var css=[
 '#'+ID+' .tail{transform-box:fill-box;transform-origin:left center;animation:rafiqTail .5s ease-in-out infinite alternate}@keyframes rafiqTail{to{transform:rotate(14deg)}}',
 '#'+ID+' .mouth{transform-box:fill-box;transform-origin:center;animation:rafiqMouth .2s ease-in-out infinite alternate}',
 '#'+ID+'.talk .mouth{animation-duration:.13s}',
+'#'+ID+' .runner.talking{animation-play-state:paused}',
+'#'+ID+' .bubble{position:absolute;bottom:126px;direction:rtl;text-align:right;pointer-events:auto;cursor:pointer;box-sizing:border-box;padding:12px 16px;border-radius:24px;background:linear-gradient(135deg,#fff 0%,#e9f8ff 100%);border:3px solid #16435f;box-shadow:0 12px 26px #16435f38;font:700 15px/1.8 Tahoma,Arial,sans-serif;color:#16435f;transform-origin:var(--tail,50%) 100%;animation:rafiqBubblePop .45s cubic-bezier(.2,1.6,.4,1) both;max-height:44vh;overflow:auto;min-height:26px}',
+'#'+ID+' .bubble:after{content:"";position:absolute;bottom:-12px;left:var(--tail,40px);width:16px;height:16px;background:#e9f8ff;border-right:3px solid #16435f;border-bottom:3px solid #16435f;transform:rotate(45deg);border-radius:0 0 5px 0}',
+'#'+ID+' .bubble.out{animation:rafiqBubbleOut .3s ease forwards}',
+'#'+ID+' .bubble .dots{display:inline-flex;gap:6px;align-items:center;height:26px}',
+'#'+ID+' .bubble .dots i{width:9px;height:9px;border-radius:50%;background:#2aa7d6;animation:rafiqDot .7s ease-in-out infinite alternate}',
+'#'+ID+' .bubble .dots i:nth-child(2){animation-delay:.18s}#'+ID+' .bubble .dots i:nth-child(3){animation-delay:.36s}',
+'@keyframes rafiqDot{from{transform:translateY(3px);opacity:.45}to{transform:translateY(-4px);opacity:1}}',
+'@keyframes rafiqBubblePop{0%{opacity:0;transform:scale(.25) translateY(22px)}100%{opacity:1;transform:none}}',
+'@keyframes rafiqBubbleOut{to{opacity:0;transform:scale(.6) translateY(14px)}}',
 '#'+ID+' .tap{position:absolute;inset:0;border:0;background:transparent;cursor:pointer}',
 '#'+ID+' .heart-pop{position:absolute;z-index:5;pointer-events:none;color:#f21f45;font-family:Arial,sans-serif;font-size:17px;line-height:1;text-shadow:0 2px 5px #b0003033;animation:rafiqHeartFloat 1.15s ease-out forwards}',
 '@keyframes rafiqHeartFloat{0%{opacity:0;transform:translate(0,8px) scale(.35) rotate(-12deg)}15%{opacity:1;transform:translate(0,0) scale(1.1) rotate(8deg)}100%{opacity:0;transform:translate(var(--dx),-76px) scale(.65) rotate(var(--rot))}}',
@@ -75,9 +85,10 @@ function getDb(){try{return typeof sb!=='undefined'?sb:null}catch(e){return null
 function mount(){addStyle();var old=document.getElementById(ID);if(old)return old;var r=document.createElement('div');r.id=ID;r.innerHTML='<div class="runner"><div class="stage">'+robotSvg()+'<button class="tap" type="button" aria-label="اضغط لسماع رفيق الأندلس"></button></div></div>';document.body.appendChild(r);r.querySelector('.tap').addEventListener('click',function(){spawnHearts(r);void play(true)});return r}
 function spawnHearts(root){var stage=root.querySelector('.stage');if(!stage)return;for(var i=0;i<7;i++){(function(index){var h=document.createElement('span');h.className='heart-pop';h.textContent='♥';h.style.left=(12+Math.random()*62)+'px';h.style.top=(20+Math.random()*38)+'px';h.style.setProperty('--dx',((Math.random()-.5)*55)+'px');h.style.setProperty('--rot',((Math.random()-.5)*55)+'deg');h.style.animationDelay=(index*45)+'ms';stage.appendChild(h);setTimeout(function(){h.remove()},1450)})(i)}}
 function safeText(x){return String(x||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,260)}
-function numberWords(value){var n=Math.max(0,Math.floor(Number(value)||0));var ones=['صفر','واحد','اثنان','ثلاثة','أربعة','خمسة','ستة','سبعة','ثمانية','تسعة','عشرة','أحد عشر','اثنا عشر','ثلاثة عشر','أربعة عشر','خمسة عشر','ستة عشر','سبعة عشر','ثمانية عشر','تسعة عشر'];var tens=['','','عشرون','ثلاثون','أربعون','خمسون','ستون','سبعون','ثمانون','تسعون'];function under100(x){if(x<20)return ones[x];var t=Math.floor(x/10),u=x%10;return u?ones[u]+' و'+tens[t]:tens[t]}if(n<100)return under100(n);if(n<1000){var h=Math.floor(n/100),r=n%100;var hw=['','مئة','مئتان','ثلاثمئة','أربعمئة','خمسمئة','ستمئة','سبعمئة','ثمانمئة','تسعمئة'][h];return hw+(r?' و'+under100(r):'')}if(n<1000000){var th=Math.floor(n/1000),r=n%1000;var tw=th===1?'ألف':th===2?'ألفان':under100(th)+' ألف';return tw+(r?' و'+numberWords(r):'')}return String(n)}
-function spokenText(s){return String(s||'').replace(/[٠-٩0-9]+/g,function(v){var n=parseInt(v.replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d)}),10);return numberWords(n)})}
-function money(x){return numberWords(Math.round(Number(x)||0))+' جنيه'}
+function fmt(v){return Math.round(Number(v)||0).toLocaleString('en-US')}
+function numberWords(v){return fmt(v)}
+function num1(v){return String(Math.round((Number(v)||0)*10)/10)}
+function money(x){return fmt(x)+' جنيه'}
 async function loadFacts(){
  var student=getStudent(),phone='';try{phone=typeof unifiedPortalPhone!=='undefined'?unifiedPortalPhone:''}catch(e){}
  var db=getDb();if(!student||!student.id||!phone||!db)throw new Error('student session unavailable');
@@ -87,7 +98,7 @@ async function loadFacts(){
  if(facts.verified!==true)throw new Error('student identity not verified');
  var out=[],attendance=Array.isArray(facts.attendance)?facts.attendance:[],payments=Array.isArray(facts.payments)?facts.payments:[];
  var absent=attendance.filter(function(x){var st=String(x.status||'').replace(/[أإآ]/g,'ا').trim();return st==='غائب'||st==='غائبة'}).length;
- out.push(absent?'بص يا بطل، متسجل عليك '+numberWords(absent)+' مرات غياب.':'تمام يا بطل، مفيش غياب متسجل عليك لحد دلوقتي.');
+ out.push(absent?'بص يا بطل، متسجل عليك غياب '+(absent===1?'مرة واحدة':absent===2?'مرتين':absent<=10?fmt(absent)+' مرات':fmt(absent)+' مرة')+'.':'تمام يا بطل، مفيش غياب متسجل عليك لحد دلوقتي.');
  if(payments.length){
   var map={};payments.forEach(function(x){if(x&&x.payment_type)map[x.payment_type]=x});
   var remaining=null,late=0;
@@ -101,7 +112,7 @@ async function loadFacts(){
  try{
   var grades=Array.isArray(facts.exam_grades)?facts.exam_grades:[];
   if(grades.length){
-   var gl=grades.slice(0,3).map(function(g){return 'في '+(g.subject||'الامتحان')+' جبت '+numberWords(Math.round(Number(g.score)||0))+(g.max_score?' من '+numberWords(Math.round(Number(g.max_score)||0)):'')}).join('، ');
+   var gl=grades.slice(0,3).map(function(g){return 'في '+(g.subject||'الامتحان')+' جبت '+num1(g.score)+(g.max_score?' من '+num1(g.max_score):'')}).join('، ');
    out.push('وفيه درجات امتحانات اتضافت جديد: '+gl+'.');
   }
  }catch(e){}
@@ -111,24 +122,10 @@ async function loadFacts(){
   var unread=nlist.filter(function(n){return !n.is_read});
   if(unread.length){
    var titles=unread.slice(0,2).map(function(n){return String(n.title||'').trim()}).filter(Boolean).join('، وكمان ');
-   out.push('عندك '+numberWords(unread.length)+(unread.length>2?' إشعارات':unread.length===2?' إشعارين':' إشعار')+' جداد'+(titles?'، أولهم: '+titles:'')+'.');
+   out.push('عندك '+(unread.length===1?'إشعار جديد':unread.length===2?'إشعارين جداد':fmt(unread.length)+' إشعارات جداد')+(titles?'، أولهم: '+titles:'')+'.');
   }else out.push('مفيش إشعارات جديدة دلوقتي.');
  }catch(e){}
  return out
-}
-function arabicVoice(){
- if(!('speechSynthesis'in window))return null;
- var voices=window.speechSynthesis.getVoices()||[];
- var malePattern=/male|man|mascul|boy|young|shakir|hesham|mohamed|ahmed|omar|khaled|tarek|طارق|حسام|محمد|عمر|أحمد|خالد|مصطفى|محمود/i;
- var femalePattern=/female|woman|girl|zira|samantha|victoria|karen|susan|female|هند|ليلى|منى|سارة/i;
- voiceCache=voices;
- var arabic=voices.filter(function(v){return /^ar([_-]|$)/i.test(v.lang||'')});
- var egyptian=arabic.filter(function(v){return /^ar[-_]EG$/i.test(v.lang||'')});
- // Prefer a voice explicitly identifiable as masculine; device voice metadata cannot guarantee gender or age.
- return egyptian.find(function(v){return malePattern.test(v.name||'')&&!femalePattern.test(v.name||'')})||
-        arabic.find(function(v){return malePattern.test(v.name||'')&&!femalePattern.test(v.name||'')})||
-        voices.find(function(v){return malePattern.test(v.name||'')&&!femalePattern.test(v.name||'')})||
-        egyptian[0]||arabic[0]||voices[0]||null
 }
 function soundFx(kind){
  try{
@@ -169,68 +166,47 @@ function kungfuCombo(root){
  setTimeout(function(){runner.classList.remove('kungfu','karate');runner.classList.add('turn')},1850);
  setTimeout(function(){runner.classList.remove('turn')},2550);
 }
-function deviceSpeak(text){
- return new Promise(function(resolve){
-  if(!('speechSynthesis'in window)||!window.SpeechSynthesisUtterance){console.warn('Rafiq: SpeechSynthesis غير مدعوم في المتصفح');resolve(false);return}
-  var synth=window.speechSynthesis,voice=arabicVoice(),u=new SpeechSynthesisUtterance(spokenText(text)),finished=false;
-  u.lang=voice&&voice.lang?voice.lang:'ar-EG';if(voice)u.voice=voice;
-  u.rate=.94;u.pitch=1;u.volume=1;
-  function done(ok){if(finished)return;finished=true;clearTimeout(safety);var root=document.getElementById(ID);if(root)root.classList.remove('talk');resolve(ok)}
-  // Some mobile speech engines omit onend; release the queue after a safety timeout.
-  var safety=setTimeout(function(){if(!finished){try{synth.cancel()}catch(e){}done(false)}},Math.max(20000,spokenText(text).length*180));
-  u.onstart=function(){var root=document.getElementById(ID);if(root)root.classList.add('talk')};
-  u.onend=function(){done(true)};
-  u.onerror=function(e){console.warn('Rafiq speech error:',e.error,'lang:',u.lang);done(false)};
-  try{synth.resume();synth.speak(u)}catch(e){console.warn('Rafiq speak failed:',e);done(false)}
- });
+var bubbleEl=null,skipNow=null;
+function sleep(ms){return new Promise(function(res){var t=setTimeout(done,ms);function done(){clearTimeout(t);skipNow=null;res()}skipNow=done})}
+function placeBubble(root){
+ if(!bubbleEl)return;var run=root.querySelector('.runner');if(!run)return;
+ var r=run.getBoundingClientRect(),vw=document.documentElement.clientWidth||window.innerWidth,W=Math.min(300,vw-24),cx=r.left+r.width/2,left=Math.max(12,Math.min(vw-W-12,cx-W/2));
+ bubbleEl.style.width=W+'px';bubbleEl.style.left=left+'px';bubbleEl.style.setProperty('--tail',Math.max(22,Math.min(W-44,cx-left-9))+'px');
 }
-var ttsEl=null,TTS_CACHE='rafiq-tts-v1';
-function primeAudio(){try{if(!window.ANDALUS_RAFIQ_TTS_URL)return;if(!ttsEl)ttsEl=new Audio();ttsEl.src='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';var p=ttsEl.play();if(p&&p.catch)p.catch(function(){})}catch(e){}}
-async function fetchClip(text){
- var base=String(window.ANDALUS_RAFIQ_TTS_URL).replace(/\/$/,''),key=new Request(base+'/clip?t='+encodeURIComponent(text)),store=null;
- try{store=await caches.open(TTS_CACHE);var hit=await store.match(key);if(hit)return await hit.blob()}catch(e){}
- var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},9000);
+function emojiFor(t){t=String(t);if(/إشعار/.test(t))return ' 🔔';if(/غياب/.test(t))return t.indexOf('مفيش')>-1?' ✅':' 📅';if(/غرامات|مصروفات|رسوم|جنيه/.test(t))return /مسددة/.test(t)?' 🎉':' 💰';if(/درجات|امتحان/.test(t))return ' 📝';if(/إشعار/.test(t))return ' 🔔';return ''}
+async function say(root,msgs){
+ var run=root.querySelector('.runner');if(run)run.classList.add('talking');root.classList.add('talk');
+ bubbleEl=document.createElement('div');bubbleEl.className='bubble';bubbleEl.setAttribute('role','status');bubbleEl.setAttribute('aria-live','polite');
+ bubbleEl.addEventListener('click',function(){if(skipNow)skipNow()});root.appendChild(bubbleEl);placeBubble(root);
  try{
-  var r=await fetch(base+'/speak',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text}),signal:ctl.signal});
-  if(!r.ok)throw new Error('tts '+r.status);
-  var b=await r.blob();
-  if(store)try{await store.put(key,new Response(b,{headers:{'Content-Type':'audio/mpeg'}}))}catch(e){}
-  return b;
- }finally{clearTimeout(to)}
+  for(var i=0;i<msgs.length;i++){
+   bubbleEl.innerHTML='<span class="dots"><i></i><i></i><i></i></span>';placeBubble(root);await sleep(420);
+   var text=String(msgs[i]),words=text.split(' ');bubbleEl.textContent='';
+   for(var w=0;w<words.length;w++){bubbleEl.textContent=words.slice(0,w+1).join(' ');await sleep(95)}
+   await sleep(Math.max(1500,text.length*55));
+  }
+ }finally{
+  var b=bubbleEl;bubbleEl=null;skipNow=null;if(b){b.classList.add('out');setTimeout(function(){b.remove()},320)}
+  root.classList.remove('talk');if(run)run.classList.remove('talking');
+ }
 }
-function playBlob(b){return new Promise(function(resolve){var u=URL.createObjectURL(b),a=ttsEl||(ttsEl=new Audio()),fin=false;function end(ok){if(fin)return;fin=true;a.onended=a.onerror=null;try{URL.revokeObjectURL(u)}catch(e){}resolve(ok)}a.onended=function(){end(true)};a.onerror=function(){end(false)};a.src=u;var pr=a.play();if(pr&&pr.catch)pr.catch(function(){end(false)})})}
-async function speakGreeting(parts,fallbackText){
- if(!window.ANDALUS_RAFIQ_TTS_URL)return deviceSpeak(fallbackText);
- var root=document.getElementById(ID),blobs;
- try{blobs=await Promise.all(parts.map(fetchClip))}catch(e){return deviceSpeak(fallbackText)}
- if(root)root.classList.add('talk');
- try{for(var i=0;i<blobs.length;i++){var ok=await playBlob(blobs[i]);if(!ok){if(i===0){if(root)root.classList.remove('talk');return deviceSpeak(fallbackText)}break}}}
- finally{if(root)root.classList.remove('talk')}
- return true;
-}
-function speakOnce(text){return deviceSpeak(text)}
 async function play(replay){
  var student=getStudent();if(busy||!student||!student.id)return;busy=true;
  try{
   var root=mount();kungfuCombo(root);
   var name=String(student.name||'يا بطل').trim().split(/\s+/).slice(0,2).join(' ');
-  // Start speech directly in the tap gesture, then speak the remaining information as one utterance.
-  var greetHead='إزيك يا',greetTail='عامل إيه النهارده؟ مستر إسلام بيمسّي عليك. اضغط على قلبي وشوف!';
-  var intro=greetHead+' '+name+'، '+greetTail;
-  primeAudio();
-  var introFinished=speakGreeting([greetHead,name,greetTail],intro);
-  var details=[];try{details=await Promise.race([loadFacts(),new Promise(function(_,reject){setTimeout(function(){reject(new Error('student facts timeout'))},8000)})])}catch(e){console.warn('Rafiq facts unavailable:',e);details=['مش قادر أوصل لبياناتك دلوقتي، تابع إشعاراتك وبياناتك من بوابة الطالب.']}
-  // Do not let a missing mobile onend event block the rest of Rafiq's message.
-  await introFinished;
-  var rest=['وبالمناسبة، أنا كمان بحب أتحرك! استعدوا لحركات الكونغ فو والكاراتيه! هوب! هاا!','عاش يا بطل! تابع إشعارات الأكاديمية، ومواعيد امتحاناتك، ودرجاتك، والملخصات والفيديوهات المتاحة ليك.']
-   .concat(details.map(function(x){return String(x).replace(/بص يا بطل/g,'بص يا نجم').replace(/خلي بالك/g,'خد بالك').replace(/لحد دلوقتي/g,'لغاية دلوقتي')}))
-   .concat(['شد حيلك يا بطل، إنت قدها وقدود! يلا سلام يا نجم.']).join(' ');
-  await speakOnce(rest);
+  var greeting=['إزيك يا '+name+'! 👋','عامل إيه النهارده؟ مستر إسلام بيمسّي عليك 😄','اضغط على قلبي وشوف! ❤️'];
+  var details=[];
+  var factsPromise=Promise.race([loadFacts(),new Promise(function(_,reject){setTimeout(function(){reject(new Error('student facts timeout'))},8000)})]).then(function(d){details=d},function(e){console.warn('Rafiq facts unavailable:',e);details=['مش قادر أوصل لبياناتك دلوقتي، تابع إشعاراتك وبياناتك من بوابة الطالب.']});
+  await say(root,greeting);
+  await factsPromise;
+  var rest=['وبالمناسبة، أنا كمان بحب أتحرك! استعدوا للكونغ فو والكاراتيه! هوب! هاا! 🥋','عاش يا بطل! تابع إشعارات الأكاديمية، ومواعيد امتحاناتك، ودرجاتك، والملخصات والفيديوهات المتاحة ليك 📚']
+   .concat(details.map(function(x){x=String(x).replace(/بص يا بطل/g,'بص يا نجم').replace(/خلي بالك/g,'خد بالك').replace(/لحد دلوقتي/g,'لغاية دلوقتي');return x+emojiFor(x)}))
+   .concat(['شد حيلك يا بطل، إنت قدها وقدود! 💪 يلا سلام يا نجم 👋']);
+  await say(root,rest);
  }finally{busy=false}
 }
 function install(){var original=window.renderStudentPortalMenu;if(typeof original!=='function'||original.__rafiqWrapped)return false;var wrapped=function(){var result=original.apply(this,arguments);if(getStudent()&&getStudent().id)mount();return result};wrapped.__rafiqWrapped=true;window.renderStudentPortalMenu=wrapped;return true}
 if(!install()){var attempts=0,t=setInterval(function(){attempts++;if(install()||attempts>80)clearInterval(t)},250)}
-document.addEventListener('visibilitychange',function(){if(document.hidden){try{if(ttsEl)ttsEl.pause()}catch(e){}if('speechSynthesis'in window)try{window.speechSynthesis.cancel()}catch(e){}}});
-window.addEventListener('pagehide',function(){if('speechSynthesis'in window)try{window.speechSynthesis.cancel()}catch(e){}});
-if('speechSynthesis'in window)window.speechSynthesis.onvoiceschanged=function(){arabicVoice()};
+window.addEventListener('resize',function(){var r=document.getElementById(ID);if(r&&bubbleEl)placeBubble(r)});
 })();
